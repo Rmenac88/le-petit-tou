@@ -11,6 +11,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,21 +22,36 @@ const showAlert = (title: string, message: string) => {
     Alert.alert(title, message);
   }
 };
+
+const triggerHaptic = () => {
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(10);
+      }
+    }
+  } catch (e) {}
+};
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   withRepeat,
   withSequence,
+  withSpring,
   Easing,
 } from 'react-native-reanimated';
 import { GlassView } from 'expo-glass-effect';
 import * as Icons from 'lucide-react-native';
 
 import { supabase } from '../../lib/supabase';
+import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
 
 const { width, height } = Dimensions.get('window');
 const APPLE_EASE = Easing.bezier(0.25, 0.1, 0.25, 1);
+const DRAWER_HEIGHT = height * 0.92;
+const SNAP_HALF = DRAWER_HEIGHT - height * 0.5;
+const SNAP_FULL = 0;
 
 interface Category {
   id: string;
@@ -76,7 +92,16 @@ function DynamicIcon({ name, color, size = 20, strokeWidth = 2.2 }: DynamicIconP
   return <IconComponent color={color} size={size} strokeWidth={strokeWidth} />;
 }
 
-export default function HomeView({ onChangeTab }: { onChangeTab?: (tab: any) => void }) {
+export default function HomeView({
+  onChangeTab,
+  onToggleDock,
+  onSelectSpot,
+}: {
+  onChangeTab?: (tab: any) => void;
+  onToggleDock?: (visible: boolean) => void;
+  onSelectSpot?: (spotId: string) => void;
+}) {
+  const [selectedSpotDetail, setSelectedSpotDetail] = useState<SpotDetail | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -199,13 +224,27 @@ export default function HomeView({ onChangeTab }: { onChangeTab?: (tab: any) => 
           .select('*')
           .order('event_date', { ascending: true });
 
+        const isProduction = true; // Filter test events
+        const isTestEvent = (e: any) => {
+          const t = (e.title || '').toLowerCase();
+          const d = (e.description || '').toLowerCase();
+          return t.includes('test') || d.includes('test') || t.includes('générique');
+        };
+
         if (!eventsError && eventsData && eventsData.length > 0) {
-          setEvents(eventsData);
+          const cleanEvents = isProduction ? eventsData.filter((e: any) => !isTestEvent(e)) : eventsData;
+          setEvents(cleanEvents);
         } else {
-          setEvents(MOCK_EVENTS);
+          const cleanMock = isProduction ? MOCK_EVENTS.filter((e: any) => !isTestEvent(e)) : MOCK_EVENTS;
+          setEvents(cleanMock);
         }
       } catch (e) {
-        setEvents(MOCK_EVENTS);
+        const isTestEvent = (e: any) => {
+          const t = (e.title || '').toLowerCase();
+          const d = (e.description || '').toLowerCase();
+          return t.includes('test') || d.includes('test') || t.includes('générique');
+        };
+        setEvents(MOCK_EVENTS.filter((e: any) => !isTestEvent(e)));
       }
 
       setLoading(false);
@@ -232,15 +271,65 @@ export default function HomeView({ onChangeTab }: { onChangeTab?: (tab: any) => 
     );
   }, []);
 
+  const closeDrawer = () => {
+    drawerY.value = withTiming(height, { duration: 300, easing: APPLE_EASE });
+    overlayOpacity.value = withTiming(0, { duration: 250, easing: APPLE_EASE });
+    setShowAllCategories(false);
+  };
+
   useEffect(() => {
     if (showAllCategories) {
-      drawerY.value = withTiming(0, { duration: 350, easing: APPLE_EASE });
+      drawerY.value = withSpring(SNAP_HALF, { damping: 25, stiffness: 200 });
       overlayOpacity.value = withTiming(1, { duration: 300, easing: APPLE_EASE });
-    } else {
-      drawerY.value = withTiming(height, { duration: 300, easing: APPLE_EASE });
-      overlayOpacity.value = withTiming(0, { duration: 250, easing: APPLE_EASE });
     }
-  }, [showAllCategories, drawerY, overlayOpacity]);
+  }, [showAllCategories]);
+
+  const drawerDragStart = React.useRef(0);
+  const drawerPanResponder = React.useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 5,
+        onPanResponderGrant: () => {
+          drawerDragStart.current = drawerY.value;
+        },
+        onPanResponderMove: (_, g) => {
+          const newY = drawerDragStart.current + g.dy;
+          drawerY.value = Math.max(SNAP_FULL, Math.min(height, newY));
+        },
+        onPanResponderRelease: (_, g) => {
+          const curY = drawerY.value;
+          const vy = g.vy;
+          if (vy > 0.5) {
+            if (curY > SNAP_HALF * 0.7) {
+              closeDrawer();
+            } else {
+              drawerY.value = withSpring(SNAP_HALF, { damping: 25, stiffness: 200 });
+            }
+          } else if (vy < -0.5) {
+            drawerY.value = withSpring(SNAP_FULL, { damping: 25, stiffness: 200 });
+          } else {
+            const mid = (SNAP_FULL + SNAP_HALF) / 2;
+            if (curY < mid) {
+              drawerY.value = withSpring(SNAP_FULL, { damping: 25, stiffness: 200 });
+            } else if (curY < SNAP_HALF + height * 0.15) {
+              drawerY.value = withSpring(SNAP_HALF, { damping: 25, stiffness: 200 });
+            } else {
+              closeDrawer();
+            }
+          }
+        },
+      }),
+    []
+  );
+
+  const isAnyModalOpen = showAllCategories || !!bookingEvent || !!successEvent || !!infoAlert || !!selectedSpotDetail;
+
+  useEffect(() => {
+    if (onToggleDock) {
+      onToggleDock(!isAnyModalOpen);
+    }
+  }, [isAnyModalOpen, onToggleDock]);
 
   const drawStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: drawerY.value }],
@@ -257,6 +346,7 @@ export default function HomeView({ onChangeTab }: { onChangeTab?: (tab: any) => 
   }));
 
   const toggleFavorite = (id: string) => {
+    triggerHaptic();
     if (favorites.includes(id)) {
       setFavorites(favorites.filter(favId => favId !== id));
     } else {
@@ -316,7 +406,7 @@ export default function HomeView({ onChangeTab }: { onChangeTab?: (tab: any) => 
               <Animated.View style={[styles.brutalistInputContainer, borderStyle]}>
                 <Icons.Search color="#888888" size={18} strokeWidth={2.5} style={styles.brutalistSearchIcon} />
                 <TextInput
-                  placeholder="TYPE HERE"
+                  placeholder="Rechercher une adresse, un lieu..."
                   placeholderTextColor="#888888"
                   value={searchQuery}
                   onChangeText={setSearchQuery}
@@ -405,12 +495,35 @@ export default function HomeView({ onChangeTab }: { onChangeTab?: (tab: any) => 
               {recommendedAddresses.map(addr => {
                 const isFav = favorites.includes(addr.id);
                 return (
-                  <View key={addr.id} style={styles.largeCard}>
-                    <Image source={{ uri: addr.image_url }} style={styles.largeCardImage} />
+                  <Pressable
+                    key={addr.id}
+                    style={styles.largeCard}
+                    onPress={() => {
+                      setSelectedSpotDetail({
+                        id: addr.id,
+                        title: addr.title,
+                        description: addr.description,
+                        image_url: addr.image_url,
+                        rating: addr.rating,
+                        category: categories.find(c => c.id === addr.category_id)?.name || 'Lieu',
+                        price_level: addr.price_level,
+                        location: addr.location,
+                        address: `${addr.location}, Toulouse`,
+                      });
+                    }}
+                  >
+                    <Image source={{ uri: addr.image_url }} style={styles.largeCardImage} resizeMode="cover" />
                     
+                    {/* Carousel Paginator Dot Indicator Badge */}
+                    <View style={styles.carouselPaginatorBadge}>
+                      <View style={[styles.paginatorDot, styles.paginatorDotActive]} />
+                      <View style={styles.paginatorDot} />
+                      <View style={styles.paginatorDot} />
+                    </View>
+
                     <View style={styles.ratingBadge}>
-                      <Icons.Star color="#E5A93B" size={14} fill="#E5A93B" />
-                      <Text style={styles.ratingText}>{addr.rating}</Text>
+                      <Icons.Star color="#E5A93B" size={13} fill="#E5A93B" />
+                      <Text style={styles.ratingText}>{typeof addr.rating === 'number' ? addr.rating.toFixed(1) : addr.rating}</Text>
                     </View>
 
                     <View style={styles.largeCardInfo}>
@@ -439,7 +552,7 @@ export default function HomeView({ onChangeTab }: { onChangeTab?: (tab: any) => 
                         </Pressable>
                       </View>
                     </View>
-                  </View>
+                  </Pressable>
                 );
               })}
             </ScrollView>
@@ -468,12 +581,35 @@ export default function HomeView({ onChangeTab }: { onChangeTab?: (tab: any) => 
               {newAddresses.map(addr => {
                 const isFav = favorites.includes(addr.id);
                 return (
-                  <View key={addr.id} style={styles.smallCard}>
-                    <Image source={{ uri: addr.image_url }} style={styles.smallCardImage} />
+                  <Pressable
+                    key={addr.id}
+                    style={styles.smallCard}
+                    onPress={() => {
+                      setSelectedSpotDetail({
+                        id: addr.id,
+                        title: addr.title,
+                        description: addr.description,
+                        image_url: addr.image_url,
+                        rating: addr.rating,
+                        category: categories.find(c => c.id === addr.category_id)?.name || 'Lieu',
+                        price_level: addr.price_level,
+                        location: addr.location,
+                        address: `${addr.location}, Toulouse`,
+                      });
+                    }}
+                  >
+                    <Image source={{ uri: addr.image_url }} style={styles.smallCardImage} resizeMode="cover" />
                     
+                    {/* Carousel Paginator Dot Indicator Badge */}
+                    <View style={styles.carouselPaginatorBadgeSmall}>
+                      <View style={[styles.paginatorDotSmall, styles.paginatorDotActive]} />
+                      <View style={styles.paginatorDotSmall} />
+                      <View style={styles.paginatorDotSmall} />
+                    </View>
+
                     <View style={styles.ratingBadge}>
-                      <Icons.Star color="#E5A93B" size={12} fill="#E5A93B" />
-                      <Text style={styles.ratingTextSmall}>{addr.rating}</Text>
+                      <Icons.Star color="#E5A93B" size={11} fill="#E5A93B" />
+                      <Text style={styles.ratingTextSmall}>{typeof addr.rating === 'number' ? addr.rating.toFixed(1) : addr.rating}</Text>
                     </View>
 
                     <View style={styles.smallCardInfo}>
@@ -498,7 +634,7 @@ export default function HomeView({ onChangeTab }: { onChangeTab?: (tab: any) => 
                         </Pressable>
                       </View>
                     </View>
-                  </View>
+                  </Pressable>
                 );
               })}
             </ScrollView>
@@ -776,9 +912,23 @@ export default function HomeView({ onChangeTab }: { onChangeTab?: (tab: any) => 
         </View>
       )}
 
+      {/* Dedicated Address Detail View Modal */}
+      {selectedSpotDetail && (
+        <AddressDetailModal
+          spot={selectedSpotDetail}
+          onClose={() => setSelectedSpotDetail(null)}
+          onGoToMap={(spotId) => {
+            setSelectedSpotDetail(null);
+            if (onSelectSpot) {
+              onSelectSpot(spotId);
+            }
+          }}
+        />
+      )}
+
       {/* Categories Drawer - Apple-like Glassmorphic slide up */}
       <Animated.View style={[styles.overlay, overlayStyle]}>
-        <Pressable style={styles.overlayDismiss} onPress={() => setShowAllCategories(false)} />
+        <Pressable style={styles.overlayDismiss} onPress={closeDrawer} />
         
         <Animated.View style={[styles.drawerContainer, drawStyle]}>
           <GlassView
@@ -786,16 +936,21 @@ export default function HomeView({ onChangeTab }: { onChangeTab?: (tab: any) => 
             tintColor="#ffffff"
             style={styles.drawerGlass}
           >
-            <View style={styles.grabHandle} />
-
-            <View style={styles.drawerHeader}>
-              <Text style={styles.drawerTitle}>Toutes les catégories</Text>
-              <Pressable style={styles.closeButton} onPress={() => setShowAllCategories(false)}>
-                <Icons.X color="#1E293B" size={20} strokeWidth={2.5} />
-              </Pressable>
+            <View {...drawerPanResponder.panHandlers} style={styles.drawerDragZone}>
+              <View style={styles.grabHandle} />
+              <View style={styles.drawerHeader}>
+                <Text style={styles.drawerTitle}>Toutes les catégories</Text>
+                <Pressable style={styles.closeButton} onPress={closeDrawer}>
+                  <Icons.X color="#1E293B" size={20} strokeWidth={2.5} />
+                </Pressable>
+              </View>
             </View>
 
-            <View style={styles.categoriesGrid}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.categoriesGrid}
+            >
               {categories.map(category => (
                 <Pressable
                   key={category.id}
@@ -808,7 +963,7 @@ export default function HomeView({ onChangeTab }: { onChangeTab?: (tab: any) => 
                   <Text style={styles.gridItemLabel}>{category.name}</Text>
                 </Pressable>
               ))}
-            </View>
+            </ScrollView>
           </GlassView>
         </Animated.View>
       </Animated.View>
@@ -819,13 +974,13 @@ export default function HomeView({ onChangeTab }: { onChangeTab?: (tab: any) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#FAF5EF',
   },
   safeArea: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 130,
   },
   header: {
     flexDirection: 'row',
@@ -848,20 +1003,21 @@ const styles = StyleSheet.create({
   logo: {
     height: 42,
     width: 120,
+    backgroundColor: '#FAF5EF',
   },
   hookContainer: {
     paddingHorizontal: 20,
-    marginTop: 20,
-    marginBottom: 16,
+    marginTop: 12,
+    marginBottom: 8,
   },
   hookText: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
     color: '#1E293B',
     letterSpacing: -0.5,
   },
   hookSubtitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
     color: '#C52824',
     letterSpacing: -0.5,
@@ -869,8 +1025,8 @@ const styles = StyleSheet.create({
   },
   brutalistWrapper: {
     marginHorizontal: 20,
-    marginTop: 25,
-    marginBottom: 20,
+    marginTop: 16,
+    marginBottom: 16,
   },
   brutalistContainer: {
     position: 'relative',
@@ -914,7 +1070,7 @@ const styles = StyleSheet.create({
   },
   brutalistLabel: {
     position: 'absolute',
-    left: -4,
+    left: 0,
     top: -20,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -1030,21 +1186,66 @@ const styles = StyleSheet.create({
     height: 140,
     backgroundColor: '#F1F5F9',
   },
-  ratingBadge: {
+  carouselPaginatorBadge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    bottom: 146,
+    left: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 10,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
     gap: 4,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    zIndex: 10,
+  },
+  carouselPaginatorBadgeSmall: {
+    position: 'absolute',
+    bottom: 126,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6,
+    zIndex: 10,
+  },
+  paginatorDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  paginatorDotSmall: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  paginatorDotActive: {
+    width: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  ratingBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 10,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    gap: 4,
+    zIndex: 15,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(30, 41, 59, 0.1)',
   },
   ratingText: {
     fontSize: 12,
@@ -1063,8 +1264,8 @@ const styles = StyleSheet.create({
   },
   cardCategoryText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
+    fontWeight: '800',
+    color: '#475569',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -1165,10 +1366,12 @@ const styles = StyleSheet.create({
 
   // Skeleton Loader Styles
   categorySkeleton: {
-    width: 100,
-    height: 40,
+    width: 110,
+    height: 44,
     borderRadius: 16,
     backgroundColor: '#E2E8F0',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
     marginRight: 12,
   },
   largeCardSkeleton: {
@@ -1176,6 +1379,8 @@ const styles = StyleSheet.create({
     height: 270,
     borderRadius: 20,
     backgroundColor: '#E2E8F0',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
     marginRight: 16,
   },
   smallCardSkeleton: {
@@ -1183,6 +1388,8 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 16,
     backgroundColor: '#E2E8F0',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
     marginRight: 14,
   },
 
@@ -1200,26 +1407,34 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    maxHeight: height * 0.5,
+    height: DRAWER_HEIGHT,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
   },
   drawerGlass: {
-    paddingTop: 12,
+    flex: 1,
     paddingHorizontal: 24,
     paddingBottom: Platform.OS === 'ios' ? 44 : 24,
     backgroundColor: Platform.OS === 'ios' ? 'rgba(255, 255, 255, 0.75)' : '#FFFFFF',
     borderTopWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.4)',
   },
+  drawerDragZone: {
+    paddingTop: 12,
+  },
   grabHandle: {
-    width: 40,
-    height: 5,
-    backgroundColor: '#E2E8F0',
+    width: 54,
+    height: 6,
+    backgroundColor: '#94A3B8',
     borderRadius: 3,
     alignSelf: 'center',
     marginBottom: 16,
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 1,
   },
   drawerHeader: {
     flexDirection: 'row',
@@ -1246,6 +1461,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     gap: 16,
+    paddingBottom: 24,
   },
   gridItem: {
     width: (width - 48 - 16) / 2,
@@ -1387,7 +1603,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 0,
     overflow: 'hidden',
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
   },
   confirmHeaderStrip: {
     height: 36,
@@ -1510,7 +1726,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 0,
     overflow: 'hidden',
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
   },
   successHeaderStrip: {
     height: 36,
@@ -1596,7 +1812,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 0,
     overflow: 'hidden',
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
   },
   infoHeaderStrip: {
     height: 36,

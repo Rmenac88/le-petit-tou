@@ -12,6 +12,7 @@ import {
   TextInput,
   Dimensions,
   ScrollView,
+  PanResponder,
 } from 'react-native';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
@@ -32,6 +33,7 @@ import {
 } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 import { BACKGROUND_LOCATION_TASK } from '../../app/_layout';
+import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
 
 // Conditional dynamic imports to prevent native modules breaking the web bundle
 let NativeMapView: any = null;
@@ -49,6 +51,7 @@ if (Platform.OS !== 'web') {
 // Toulouse Default Center Coordinates
 const TOULOUSE_LAT = 43.6047;
 const TOULOUSE_LNG = 1.4442;
+const { height } = Dimensions.get('window');
 
 // Le Petit Tou recommended mock spots in Toulouse
 const PT_SPOTS = [
@@ -60,14 +63,14 @@ const PT_SPOTS = [
 
 // Beautiful custom stylized theme for Google Maps (Cream/Slate/Red palette)
 const customGoogleMapStyle = [
-  { elementType: "geometry", stylers: [{ color: "#FCF7F1" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#FCF7F1" }] },
+  { elementType: "geometry", stylers: [{ color: "#FAF5EF" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#FAF5EF" }] },
   { elementType: "labels.text.fill", stylers: [{ color: "#1E293B" }] },
   { featureType: "water", elementType: "geometry", stylers: [{ color: "#D1E2EC" }] },
   { featureType: "road", elementType: "geometry.fill", stylers: [{ color: "#FFFFFF" }] },
   { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#E2E8F0" }] },
   { featureType: "poi", elementType: "geometry", stylers: [{ color: "#F1ECE4" }] },
-  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#FCF7F1" }] }
+  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#FAF5EF" }] }
 ];
 
 // Safe Alert wrapper to prevent runtime crashes on web browser
@@ -77,6 +80,16 @@ const showAlert = (title: string, message: string) => {
   } else {
     Alert.alert(title, message);
   }
+};
+
+const triggerHaptic = () => {
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(10);
+      }
+    }
+  } catch (e) {}
 };
 
 // Beautiful customized HTML Map for Web rendering (using CartoDB light cream tiles & Leaflet)
@@ -90,22 +103,44 @@ const getWebMapHtml = () => `
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; font-family: -apple-system, sans-serif; }
-    .leaflet-container { background: #FCF7F1 !important; }
+    .leaflet-container { background: #FAF5EF !important; }
+    
+    /* Reposition attribution away from bottom navigation & floating buttons */
+    .leaflet-bottom.leaflet-right {
+      bottom: 110px !important;
+      right: 12px !important;
+    }
+    .leaflet-control-attribution {
+      background: rgba(250, 245, 239, 0.85) !important;
+      padding: 3px 8px !important;
+      border-radius: 6px !important;
+      border: 1px solid #1E293B !important;
+      font-size: 10px !important;
+      font-weight: 600 !important;
+      color: #64748B !important;
+      box-shadow: 1px 1px 0px #1E293B !important;
+    }
     
     /* Custom Neo-Brutalist Categorized Markers */
     .custom-marker {
       display: flex;
       justify-content: center;
       align-items: center;
-      width: 30px;
-      height: 30px;
-      border-radius: 15px;
-      border: 2px solid #1E293B;
+      width: 32px;
+      height: 32px;
+      border-radius: 16px;
+      border: 2.5px solid #1E293B;
       box-shadow: 2px 2px 0px #1E293B;
       color: #FFFFFF;
       font-weight: 900;
       font-size: 14px;
-      text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+      transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.25s ease;
+    }
+    .custom-marker.active-marker {
+      transform: scale(1.35) translateY(-4px);
+      box-shadow: 4px 6px 0px #1E293B;
+      border-color: #1E293B;
+      z-index: 9999 !important;
     }
     .custom-marker.cat-food { background: #C52824; }
     .custom-marker.cat-drinks { background: #E5A93B; }
@@ -138,27 +173,47 @@ const getWebMapHtml = () => `
     var map = L.map('map', { zoomControl: false }).setView([${TOULOUSE_LAT}, ${TOULOUSE_LNG}], 14);
     
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap'
+      attribution: '&copy; OpenStreetMap',
+      keepBuffer: 2,
+      updateWhenIdle: true,
+      maxNativeZoom: 19
     }).addTo(map);
 
     var userMarker = null;
     var markersGroup = L.layerGroup().addTo(map);
+    var currentSelectedId = null;
+
+    function getIconSvg(cat) {
+      if (cat === 'food' || cat === 'brunch' || cat === 'lunch' || cat === 'dinner') return '🍴';
+      if (cat === 'drinks' || cat === 'bars' || cat === 'cafe') return '☕';
+      if (cat === 'shopping' || cat === 'mode') return '🛍️';
+      if (cat === 'sport' || cat === 'activites') return '🏋️';
+      if (cat === 'culture' || cat === 'loisirs') return '🎨';
+      return '📍';
+    }
 
     // Function to render markers from array
-    function renderSpots(spotsArray) {
+    function renderSpots(spotsArray, activeId) {
+      currentSelectedId = activeId || currentSelectedId;
       markersGroup.clearLayers();
       spotsArray.forEach(function(s) {
         var catClass = 'cat-' + (s.cat || s.category || 'food');
+        var isActive = s.id === currentSelectedId;
+        var activeClass = isActive ? ' active-marker' : '';
+        var symbol = getIconSvg(s.cat || s.category);
+
         var customIcon = L.divIcon({
           className: 'custom-icon-wrapper',
-          html: '<div class="custom-marker ' + catClass + '">t</div>',
-          iconSize: [30, 30],
-          iconAnchor: [15, 15]
+          html: '<div class="custom-marker ' + catClass + activeClass + '">' + symbol + '</div>',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
         });
 
-        L.marker([s.lat, s.lng], { icon: customIcon })
+        L.marker([s.lat, s.lng], { icon: customIcon, zIndexOffset: isActive ? 1000 : 0 })
           .addTo(markersGroup)
           .on('click', function() {
+            currentSelectedId = s.id;
+            renderSpots(spotsArray, s.id);
             window.parent.postMessage(JSON.stringify({ type: 'SPOT_CLICKED', id: s.id }), '*');
           });
       });
@@ -191,8 +246,15 @@ const getWebMapHtml = () => `
           map.setView([${TOULOUSE_LAT}, ${TOULOUSE_LNG}], 13);
         } else if (data.type === 'FOCUS_SPOT') {
           map.setView([data.lat, data.lng], 15);
+          renderSpots(data.spots || [], data.id);
+        } else if (data.type === 'SELECT_SPOT') {
+          currentSelectedId = data.id;
+          renderSpots(data.spots || [], data.id);
+        } else if (data.type === 'DESELECT_SPOT') {
+          currentSelectedId = null;
+          renderSpots(data.spots || [], null);
         } else if (data.type === 'UPDATE_SPOTS') {
-          renderSpots(data.spots);
+          renderSpots(data.spots, currentSelectedId);
         }
       } catch(e) {}
     });
@@ -202,6 +264,7 @@ const getWebMapHtml = () => `
 
     // Dismiss selected card when clicking anywhere on the background map (Web)
     map.on('click', function(e) {
+      currentSelectedId = null;
       window.parent.postMessage(JSON.stringify({ type: 'MAP_CLICKED' }), '*');
     });
   </script>
@@ -250,9 +313,13 @@ export const renderCategoryIcon = (category: string) => {
 export default function MapView({
   focusedSpotId,
   clearFocusedSpot,
+  onToggleDock,
+  onChangeTab,
 }: {
   focusedSpotId?: string | null;
   clearFocusedSpot?: () => void;
+  onToggleDock?: (visible: boolean) => void;
+  onChangeTab?: (tab: any) => void;
 }) {
   const [locationPermission, setLocationPermission] = useState<'checking' | 'granted' | 'denied'>('checking');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -278,6 +345,14 @@ export default function MapView({
 
   // Drawer Animation States
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
+  const [showFullAddressModal, setShowFullAddressModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  useEffect(() => {
+    if (onToggleDock) {
+      onToggleDock(!filterSheetVisible && !showFullAddressModal);
+    }
+  }, [filterSheetVisible, showFullAddressModal, onToggleDock]);
   const slideAnim = useRef(new Animated.Value(300)).current;
   const filterAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
 
@@ -454,7 +529,14 @@ export default function MapView({
   };
 
   const handleSelectSpot = (spot: any) => {
+    triggerHaptic();
     setSelectedSpot(spot);
+    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ type: 'SELECT_SPOT', id: spot.id, spots: filteredSpots }),
+        '*'
+      );
+    }
     Animated.spring(slideAnim, {
       toValue: 0,
       useNativeDriver: true,
@@ -464,6 +546,12 @@ export default function MapView({
   };
 
   const handleCloseCard = () => {
+    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ type: 'DESELECT_SPOT', spots: filteredSpots }),
+        '*'
+      );
+    }
     Animated.timing(slideAnim, {
       toValue: 300,
       duration: 250,
@@ -471,10 +559,15 @@ export default function MapView({
     }).start(() => setSelectedSpot(null));
   };
 
+  const FILTER_DRAWER_HEIGHT = height * 0.92;
+  const FILTER_SNAP_HALF = FILTER_DRAWER_HEIGHT - height * 0.55;
+  const FILTER_SNAP_FULL = 0;
+
   const handleOpenFilters = () => {
+    triggerHaptic();
     setFilterSheetVisible(true);
     Animated.spring(filterAnim, {
-      toValue: 0,
+      toValue: FILTER_SNAP_HALF,
       useNativeDriver: true,
       tension: 40,
       friction: 8,
@@ -488,6 +581,68 @@ export default function MapView({
       useNativeDriver: true,
     }).start(() => setFilterSheetVisible(false));
   };
+
+  const filterDragStart = useRef(0);
+  const filterPanResponder = React.useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 5,
+        onPanResponderGrant: () => {
+          filterAnim.stopAnimation((val) => {
+            filterDragStart.current = val;
+          });
+        },
+        onPanResponderMove: (_, g) => {
+          const newY = filterDragStart.current + g.dy;
+          filterAnim.setValue(Math.max(FILTER_SNAP_FULL, Math.min(height, newY)));
+        },
+        onPanResponderRelease: (_, g) => {
+          const vy = g.vy;
+          let curY = 0;
+          filterAnim.stopAnimation((val) => { curY = val; });
+          if (vy > 0.5) {
+            if (curY > FILTER_SNAP_HALF * 0.7) {
+              handleCloseFilters();
+            } else {
+              Animated.spring(filterAnim, {
+                toValue: FILTER_SNAP_HALF,
+                useNativeDriver: true,
+                tension: 50,
+                friction: 8,
+              }).start();
+            }
+          } else if (vy < -0.5) {
+            Animated.spring(filterAnim, {
+              toValue: FILTER_SNAP_FULL,
+              useNativeDriver: true,
+              tension: 50,
+              friction: 8,
+            }).start();
+          } else {
+            const mid = (FILTER_SNAP_FULL + FILTER_SNAP_HALF) / 2;
+            if (curY < mid) {
+              Animated.spring(filterAnim, {
+                toValue: FILTER_SNAP_FULL,
+                useNativeDriver: true,
+                tension: 50,
+                friction: 8,
+              }).start();
+            } else if (curY < FILTER_SNAP_HALF + height * 0.15) {
+              Animated.spring(filterAnim, {
+                toValue: FILTER_SNAP_HALF,
+                useNativeDriver: true,
+                tension: 50,
+                friction: 8,
+              }).start();
+            } else {
+              handleCloseFilters();
+            }
+          }
+        },
+      }),
+    []
+  );
 
   const handleResetFilters = () => {
     setSearchQuery('');
@@ -644,7 +799,7 @@ export default function MapView({
 
   const handleToggleLike = async (spotId: string) => {
     if (!session) {
-      showAlert("Connexion requise", "Veuillez vous connecter dans l'onglet Profil pour aimer cette adresse.");
+      setShowLoginModal(true);
       return;
     }
     const isLiked = likedSpotIds.includes(spotId);
@@ -696,10 +851,13 @@ export default function MapView({
           )}
 
           <Pressable
-            onPress={() => setLocationPermission('granted')}
+            onPress={() => {
+              setLocationPermission('granted');
+              handleResetToToulouse();
+            }}
             style={styles.skipBtn}
           >
-            <Text style={styles.skipBtnText}>Continuer sans géolocalisation</Text>
+            <Text style={styles.skipBtnText}>Continuer sans géolocalisation (Place du Capitole)</Text>
           </Pressable>
         </View>
       </View>
@@ -733,17 +891,27 @@ export default function MapView({
             onPress={handleCloseCard}
           >
             {/* Render custom filtered spots */}
-            {filteredSpots.map((s) => (
-              <NativeMarker
-                key={s.id}
-                coordinate={{ latitude: s.lat, longitude: s.lng }}
-                onPress={() => handleSelectSpot(s)}
-              >
-                <View style={[styles.nativeMarker, { backgroundColor: getMarkerColor(s.cat || s.category) }]}>
-                  <Text style={styles.markerText}>t</Text>
-                </View>
-              </NativeMarker>
-            ))}
+            {filteredSpots.map((s) => {
+              const isSelected = selectedSpot?.id === s.id;
+              return (
+                <NativeMarker
+                  key={s.id}
+                  coordinate={{ latitude: s.lat, longitude: s.lng }}
+                  onPress={() => handleSelectSpot(s)}
+                  zIndex={isSelected ? 99 : 1}
+                >
+                  <View
+                    style={[
+                      styles.nativeMarker,
+                      { backgroundColor: getMarkerColor(s.cat || s.category) },
+                      isSelected && styles.nativeMarkerSelected,
+                    ]}
+                  >
+                    {renderCategoryIcon(s.cat || s.category)}
+                  </View>
+                </NativeMarker>
+              );
+            })}
           </NativeMapView>
         )
       )}
@@ -768,7 +936,7 @@ export default function MapView({
             { transform: [{ translateY: slideAnim }] }
           ]}
         >
-          <View
+          <Pressable
             style={[
               styles.detailsCard,
               {
@@ -776,6 +944,7 @@ export default function MapView({
                 shadowColor: getMarkerColor(selectedSpot.cat || selectedSpot.category),
               }
             ]}
+            onPress={() => setShowFullAddressModal(true)}
           >
             <View style={styles.cardLeft}>
               {/* Row of Category & Visit tags */}
@@ -839,8 +1008,64 @@ export default function MapView({
                 <ArrowUpRight size={20} color="#FFFFFF" strokeWidth={2.8} />
               </Pressable>
             </View>
-          </View>
+          </Pressable>
         </Animated.View>
+      )}
+
+      {/* Login Requirement Modal on Map */}
+      {showLoginModal && (
+        <View style={styles.modalBackdrop}>
+          <View style={styles.loginCardModal}>
+            <View style={styles.loginModalHeader}>
+              <Text style={styles.loginModalHeaderTitle}>CONNEXION REQUISE</Text>
+            </View>
+            <View style={styles.loginModalBody}>
+              <Heart size={36} color="#C52824" style={{ marginBottom: 12 }} />
+              <Text style={styles.loginModalTitle}>Ajouter aux favoris</Text>
+              <Text style={styles.loginModalSub}>
+                Connectez-vous pour sauvegarder vos adresses préférées et y accéder depuis votre profil à tout moment.
+              </Text>
+              <View style={styles.loginModalBtnRow}>
+                <Pressable
+                  style={styles.loginModalBtnCancel}
+                  onPress={() => setShowLoginModal(false)}
+                >
+                  <Text style={styles.loginModalBtnCancelText}>Annuler</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.loginModalBtnConfirm}
+                  onPress={() => {
+                    setShowLoginModal(false);
+                    if (onChangeTab) onChangeTab('profile');
+                  }}
+                >
+                  <Text style={styles.loginModalBtnConfirmText}>Se connecter 👤</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Address Detail Modal from Map */}
+      {showFullAddressModal && selectedSpot && (
+        <AddressDetailModal
+          spot={{
+            id: selectedSpot.id,
+            title: selectedSpot.name || selectedSpot.title,
+            description: selectedSpot.description || selectedSpot.desc,
+            category: getCategoryLabel(selectedSpot.cat || selectedSpot.category),
+            location: selectedSpot.location || 'Toulouse',
+            address: selectedSpot.address || `${selectedSpot.name}, Toulouse`,
+            rating: selectedSpot.rating || 4.8,
+            price_level: selectedSpot.price_max ? `Jusqu'à ${selectedSpot.price_max}€` : '€€',
+            image_url: selectedSpot.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80',
+          }}
+          onClose={() => setShowFullAddressModal(false)}
+          onGoToMap={() => {
+            setShowFullAddressModal(false);
+          }}
+        />
       )}
 
       {/* Floating Action Buttons Column (GPS + Filter) */}
@@ -877,14 +1102,14 @@ export default function MapView({
             { transform: [{ translateY: filterAnim }] }
           ]}
         >
-          <View style={styles.drawerHeader}>
+          <View {...filterPanResponder.panHandlers} style={styles.drawerDragZone}>
             <View style={styles.drawerIndicator} />
             <Pressable style={styles.closeDrawerBtn} onPress={handleCloseFilters}>
               <X size={20} color="#1E293B" />
             </Pressable>
           </View>
 
-          <ScrollView contentContainerStyle={styles.drawerScrollContent} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={styles.drawerScrollContent} keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
             {/* Search Input Bar */}
             <View style={styles.searchBarRow}>
               <View style={styles.searchBarContainer}>
@@ -1023,7 +1248,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     position: 'relative',
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
   },
   webMap: {
     width: '100%',
@@ -1044,7 +1269,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 320,
     padding: 24,
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     borderRadius: 12,
     borderWidth: 2.5,
     borderColor: '#1E293B',
@@ -1122,7 +1347,7 @@ const styles = StyleSheet.create({
     top: Platform.OS === 'ios' ? 60 : 35,
     left: 20,
     right: 20,
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     borderRadius: 10,
     borderWidth: 2,
     borderColor: '#1E293B',
@@ -1163,7 +1388,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 2,
     borderColor: '#1E293B',
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#1E293B',
@@ -1196,6 +1421,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 0,
   },
+  nativeMarkerSelected: {
+    transform: [{ scale: 1.35 }, { translateY: -4 }],
+    shadowOffset: { width: 4, height: 4 },
+    borderWidth: 3,
+  },
   markerRed: {
     backgroundColor: '#C52824',
   },
@@ -1212,7 +1442,7 @@ const styles = StyleSheet.create({
   // --- Bottom Details Card Styling ---
   animatedCardContainer: {
     position: 'absolute',
-    bottom: 120, // Positioned above the floating dock
+    bottom: 120, // Positioned just above the floating dock
     left: 20,
     right: 20,
     zIndex: 95,
@@ -1221,7 +1451,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     borderRadius: 12,
     borderWidth: 2.5,
     borderColor: '#1E293B',
@@ -1318,7 +1548,7 @@ const styles = StyleSheet.create({
     shadowRadius: 0,
   },
   likeBtnInactive: {
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
   },
   likeBtnActive: {
     backgroundColor: '#C52824',
@@ -1358,21 +1588,22 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderTopWidth: 3,
     borderColor: '#1E293B',
     zIndex: 100,
-    height: '80%',
+    height: '92%',
     shadowColor: '#1E293B',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 10,
     elevation: 10,
   },
-  drawerHeader: {
-    height: 36,
+  drawerDragZone: {
+    paddingTop: 4,
+    paddingBottom: 4,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -1380,10 +1611,12 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E2E8F0',
   },
   drawerIndicator: {
-    width: 40,
+    width: 48,
     height: 5,
     borderRadius: 2.5,
     backgroundColor: '#CBD5E1',
+    marginTop: 8,
+    marginBottom: 8,
   },
   closeDrawerBtn: {
     position: 'absolute',
@@ -1502,7 +1735,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#C52824',
     borderWidth: 2,
-    borderColor: '#FCF7F1',
+    borderColor: '#FAF5EF',
     position: 'absolute',
     top: -5,
     marginLeft: -8,
@@ -1634,5 +1867,100 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.15)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 1,
+  },
+
+  // Modal Login Requirement Styles
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(30, 41, 59, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    zIndex: 999,
+  },
+  loginCardModal: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#FAF5EF',
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: '#1E293B',
+    overflow: 'hidden',
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 6, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 8,
+  },
+  loginModalHeader: {
+    backgroundColor: '#1E293B',
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  loginModalHeaderTitle: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  loginModalBody: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  loginModalTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#1E293B',
+    marginBottom: 8,
+  },
+  loginModalSub: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  loginModalBtnRow: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  loginModalBtnCancel: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#1E293B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loginModalBtnCancelText: {
+    color: '#1E293B',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  loginModalBtnConfirm: {
+    flex: 1.2,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: '#C52824',
+    borderWidth: 2,
+    borderColor: '#1E293B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+  },
+  loginModalBtnConfirmText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 14,
   },
 });

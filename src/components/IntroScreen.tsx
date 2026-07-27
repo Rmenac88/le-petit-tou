@@ -70,7 +70,7 @@ export default function IntroScreen({ onFinish }: IntroScreenProps) {
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,

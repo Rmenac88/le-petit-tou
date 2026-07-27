@@ -12,15 +12,43 @@ import ProfileView from '@/components/views/ProfileView';
 export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [focusedSpotId, setFocusedSpotId] = useState<string | null>(null);
+  const [isDockVisible, setIsDockVisible] = useState(true);
+
+  React.useEffect(() => {
+    setIsDockVisible(true);
+  }, [activeTab]);
 
   const renderActiveView = () => {
     switch (activeTab) {
       case 'home':
-        return <HomeView onChangeTab={setActiveTab} />;
+        return (
+          <HomeView
+            onChangeTab={setActiveTab}
+            onToggleDock={setIsDockVisible}
+            onSelectSpot={(id) => {
+              setFocusedSpotId(id);
+              setActiveTab('map');
+            }}
+          />
+        );
       case 'search':
-        return <SearchView />;
+        return (
+          <SearchView
+            onSelectSpot={(id) => {
+              setFocusedSpotId(id);
+              setActiveTab('map');
+            }}
+          />
+        );
       case 'map':
-        return <MapView focusedSpotId={focusedSpotId} clearFocusedSpot={() => setFocusedSpotId(null)} />;
+        return (
+          <MapView
+            focusedSpotId={focusedSpotId}
+            clearFocusedSpot={() => setFocusedSpotId(null)}
+            onToggleDock={setIsDockVisible}
+            onChangeTab={setActiveTab}
+          />
+        );
       case 'favorites':
         return (
           <FavoritesView
@@ -35,6 +63,7 @@ export default function HomeScreen() {
         return (
           <ProfileView
             onChangeTab={setActiveTab}
+            onToggleDock={setIsDockVisible}
             onFocusSpot={(id) => {
               setFocusedSpotId(id);
               setActiveTab('map');
@@ -42,7 +71,7 @@ export default function HomeScreen() {
           />
         );
       default:
-        return <HomeView />;
+        return <HomeView onToggleDock={setIsDockVisible} />;
     }
   };
 
@@ -66,7 +95,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Floating Tab Navigation */}
-      <FloatingDock activeTab={activeTab} onChangeTab={setActiveTab} />
+      <FloatingDock activeTab={activeTab} onChangeTab={setActiveTab} visible={isDockVisible} />
     </View>
   );
 }
@@ -74,12 +103,16 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FAF5EF',
     position: 'relative',
+    width: '100%',
+    overflow: 'hidden',
   },
   contentContainer: {
     flex: 1,
-    paddingBottom: 110,
+    paddingBottom: 0,
+    width: '100%',
+    overflow: 'hidden',
   },
   glow: {
     position: 'absolute',

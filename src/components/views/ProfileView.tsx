@@ -212,9 +212,11 @@ const MOCK_EVENTS = [
 export default function ProfileView({
   onChangeTab,
   onFocusSpot,
+  onToggleDock,
 }: {
   onChangeTab?: (tab: any) => void;
   onFocusSpot?: (spotId: string) => void;
+  onToggleDock?: (visible: boolean) => void;
 }) {
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -814,6 +816,21 @@ export default function ProfileView({
     }
   }, []);
 
+  const isAnyOverlayActive = !!(
+    selectedTicket ||
+    showAdminCodeModal ||
+    showAdminPortal ||
+    spotSuccessModal.visible ||
+    eventSuccessModal.visible ||
+    adminCodeError.visible
+  );
+
+  useEffect(() => {
+    if (onToggleDock) {
+      onToggleDock(!isAnyOverlayActive);
+    }
+  }, [isAnyOverlayActive, onToggleDock]);
+
   const fetchUserStats = async (userId: string) => {
     try {
       const { data: favs } = await supabase
@@ -1095,16 +1112,16 @@ export default function ProfileView({
         <View style={styles.formCard}>
           {/* Welcome Title */}
           <Text style={styles.titleText}>
-            Welcome,<br />
+            Bienvenue,{'\n'}
             <Text style={styles.titleSpan}>
-              {isSignUp ? 'sign up to continue' : 'sign in to continue'}
+              {isSignUp ? 'créez un compte pour continuer' : 'connexion pour continuer'}
             </Text>
           </Text>
 
           {/* Inputs Section */}
           <View style={styles.formGroup}>
             <TextInput
-              placeholder="Email"
+              placeholder="Adresse e-mail"
               placeholderTextColor="#64748B"
               value={email}
               onChangeText={setEmail}
@@ -1119,7 +1136,7 @@ export default function ProfileView({
             />
 
             <TextInput
-              placeholder="Password"
+              placeholder="Mot de passe"
               placeholderTextColor="#64748B"
               secureTextEntry
               value={password}
@@ -1175,7 +1192,9 @@ export default function ProfileView({
             ]}
             onPress={isSignUp ? handleSignUp : handleSignIn}
           >
-            <Text style={styles.buttonConfirmText}>Let's go →</Text>
+            <Text style={styles.buttonConfirmText}>
+              {isSignUp ? "S'inscrire →" : "Se connecter →"}
+            </Text>
           </Pressable>
 
           {/* Switch Link */}
@@ -1282,7 +1301,7 @@ export default function ProfileView({
                   </View>
 
                   {/* Corps Crème */}
-                  <View style={{ padding: 22, gap: 12, backgroundColor: '#FCF7F1' }}>
+                  <View style={{ padding: 22, gap: 12, backgroundColor: '#FAF5EF' }}>
                     <Text style={[styles.titleText, { fontSize: 15, marginBottom: 0, textAlign: 'center', lineHeight: 22 }]}>
                       {adminCodeError.message}
                     </Text>
@@ -1439,7 +1458,7 @@ export default function ProfileView({
                     <Pressable
                       style={({ pressed }) => [
                         styles.buttonLog, 
-                        { width: 44, height: 44, borderRadius: 8, marginBottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FCF7F1', borderColor: '#1E293B' },
+                        { width: 44, height: 44, borderRadius: 8, marginBottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FAF5EF', borderColor: '#1E293B' },
                         pressed && styles.buttonLogPressed
                       ]}
                       onPress={() => handlePickAndUpload('image')}
@@ -1469,7 +1488,7 @@ export default function ProfileView({
                     <Pressable
                       style={({ pressed }) => [
                         styles.buttonLog, 
-                        { width: 44, height: 44, borderRadius: 8, marginBottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FCF7F1', borderColor: '#1E293B' },
+                        { width: 44, height: 44, borderRadius: 8, marginBottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FAF5EF', borderColor: '#1E293B' },
                         pressed && styles.buttonLogPressed
                       ]}
                       onPress={() => handlePickAndUpload('video')}
@@ -1702,7 +1721,7 @@ export default function ProfileView({
                   </View>
 
                   {/* Corps crème */}
-                  <View style={{ padding: 22, gap: 12, backgroundColor: '#FCF7F1' }}>
+                  <View style={{ padding: 22, gap: 12, backgroundColor: '#FAF5EF' }}>
                     <Text style={[styles.titleText, { fontSize: 15, marginBottom: 0, lineHeight: 22 }]}>
                       {spotSuccessModal.name}
                     </Text>
@@ -1755,7 +1774,7 @@ export default function ProfileView({
                   </View>
 
                   {/* Corps crème */}
-                  <View style={{ padding: 22, gap: 12, backgroundColor: '#FCF7F1' }}>
+                  <View style={{ padding: 22, gap: 12, backgroundColor: '#FAF5EF' }}>
                     <Text style={[styles.titleText, { fontSize: 15, marginBottom: 0, lineHeight: 22 }]}>
                       {eventSuccessModal.title}
                     </Text>
@@ -2527,7 +2546,7 @@ export default function ProfileView({
                 <Pressable
                   style={({ pressed }) => [
                     styles.buttonLog, 
-                    { width: 44, height: 44, borderRadius: 8, marginBottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FCF7F1', borderColor: '#1E293B' },
+                    { width: 44, height: 44, borderRadius: 8, marginBottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FAF5EF', borderColor: '#1E293B' },
                     pressed && styles.buttonLogPressed
                   ]}
                   onPress={() => handlePickAndUpload('image')}
@@ -2555,7 +2574,7 @@ export default function ProfileView({
                 <Pressable
                   style={({ pressed }) => [
                     styles.buttonLog, 
-                    { width: 44, height: 44, borderRadius: 8, marginBottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FCF7F1', borderColor: '#1E293B' },
+                    { width: 44, height: 44, borderRadius: 8, marginBottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FAF5EF', borderColor: '#1E293B' },
                     pressed && styles.buttonLogPressed
                   ]}
                   onPress={() => handlePickAndUpload('video')}
@@ -2747,7 +2766,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 320,
     padding: 20,
-    backgroundColor: '#FCF7F1', // Association Cream color
+    backgroundColor: '#FAF5EF', // Association Cream color
     borderRadius: 8,
     borderWidth: 2.5,
     borderColor: '#1E293B',
@@ -2805,7 +2824,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   roleCard: {
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     borderWidth: 2,
     borderColor: '#1E293B',
     borderRadius: 10,
@@ -2854,7 +2873,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 2,
     borderColor: '#1E293B',
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     shadowColor: '#1E293B',
     shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
@@ -2879,7 +2898,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 2,
     borderColor: '#1E293B',
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     shadowColor: '#1E293B',
     shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
@@ -2910,7 +2929,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 2,
     borderColor: '#1E293B',
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     shadowColor: '#1E293B',
     shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
@@ -3266,7 +3285,7 @@ const styles = StyleSheet.create({
   ticketCard: {
     width: '100%',
     maxWidth: 340,
-    backgroundColor: '#FCF7F1', // White/Cream background
+    backgroundColor: '#FAF5EF', // White/Cream background
     borderRadius: 18,
     borderWidth: 2.5,
     borderColor: '#1E293B',
@@ -3436,7 +3455,7 @@ const styles = StyleSheet.create({
   adminCodeCard: {
     width: '100%',
     maxWidth: 320,
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     borderRadius: 18,
     borderWidth: 2.5,
     borderColor: '#1E293B',
@@ -3513,8 +3532,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   adminTabActive: {
-    backgroundColor: '#FCF7F1', // Active Tab Cream
-    borderColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF', // Active Tab Cream
+    borderColor: '#FAF5EF',
   },
   adminTabText: {
     fontSize: 12,
@@ -3530,7 +3549,7 @@ const styles = StyleSheet.create({
   },
   adminSectionCard: {
     width: '100%',
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     borderRadius: 18,
     borderWidth: 2.5,
     borderColor: '#1E293B',
@@ -3665,7 +3684,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 0,
     overflow: 'hidden',
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
   },
   scannerResultHeader: {
     height: 38,
@@ -3726,7 +3745,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     borderBottomWidth: 2.5,
     borderBottomColor: '#1E293B',
   },
@@ -3742,7 +3761,7 @@ const styles = StyleSheet.create({
   },
   adminBrutalTabRow: {
     flexDirection: 'row',
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     borderBottomWidth: 2.5,
     borderBottomColor: '#1E293B',
   },
@@ -3798,7 +3817,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 12,
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     borderWidth: 2,
     borderColor: '#1E293B',
     borderRadius: 8,
@@ -3816,7 +3835,7 @@ const styles = StyleSheet.create({
   notificationSettingsContainer: {
     marginTop: 16,
     padding: 16,
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     borderWidth: 2,
     borderColor: '#1E293B',
     borderRadius: 8,

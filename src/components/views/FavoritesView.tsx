@@ -83,6 +83,27 @@ export default function FavoritesView({
   const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState<any[]>([]);
 
+  const [guestFavIds, setGuestFavIds] = useState<string[]>([]);
+
+  // Load guest favorites from localStorage / memory
+  useEffect(() => {
+    try {
+      if (Platform.OS === 'web') {
+        const stored = window.localStorage.getItem('LPT_GUEST_FAVORITES');
+        if (stored) setGuestFavIds(JSON.parse(stored));
+      }
+    } catch (e) {}
+  }, []);
+
+  const saveGuestFavs = (ids: string[]) => {
+    setGuestFavIds(ids);
+    try {
+      if (Platform.OS === 'web') {
+        window.localStorage.setItem('LPT_GUEST_FAVORITES', JSON.stringify(ids));
+      }
+    } catch (e) {}
+  };
+
   useEffect(() => {
     if (supabase) {
       supabase.auth.getSession().then(({ data: { session } }: any) => {
@@ -90,7 +111,7 @@ export default function FavoritesView({
         if (session) {
           fetchFavorites(session.user.id);
         } else {
-          setLoading(false);
+          loadGuestFavorites();
         }
       });
 
@@ -99,14 +120,22 @@ export default function FavoritesView({
         if (session) {
           fetchFavorites(session.user.id);
         } else {
-          setFavorites([]);
-          setLoading(false);
+          loadGuestFavorites();
         }
       });
 
       return () => subscription.unsubscribe();
+    } else {
+      loadGuestFavorites();
     }
-  }, []);
+  }, [guestFavIds]);
+
+  const loadGuestFavorites = () => {
+    setLoading(true);
+    const matched = PT_SPOTS.filter(s => guestFavIds.includes(s.id)).map(s => mapSpotDetails(s));
+    setFavorites(matched);
+    setLoading(false);
+  };
 
   // Algorithm to map spots data cleanly and assign fallbacks for new database entries
   const mapSpotDetails = (s: any) => {
@@ -179,7 +208,12 @@ export default function FavoritesView({
   };
 
   const handleRemoveFavorite = async (spotId: string) => {
-    if (!session) return;
+    if (!session) {
+      const updated = guestFavIds.filter(id => id !== spotId);
+      saveGuestFavs(updated);
+      setFavorites(prev => prev.filter(f => f.id !== spotId));
+      return;
+    }
     try {
       setFavorites(prev => prev.filter(f => f.id !== spotId));
 
@@ -195,33 +229,6 @@ export default function FavoritesView({
     }
   };
 
-  if (!session) {
-    return (
-      <View style={styles.centerContainer}>
-        <View style={styles.authCard}>
-          <View style={styles.iconCircle}>
-            <Heart size={38} color="#C52824" fill="#C52824" />
-          </View>
-          <Text style={styles.authTitle}>Mes Favoris</Text>
-          <Text style={styles.authDesc}>
-            Connectez-vous pour retrouver vos adresses Petit Tou favorites et les synchroniser en temps réel sur tous vos appareils !
-          </Text>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.authBtn,
-              pressed && styles.authBtnPressed,
-            ]}
-            onPress={() => onChangeTab && onChangeTab('profile')}
-          >
-            <LogIn size={18} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 8 }} />
-            <Text style={styles.authBtnText}>Se connecter sur mon Profil</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
-
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -230,10 +237,35 @@ export default function FavoritesView({
     );
   }
 
-  if (favorites.length === 0) {
-    return (
-      <View style={styles.centerContainer}>
-        <View style={styles.authCard}>
+  return (
+    <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      {/* Title Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Mes Favoris 🎯</Text>
+        <Text style={styles.subtitle}>Vos adresses toulousaines préférées au même endroit</Text>
+      </View>
+
+      {/* Guest Sync Banner */}
+      {!session && (
+        <View style={styles.guestBanner}>
+          <View style={styles.guestBannerLeft}>
+            <LogIn size={20} color="#C52824" strokeWidth={2.5} style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.guestBannerTitle}>Mode invité (stockage local)</Text>
+              <Text style={styles.guestBannerSub}>Connectez-vous pour synchroniser vos favoris sur tous vos appareils.</Text>
+            </View>
+          </View>
+          <Pressable
+            style={styles.guestBannerBtn}
+            onPress={() => onChangeTab && onChangeTab('profile')}
+          >
+            <Text style={styles.guestBannerBtnText}>Connexion</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {favorites.length === 0 ? (
+        <View style={styles.emptyCardBox}>
           <View style={styles.iconCircle}>
             <MapPin size={38} color="#E5A93B" />
           </View>
@@ -252,89 +284,79 @@ export default function FavoritesView({
             <Text style={styles.authBtnText}>Explorer la carte 🧭</Text>
           </Pressable>
         </View>
-      </View>
-    );
-  }
+      ) : (
+        /* Grid of Balanced aspect-ratio Cards (Mi-Carré / Mi-Rectangle) */
+        <View style={styles.grid}>
+          {favorites.map((spot) => (
+            <GlassView key={spot.id} glassEffectStyle="regular" tintColor="#ffffff" style={styles.spotCard}>
+              {/* Top section: Image + Overlay Info */}
+              <View style={styles.imageWrapper}>
+                <Image source={{ uri: spot.image_url }} style={styles.spotImage} />
+                
+                {/* Category Overlay Tag */}
+                <View style={[styles.catTag, spot.cat === 'food' ? styles.tagRed : styles.tagGold]}>
+                  {spot.cat === 'food' ? (
+                    <Utensils size={10} color="#FFFFFF" />
+                  ) : (
+                    <ShoppingBag size={10} color="#FFFFFF" />
+                  )}
+                </View>
 
-  return (
-    <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-      {/* Title Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Mes Favoris 🎯</Text>
-        <Text style={styles.subtitle}>Vos adresses toulousaines préférées au même endroit</Text>
-      </View>
-
-      {/* Grid of Balanced aspect-ratio Cards (Mi-Carré / Mi-Rectangle) */}
-      <View style={styles.grid}>
-        {favorites.map((spot) => (
-          <GlassView key={spot.id} glassEffectStyle="regular" tintColor="#ffffff" style={styles.spotCard}>
-            {/* Top section: Image + Overlay Info */}
-            <View style={styles.imageWrapper}>
-              <Image source={{ uri: spot.image_url }} style={styles.spotImage} />
-              
-              {/* Category Overlay Tag */}
-              <View style={[styles.catTag, spot.cat === 'food' ? styles.tagRed : styles.tagGold]}>
-                {spot.cat === 'food' ? (
-                  <Utensils size={10} color="#FFFFFF" />
-                ) : (
-                  <ShoppingBag size={10} color="#FFFFFF" />
-                )}
+                {/* Rating Overlay Tag */}
+                <View style={styles.ratingTag}>
+                  <Star size={9} color="#E5A93B" fill="#E5A93B" />
+                  <Text style={styles.ratingText}>{spot.rating}</Text>
+                </View>
               </View>
 
-              {/* Rating Overlay Tag */}
-              <View style={styles.ratingTag}>
-                <Star size={9} color="#E5A93B" fill="#E5A93B" />
-                <Text style={styles.ratingText}>{spot.rating}</Text>
+              {/* Middle Section: Meta Info */}
+              <View style={styles.infoWrapper}>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {spot.name}
+                </Text>
+                <Text style={styles.cardDesc} numberOfLines={2}>
+                  {spot.desc}
+                </Text>
               </View>
-            </View>
 
-            {/* Middle Section: Meta Info */}
-            <View style={styles.infoWrapper}>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {spot.name}
-              </Text>
-              <Text style={styles.cardDesc} numberOfLines={2}>
-                {spot.desc}
-              </Text>
-            </View>
+              {/* Bottom Row: Price & Actions */}
+              <View style={styles.actionRow}>
+                {/* Price range indicator */}
+                <Text style={styles.priceLabel}>
+                  {spot.price_min}-{spot.price_max}€
+                </Text>
 
-            {/* Bottom Row: Price & Actions */}
-            <View style={styles.actionRow}>
-              {/* Price range indicator */}
-              <Text style={styles.priceLabel}>
-                {spot.price_min}-{spot.price_max}€
-              </Text>
+                {/* Circular Action Buttons */}
+                <View style={styles.btnGroup}>
+                  {/* Heart off-toggle */}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.circleBtn,
+                      styles.heartActive,
+                      pressed && styles.btnPressed,
+                    ]}
+                    onPress={() => handleRemoveFavorite(spot.id)}
+                  >
+                    <Heart size={13} color="#FFFFFF" fill="#FFFFFF" />
+                  </Pressable>
 
-              {/* Circular Action Buttons */}
-              <View style={styles.btnGroup}>
-                {/* Heart off-toggle */}
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.circleBtn,
-                    styles.heartActive,
-                    pressed && styles.btnPressed,
-                  ]}
-                  onPress={() => handleRemoveFavorite(spot.id)}
-                >
-                  <Heart size={13} color="#FFFFFF" fill="#FFFFFF" />
-                </Pressable>
-
-                {/* Map redirect link */}
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.circleBtn,
-                    spot.cat === 'food' ? styles.mapRed : styles.mapGold,
-                    pressed && styles.btnPressed,
-                  ]}
-                  onPress={() => onFocusSpot && onFocusSpot(spot.id)}
-                >
-                  <ArrowUpRight size={14} color="#FFFFFF" strokeWidth={2.8} />
-                </Pressable>
+                  {/* Map redirect link */}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.circleBtn,
+                      spot.cat === 'food' ? styles.mapRed : styles.mapGold,
+                      pressed && styles.btnPressed,
+                    ]}
+                    onPress={() => onFocusSpot && onFocusSpot(spot.id)}
+                  >
+                    <ArrowUpRight size={14} color="#FFFFFF" strokeWidth={2.8} />
+                  </Pressable>
+                </View>
               </View>
-            </View>
-          </GlassView>
-        ))}
-      </View>
+            </GlassView>
+          ))}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -350,7 +372,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     padding: 16,
     paddingTop: Platform.OS === 'ios' ? 65 : 40,
-    paddingBottom: 110,
+    paddingBottom: 130,
   },
   header: {
     marginBottom: 20,
@@ -366,6 +388,64 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#64748B',
     marginTop: 4,
+  },
+  guestBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#C52824',
+    padding: 12,
+    marginBottom: 16,
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+  },
+  guestBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    paddingRight: 8,
+  },
+  guestBannerTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  guestBannerSub: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  guestBannerBtn: {
+    backgroundColor: '#C52824',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+  },
+  guestBannerBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  emptyCardBox: {
+    width: '100%',
+    padding: 24,
+    backgroundColor: '#FAF5EF',
+    borderRadius: 16,
+    borderWidth: 2.5,
+    borderColor: '#1E293B',
+    alignItems: 'center',
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    marginTop: 10,
   },
 
   // 2-Column Grid system
@@ -383,7 +463,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 2.5,
     borderColor: '#1E293B',
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     shadowColor: '#1E293B',
     shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
@@ -511,7 +591,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 320,
     padding: 24,
-    backgroundColor: '#FCF7F1',
+    backgroundColor: '#FAF5EF',
     borderRadius: 12,
     borderWidth: 2.5,
     borderColor: '#1E293B',

@@ -16,6 +16,7 @@ export type TabType = 'home' | 'search' | 'map' | 'favorites' | 'profile';
 interface FloatingDockProps {
   activeTab: TabType;
   onChangeTab: (tab: TabType) => void;
+  visible?: boolean;
 }
 
 interface TabButtonProps {
@@ -82,7 +83,20 @@ function TabButton({ Icon, isActive, onPress, color }: TabButtonProps) {
   );
 }
 
-export default function FloatingDock({ activeTab, onChangeTab }: FloatingDockProps) {
+export default function FloatingDock({ activeTab, onChangeTab, visible = true }: FloatingDockProps) {
+  const translateY = useSharedValue(0);
+
+  useEffect(() => {
+    translateY.value = withTiming(visible ? 0 : 150, {
+      duration: 300,
+      easing: APPLE_EASE,
+    });
+  }, [visible]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
   const tabs: {
     type: TabType;
     icon: LucideIcon;
@@ -95,7 +109,7 @@ export default function FloatingDock({ activeTab, onChangeTab }: FloatingDockPro
   ];
 
   return (
-    <View style={styles.outerContainer}>
+    <Animated.View style={[styles.outerContainer, animStyle]}>
       <GlassView
         glassEffectStyle="regular"
         tintColor="#ffffff"
@@ -118,7 +132,7 @@ export default function FloatingDock({ activeTab, onChangeTab }: FloatingDockPro
           );
         })}
       </GlassView>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -140,25 +154,26 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     paddingHorizontal: 12,
-    backgroundColor: Platform.OS === 'ios' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.85)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: Platform.OS === 'ios' ? 'rgba(255, 255, 255, 0.72)' : 'rgba(255, 255, 255, 0.92)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
     position: 'relative',
     overflow: 'hidden',
     ...Platform.select({
       ios: {},
       android: {
-        elevation: 8,
+        elevation: 12,
       },
       web: {
-        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.08)',
-        backdropFilter: 'blur(16px)',
-      },
+        boxShadow: '0 12px 36px 0 rgba(30, 41, 59, 0.18)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+      } as any,
     }),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
   },
   glassShine: {
     position: 'absolute',

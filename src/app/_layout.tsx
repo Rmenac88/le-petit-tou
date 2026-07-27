@@ -79,7 +79,21 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <StatusBar style={introFinished ? 'dark' : 'auto'} />
-      <View style={{ flex: 1 }}>
+      {Platform.OS === 'web' && (
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            html, body, #root {
+              overflow-x: hidden !important;
+              max-width: 100vw !important;
+              width: 100% !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              position: relative !important;
+            }
+          `
+        }} />
+      )}
+      <View style={{ flex: 1, width: '100%', overflow: 'hidden' }}>
         <Stack screenOptions={{ headerShown: false }} />
         {!introFinished && (
           <IntroScreen onFinish={() => setIntroFinished(true)} />
