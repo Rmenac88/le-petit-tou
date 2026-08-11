@@ -1,0 +1,2194 @@
+{
+  "31 rue Pharaon, 31000 Toulouse": {
+    "lat": 43.596455,
+    "lng": 1.4442297
+  },
+  "40 Rue Charles de Rémusat, 31000 Toulouse": {
+    "lat": 43.6066068,
+    "lng": 1.4448661
+  },
+  "7 Rue Charles de Rémusat, 31000 Toulouse": {
+    "lat": 43.6053462,
+    "lng": 1.4438974
+  },
+  "140 Allée du Château, 31620 Fronton": {
+    "lat": 43.8376577,
+    "lng": 1.3967759
+  },
+  "7 Place Arnaud Bernard, 31000 Toulouse": {
+    "lat": 43.6109898,
+    "lng": 1.4387772
+  },
+  "28 place Dupuy, 31000 Toulouse": {
+    "lat": 43.5998666,
+    "lng": 1.4532213
+  },
+  "30 place Arnaud Bernard, 31000 Toulouse": {
+    "lat": 43.610374,
+    "lng": 1.4393267
+  },
+  "6, place Victor Hugo, 31000 Toulouse": {
+    "lat": 43.6059006,
+    "lng": 1.4467175
+  },
+  "46 avenue des Minimes, 31000 Toulouse": {
+    "lat": 43.618084,
+    "lng": 1.4368268
+  },
+  "22 rue saint Bernard, 31000 Toulouse": {
+    "lat": 43.6090945,
+    "lng": 1.4445559
+  },
+  "38 rue des Polinaires, 31000 Toulouse": {
+    "lat": 43.5979009,
+    "lng": 1.4439002
+  },
+  "11 rue des tourneurs, 31000 Toulouse": {
+    "lat": 43.5998601,
+    "lng": 1.4452224
+  },
+  "75 rue du Taur, 31000 Toulouse": {
+    "lat": 43.6073661,
+    "lng": 1.4420328
+  },
+  "18, boulevard de Strasbourg, 31000 Toulouse": {
+    "lat": 43.6072795,
+    "lng": 1.4473557
+  },
+  "6 allées du Président Franklin Roosevelt, 31000 Toulouse": {
+    "lat": 43.6051433,
+    "lng": 1.4481959
+  },
+  "5 place du Pont Neuf, 31000 Toulouse": {
+    "lat": 43.5997936,
+    "lng": 1.4408256
+  },
+  "35 port Saint Sauveur, 31000 Toulouse": {
+    "lat": 43.5983364,
+    "lng": 1.4557508
+  },
+  "23 rue des Filatiers, 31000 Toulouse": {
+    "lat": 43.598736,
+    "lng": 1.4441166
+  },
+  "44 Rue de Metz, 31000 Toulouse": {
+    "lat": 43.6005007,
+    "lng": 1.4485596
+  },
+  "9 rue des Puits Clos, 31000 Toulouse": {
+    "lat": 43.6019429,
+    "lng": 1.4443656
+  },
+  "15 rue croix baragnon, 31000 Toulouse": {
+    "lat": 43.5995983,
+    "lng": 1.4464718
+  },
+  "8 Rue Jacques Cujas, 31000 Toulouse": {
+    "lat": 43.6012515,
+    "lng": 1.4410812
+  },
+  "4 rue temponières, 31000 Toulouse": {
+    "lat": 43.6014214,
+    "lng": 1.4427227
+  },
+  "16 rue Peyras, 31000 Toulouse": {
+    "lat": 43.6014373,
+    "lng": 1.4444991
+  },
+  "28 rue des Blanchers, 31000 Toulouse": {
+    "lat": 43.6026225,
+    "lng": 1.4375211
+  },
+  "9 Place de la Trinité, 31000 Toulouse": {
+    "lat": 43.5997913,
+    "lng": 1.4443402
+  },
+  "10 rue Boulbonne, 31000 Toulouse": {
+    "lat": 43.60016,
+    "lng": 1.4484733
+  },
+  "77 rue de la Colombette, 31000 Toulouse": {
+    "lat": 43.6048211,
+    "lng": 1.4556099
+  },
+  "24 rue de la Bourse, 31000 Toulouse": {
+    "lat": 43.601124,
+    "lng": 1.442325
+  },
+  "4 rue Jules Chalande, 31000 Toulouse": {
+    "lat": 43.6022894,
+    "lng": 1.4440263
+  },
+  "27 rue Pharaon, 31000 Toulouse": {
+    "lat": 43.5963319,
+    "lng": 1.4442106
+  },
+  "12 Rue Baronie, 31000 Toulouse": {
+    "lat": 43.6020107,
+    "lng": 1.4448297
+  },
+  "19 rue Peyrolières, 31000 Toulouse": {
+    "lat": 43.6006898,
+    "lng": 1.4406557
+  },
+  "27 rue de Metz, 31000 Toulouse": {
+    "lat": 43.6006096,
+    "lng": 1.4475944
+  },
+  "5 Rue d'Austerlitz, 31000 Toulouse": {
+    "lat": 43.6058908,
+    "lng": 1.4473578
+  },
+  "22 rue Lafayette, 31000 Toulouse": {
+    "lat": 43.6048248,
+    "lng": 1.4463596
+  },
+  "2 bis rue du Puits vert, 31000 Toulouse": {
+    "lat": 43.6017777,
+    "lng": 1.4439058
+  },
+  "8 rue du Canard, 31000 Toulouse": {
+    "lat": 43.5980874,
+    "lng": 1.4463131
+  },
+  "66 rue Matabiau, 31000 Toulouse": {
+    "lat": 43.6127588,
+    "lng": 1.4489588
+  },
+  "4 rue d'Astorg, 31000 Toulouse": {
+    "lat": 43.6011561,
+    "lng": 1.4482547
+  },
+  "3 Boulevard de Bonrepos, 31000 Toulouse": {
+    "lat": 43.6097459,
+    "lng": 1.4532136
+  },
+  "18 rue Cujas, 31000 Toulouse": {
+    "lat": 43.6013047,
+    "lng": 1.4416053
+  },
+  "4 rue Pierre de Fermat, 31000 Toulouse": {
+    "lat": 43.5987844,
+    "lng": 1.449018
+  },
+  "23 rue des Lois, 31000 Toulouse": {
+    "lat": 43.6063364,
+    "lng": 1.4407582
+  },
+  "10 rue Sainte Ursule, 31000 Toulouse": {
+    "lat": 43.60192,
+    "lng": 1.4422532
+  },
+  "1 bis rue Pargaminières, 31000 Toulouse": {
+    "lat": 43.603839,
+    "lng": 1.4361705
+  },
+  "17 Rue Sainte-Ursule, 31000 Toulouse": {
+    "lat": 43.6026236,
+    "lng": 1.442023
+  },
+  "7 rue Maury, 31000 Toulouse": {
+    "lat": 43.6047467,
+    "lng": 1.4536597
+  },
+  "11 rue Fermat, 31000 Toulouse": {
+    "lat": 43.599356,
+    "lng": 1.4491384
+  },
+  "2 Rue Lafon, 31000 Toulouse": {
+    "lat": 43.6095629,
+    "lng": 1.4512746
+  },
+  "18 rue Alexandre Fourtanier, 31000 Toulouse": {
+    "lat": 43.6021008,
+    "lng": 1.4488892
+  },
+  "49 Allée Jean Jaurès, 31000 Toulouse": {
+    "lat": 43.6444525,
+    "lng": 1.5208073
+  },
+  "20 Rue Arnaud Bernard, 31000 Toulouse": {
+    "lat": 43.6100055,
+    "lng": 1.439205
+  },
+  "27 rue du Rempart Matabiau, 31000 Toulouse": {
+    "lat": 43.607349,
+    "lng": 1.446181
+  },
+  "31 rue du Taur, 31000 Toulouse": {
+    "lat": 43.60588,
+    "lng": 1.4425519
+  },
+  "23 avenue Honoré Serres, 31000 Toulouse": {
+    "lat": 43.6122463,
+    "lng": 1.4383638
+  },
+  "1 rue de l'Echarpe, 31000 Toulouse": {
+    "lat": 43.600374,
+    "lng": 1.4412795
+  },
+  "14 Rue des Prêtres, 31000 Toulouse": {
+    "lat": 43.5972491,
+    "lng": 1.4439215
+  },
+  "48 Place Nicolas Bachelier, 31000 Toulouse": {
+    "lat": 43.6067645,
+    "lng": 1.4523464
+  },
+  "14 place Saint Pierre, 31000 Toulouse": {
+    "lat": 43.6040534,
+    "lng": 1.435254
+  },
+  "41 rue Gambetta, 31000 Toulouse": {
+    "lat": 43.6038536,
+    "lng": 1.4425841
+  },
+  "11 avenue Maurice Hauriou, 31000 Toulouse": {
+    "lat": 43.5931084,
+    "lng": 1.4436045
+  },
+  "52 avenue Honoré Serres, 31000 Toulouse": {
+    "lat": 43.6151615,
+    "lng": 1.4377875
+  },
+  "2 rue Raymond IV, 31000 Toulouse": {
+    "lat": 43.6094344,
+    "lng": 1.4468107
+  },
+  "1 rue Gabriel Péri, 31000 Toulouse": {
+    "lat": 43.6056272,
+    "lng": 1.4496086
+  },
+  "9 rue de la Colombette, 31000 Toulouse": {
+    "lat": 43.6044112,
+    "lng": 1.4514727
+  },
+  "10 Descente de la Halle Aux Poissons, 31000 Toulouse": {
+    "lat": 43.5986751,
+    "lng": 1.4409858
+  },
+  "5 place Saint Pierre, 31000 Toulouse": {
+    "lat": 43.6034697,
+    "lng": 1.436448
+  },
+  "24 rue Nicolas Bachelier, 31000 Toulouse": {
+    "lat": 43.6069158,
+    "lng": 1.4519811
+  },
+  "14 boulevard Pierre Paul Riquet, 31000 Toulouse": {
+    "lat": 43.6041228,
+    "lng": 1.4564593
+  },
+  "1 ter place Saint Sernin, 31000 Toulouse": {
+    "lat": 43.6078201,
+    "lng": 1.4413684
+  },
+  "7 Place Saint-Sernin, 31000 Toulouse": {
+    "lat": 43.6088735,
+    "lng": 1.4415193
+  },
+  "8 rue Fermat, 31000 Toulouse": {
+    "lat": 43.5989824,
+    "lng": 1.4491116
+  },
+  "11 quai Saint-Pierre, 31000 Toulouse": {
+    "lat": 43.6041754,
+    "lng": 1.431971
+  },
+  "13 rue Saint-Bernard, 31000 Toulouse": {
+    "lat": 43.6090315,
+    "lng": 1.4439726
+  },
+  "22, allée de Barcelone, 31000 Toulouse": {
+    "lat": 43.605788,
+    "lng": 1.4335716
+  },
+  "1 pl. du Capitole, 31000 Toulouse": {
+    "lat": 43.6041433,
+    "lng": 1.4443378
+  },
+  "18 rue des Paradoux, 31000 Toulouse": {
+    "lat": 43.5988033,
+    "lng": 1.4428925
+  },
+  "42 rue des Couteliers, 31000 Toulouse": {
+    "lat": 43.5991701,
+    "lng": 1.4416469
+  },
+  "29 rue de la Colombette, 31000 Toulouse": {
+    "lat": 43.6044695,
+    "lng": 1.4531005
+  },
+  "9 Rue de la Zone d'Activité de Ribaute, 31130 Quint-Fonsegrives": {
+    "lat": 43.5831327,
+    "lng": 1.5151065
+  },
+  "11 Place des Carmes, 31000 Toulouse": {
+    "lat": 43.5977919,
+    "lng": 1.4442442
+  },
+  "47 Rue de Metz, 31000 Toulouse": {
+    "lat": 43.6005977,
+    "lng": 1.4513639
+  },
+  "12 Avenue Honoré Serres, 31000 Toulouse": {
+    "lat": 43.6123646,
+    "lng": 1.438559
+  },
+  "7 Rue Temponières, 31000 Toulouse": {
+    "lat": 43.6014995,
+    "lng": 1.4428047
+  },
+  "23 Place Dominique Martin Dupuy, 31000 Toulouse": {
+    "lat": 43.599994,
+    "lng": 1.4538314
+  },
+  "25 Rue Pharaon, 31000 Toulouse": {
+    "lat": 43.59626,
+    "lng": 1.4442025
+  },
+  "Rue d'Alsace-Lorraine, 31000 Toulouse": {
+    "lat": 43.5999863,
+    "lng": 1.4456613
+  },
+  "86 Avenue des Minimes, 31200 Toulouse": {
+    "lat": 43.620277,
+    "lng": 1.4360462
+  },
+  "22 Rue Gabriel Péri, 31000 Toulouse": {
+    "lat": 43.605932,
+    "lng": 1.4531385
+  },
+  "41 Rue des Tourneurs, 31000 Toulouse": {
+    "lat": 43.60077,
+    "lng": 1.4450227
+  },
+  "1 Rue des Pénitents Gris, 31000 Toulouse": {
+    "lat": 43.6055933,
+    "lng": 1.4425714
+  },
+  "31 Rue Léon Gambetta, 31000 Toulouse": {
+    "lat": 43.6034755,
+    "lng": 1.4421727
+  },
+  "Toulouse Centre, 31000 Toulouse": {
+    "lat": 43.61081,
+    "lng": 1.4352663
+  },
+  "45 Rue des Tourneurs, 31000 Toulouse": {
+    "lat": 43.601048,
+    "lng": 1.445003
+  },
+  "2 Rue Roquelaine, 31000 Toulouse": {
+    "lat": 43.6101068,
+    "lng": 1.4446007
+  },
+  "8 Rue Maury, 31000 Toulouse": {
+    "lat": 43.6050657,
+    "lng": 1.4535199
+  },
+  "46 Rue du Taur, 31000 Toulouse": {
+    "lat": 43.6066941,
+    "lng": 1.4424334
+  },
+  "53 Rue de la Colombette, 31000 Toulouse": {
+    "lat": 43.6046601,
+    "lng": 1.4546724
+  },
+  "37 Avenue des Minimes, 31200 Toulouse": {
+    "lat": 43.6188224,
+    "lng": 1.4361877
+  },
+  "10 Rue Labéda, 31000 Toulouse": {
+    "lat": 43.6046123,
+    "lng": 1.4489167
+  },
+  "Place Mage, 31000 Toulouse": {
+    "lat": 43.5984157,
+    "lng": 1.4470847
+  },
+  "2 Place Saint-Étienne, 31000 Toulouse": {
+    "lat": 43.5996828,
+    "lng": 1.449123
+  },
+  "12 Rue Saint-Germier, 31000 Toulouse": {
+    "lat": 43.6117951,
+    "lng": 1.4412137
+  },
+  "4 Rue des Filatiers, 31000 Toulouse": {
+    "lat": 43.59811,
+    "lng": 1.4443119
+  },
+  "1 Rue de Sébastopol, 31000 Toulouse": {
+    "lat": 43.6101189,
+    "lng": 1.43049
+  },
+  "32 Rue de la Colombette, 31000 Toulouse": {
+    "lat": 43.6045011,
+    "lng": 1.4525603
+  },
+  "2 Rue des Pénitents Gris, 31000 Toulouse": {
+    "lat": 43.6056772,
+    "lng": 1.4424095
+  },
+  "18 Rue d'Astorg, 31000 Toulouse": {
+    "lat": 43.6010247,
+    "lng": 1.4488699
+  },
+  "10 Rue Rivals, 31000 Toulouse": {
+    "lat": 43.6059813,
+    "lng": 1.4451364
+  },
+  "41 Rue Réclusane, 31300 Toulouse": {
+    "lat": 43.5988728,
+    "lng": 1.4318232
+  },
+  "23 Place Victor Hugo, 31000 Toulouse": {
+    "lat": 43.6068338,
+    "lng": 1.4462329
+  },
+  "22 Rue du Fourbastard, 31000 Toulouse": {
+    "lat": 43.6024689,
+    "lng": 1.4458918
+  },
+  "Rue du Pont Saint-Pierre, 31300 Toulouse": {
+    "lat": 43.599132,
+    "lng": 1.4326185
+  },
+  "20 Rue Perchepinte, 31000 Toulouse": {
+    "lat": 43.5975651,
+    "lng": 1.4483561
+  },
+  "67 Rue de la Colombette, 31000 Toulouse": {
+    "lat": 43.6047516,
+    "lng": 1.4552052
+  },
+  "63 Avenue des Minimes, 31200 Toulouse": {
+    "lat": 43.620045,
+    "lng": 1.4358181
+  },
+  "40 Rue de la Pomme, 31000 Toulouse": {
+    "lat": 43.6030111,
+    "lng": 1.4458731
+  },
+  "8 Rue Sainte-Ursule, 31000 Toulouse": {
+    "lat": 43.6018654,
+    "lng": 1.4423
+  },
+  "16 Rue Sainte-Ursule, 31000 Toulouse": {
+    "lat": 43.6022592,
+    "lng": 1.4421852
+  },
+  "13 Rue Perchepinte, 31000 Toulouse": {
+    "lat": 43.5972146,
+    "lng": 1.4479739
+  },
+  "22 Rue Charles de Rémusat, 31000 Toulouse": {
+    "lat": 43.6059272,
+    "lng": 1.4444092
+  },
+  "8 Rue Jules Chalande, 31000 Toulouse": {
+    "lat": 43.6022032,
+    "lng": 1.4443706
+  },
+  "11 Rue Caraman, 31000 Toulouse": {
+    "lat": 43.6022996,
+    "lng": 1.4525358
+  },
+  "52 Rue Charles de Rémusat, 31000 Toulouse": {
+    "lat": 43.6072758,
+    "lng": 1.4453141
+  },
+  "12 Rue Perchepinte, 31000 Toulouse": {
+    "lat": 43.5973231,
+    "lng": 1.4482123
+  },
+  "22 Rue Croix-Baragnon, 31000 Toulouse": {
+    "lat": 43.5998382,
+    "lng": 1.4478171
+  },
+  "37 Rue de la République, 31300 Toulouse": {
+    "lat": 43.5983752,
+    "lng": 1.4334273
+  },
+  "2 Rue Maletache, 31000 Toulouse": {
+    "lat": 43.5984152,
+    "lng": 1.4444746
+  },
+  "21 Boulevard de Strasbourg, 31000 Toulouse": {
+    "lat": 43.6069512,
+    "lng": 1.4470777
+  },
+  "6 Rue des Trois Journées, 31000 Toulouse": {
+    "lat": 43.6047472,
+    "lng": 1.4492978
+  },
+  "7 Rue Léon Gambetta, 31000 Toulouse": {
+    "lat": 43.6029365,
+    "lng": 1.4416335
+  },
+  "40 Rue des Marchands, 31000 Toulouse": {
+    "lat": 43.5999006,
+    "lng": 1.4436017
+  },
+  "6 Rue Saint-Ferréol, 31000 Toulouse": {
+    "lat": 43.6065841,
+    "lng": 1.4546953
+  },
+  "8 Place de Belfort, 31000 Toulouse": {
+    "lat": 43.6086437,
+    "lng": 1.4499217
+  },
+  "5 Rue Temponières, 31000 Toulouse": {
+    "lat": 43.6014927,
+    "lng": 1.4427193
+  },
+  "5 Rue Viguerie, 31300 Toulouse": {
+    "lat": 43.599174,
+    "lng": 1.4363441
+  },
+  "18 Boulevard Pierre-Paul-Riquet, 31000 Toulouse": {
+    "lat": 43.6045659,
+    "lng": 1.4564825
+  },
+  "36 Rue de la Colombette, 31000 Toulouse": {
+    "lat": 43.6045212,
+    "lng": 1.452823
+  },
+  "33 Rue Léon Gambetta, 31000 Toulouse": {
+    "lat": 43.603558,
+    "lng": 1.4421973
+  },
+  "20 Rue des Lois, 31000 Toulouse": {
+    "lat": 43.6054792,
+    "lng": 1.441952
+  },
+  "44 Rue Léon Gambetta, 31000 Toulouse": {
+    "lat": 43.6025596,
+    "lng": 1.441234
+  },
+  "3 Rue des Lois, 31000 Toulouse": {
+    "lat": 43.6050687,
+    "lng": 1.4423322
+  },
+  "13 Rue des Lois, 31000 Toulouse": {
+    "lat": 43.6058915,
+    "lng": 1.4413139
+  },
+  "24 Rue Montardy, 31000 Toulouse": {
+    "lat": 43.6039842,
+    "lng": 1.4467818
+  },
+  "7 Rue Croix-Baragnon, 31000 Toulouse": {
+    "lat": 43.5995387,
+    "lng": 1.4460508
+  },
+  "49 Rue Réclusane, 31300 Toulouse": {
+    "lat": 43.5988887,
+    "lng": 1.4315304
+  },
+  "13 Rue Pierre de Fermat, 31000 Toulouse": {
+    "lat": 43.5995775,
+    "lng": 1.4491739
+  },
+  "56 Rue Léon Gambetta, 31000 Toulouse": {
+    "lat": 43.6036117,
+    "lng": 1.4424225
+  },
+  "32 Rue des Lois, 31000 Toulouse": {
+    "lat": 43.6059377,
+    "lng": 1.4414229
+  },
+  "2 Place de Damloup, 31000 Toulouse": {
+    "lat": 43.6057643,
+    "lng": 1.4530774
+  },
+  "7 Rue Clémence Isaure, 31000 Toulouse": {
+    "lat": 43.600834,
+    "lng": 1.4414281
+  },
+  "6 Rue de la Bourse, 31000 Toulouse": {
+    "lat": 43.600357,
+    "lng": 1.4425633
+  },
+  "Place Victor Hugo, 31000 Toulouse": {
+    "lat": 43.6059769,
+    "lng": 1.4467615
+  },
+  "5 Rue de la Colombette, 31000 Toulouse": {
+    "lat": 43.6044045,
+    "lng": 1.4510408
+  },
+  "3 Rue Paul Vidal, 31000 Toulouse": {
+    "lat": 43.6026234,
+    "lng": 1.4479465
+  },
+  "5 Rue Théodore Ozenne, 31000 Toulouse": {
+    "lat": 43.5976262,
+    "lng": 1.4459447
+  },
+  "73 Rue de la Pomme, 31000 Toulouse": {
+    "lat": 43.6038634,
+    "lng": 1.4443514
+  },
+  "18 Rue des Puits-Clos, 31000 Toulouse": {
+    "lat": 43.6026196,
+    "lng": 1.4448796
+  },
+  "18 Rue Réclusane, 31300 Toulouse": {
+    "lat": 43.5989256,
+    "lng": 1.4322422
+  },
+  "5 Place Intérieure Saint-Cyprien, 31300 Toulouse": {
+    "lat": 43.5977516,
+    "lng": 1.4318683
+  },
+  "5 Rue du Coq d'Inde, 31000 Toulouse": {
+    "lat": 43.599379,
+    "lng": 1.4429989
+  },
+  "17 Rue des Arts, 31000 Toulouse": {
+    "lat": 43.601837,
+    "lng": 1.4468505
+  },
+  "19 Rue du Coq d'Inde, 31000 Toulouse": {
+    "lat": 43.5995629,
+    "lng": 1.4436712
+  },
+  "11 Rue des Paradoux, 31000 Toulouse": {
+    "lat": 43.5985177,
+    "lng": 1.4426187
+  },
+  "19 Rue du Languedoc, 31000 Toulouse": {
+    "lat": 43.5968242,
+    "lng": 1.4454697
+  },
+  "9 Rue Saint-Antoine du T, 31000 Toulouse": {
+    "lat": 43.6028477,
+    "lng": 1.4470477
+  },
+  "20 Rue de la Pomme, 31000 Toulouse": {
+    "lat": 43.602473,
+    "lng": 1.446459
+  },
+  "8 Rue Baronie, 31000 Toulouse": {
+    "lat": 43.6017552,
+    "lng": 1.4449808
+  },
+  "19 Rue Croix-Baragnon, 31000 Toulouse": {
+    "lat": 43.599651,
+    "lng": 1.4467513
+  },
+  "9 Place du Président Wilson, 31000 Toulouse": {
+    "lat": 43.6046825,
+    "lng": 1.446734
+  },
+  "7 Rue Sainte-Ursule, 31000 Toulouse": {
+    "lat": 43.601727,
+    "lng": 1.4422064
+  },
+  "39 Rue Peyrolières, 31000 Toulouse": {
+    "lat": 43.601624,
+    "lng": 1.4407119
+  },
+  "40 Rue des Potiers, 31000 Toulouse": {
+    "lat": 43.5991719,
+    "lng": 1.4541549
+  },
+  "50 Rue des Tourneurs, 31000 Toulouse": {
+    "lat": 43.601036,
+    "lng": 1.4451059
+  },
+  "5 Rue des Tourneurs, 31000 Toulouse": {
+    "lat": 43.5996719,
+    "lng": 1.4452573
+  },
+  "13 Rue de la Colombette, 31000 Toulouse": {
+    "lat": 43.6044206,
+    "lng": 1.4520326
+  },
+  "17 Rue des Blanchers, 31000 Toulouse": {
+    "lat": 43.6023364,
+    "lng": 1.437998
+  },
+  "22 Rue Arnaud Bernard, 31000 Toulouse": {
+    "lat": 43.6100777,
+    "lng": 1.4392003
+  },
+  "62 Boulevard Lazare Carnot, 31000 Toulouse": {
+    "lat": 43.6052887,
+    "lng": 1.4494338
+  },
+  "7 Place de Damloup, 31000 Toulouse": {
+    "lat": 43.60564,
+    "lng": 1.4528685
+  },
+  "22 Rue Peyras, 31000 Toulouse": {
+    "lat": 43.6014215,
+    "lng": 1.4448134
+  },
+  "26 Rue du Languedoc, 31000 Toulouse": {
+    "lat": 43.5963638,
+    "lng": 1.4457143
+  },
+  "16 Allée de Barcelone, 31000 Toulouse": {
+    "lat": 43.6055284,
+    "lng": 1.4340303
+  },
+  "1 Rue André Mercadier, 31000 Toulouse": {
+    "lat": 43.6049236,
+    "lng": 1.4547444
+  },
+  "16 Rue Maurice Fonvieille, 31000 Toulouse": {
+    "lat": 43.6038277,
+    "lng": 1.4489521
+  },
+  "36 Rue Peyrolières, 31000 Toulouse": {
+    "lat": 43.60111,
+    "lng": 1.4406387
+  },
+  "5 Boulevard de Strasbourg, 31000 Toulouse": {
+    "lat": 43.6061522,
+    "lng": 1.4479131
+  },
+  "13 Boulevard de l'Embouchure, 31200 Toulouse": {
+    "lat": 43.6160222,
+    "lng": 1.4356375
+  },
+  "9 Place du Capitole, 31000 Toulouse": {
+    "lat": 43.603921,
+    "lng": 1.4428256
+  },
+  "6 Rue Réclusane, 31300 Toulouse": {
+    "lat": 43.5986198,
+    "lng": 1.4336621
+  },
+  "19 Rue Arnaud Bernard, 31000 Toulouse": {
+    "lat": 43.6101569,
+    "lng": 1.4391025
+  },
+  "9 Rue du Pont Saint-Pierre, 31300 Toulouse": {
+    "lat": 43.5990839,
+    "lng": 1.4326387
+  },
+  "40 Avenue des Minimes, 31200 Toulouse": {
+    "lat": 43.6176951,
+    "lng": 1.4369003
+  },
+  "56 Rue Léon Gambetta, 31000 Toulouse, France": {
+    "lat": 43.6036117,
+    "lng": 1.4424225
+  },
+  "32 Rue des Lois, 31000 Toulouse, France": {
+    "lat": 43.6059377,
+    "lng": 1.4414229
+  },
+  "2 Place de Damloup, 31000 Toulouse, France": {
+    "lat": 43.6057643,
+    "lng": 1.4530774
+  },
+  "7 Rue Clémence Isaure, 31000 Toulouse, France": {
+    "lat": 43.600834,
+    "lng": 1.4414281
+  },
+  "6 Rue de la Bourse, 31000 Toulouse, France": {
+    "lat": 43.600357,
+    "lng": 1.4425633
+  },
+  "Place Victor Hugo, 31000 Toulouse, France": {
+    "lat": 43.6059769,
+    "lng": 1.4467615
+  },
+  "5 Rue de la Colombette, 31000 Toulouse, France": {
+    "lat": 43.6044045,
+    "lng": 1.4510408
+  },
+  "3 Rue Paul Vidal, 31000 Toulouse, France": {
+    "lat": 43.6026234,
+    "lng": 1.4479465
+  },
+  "5 Rue Théodore Ozenne, 31000 Toulouse, France": {
+    "lat": 43.5976262,
+    "lng": 1.4459447
+  },
+  "73 Rue de la Pomme, 31000 Toulouse, France": {
+    "lat": 43.6038634,
+    "lng": 1.4443514
+  },
+  "18 Rue des Puits-Clos, 31000 Toulouse, France": {
+    "lat": 43.6026196,
+    "lng": 1.4448796
+  },
+  "18 Rue Réclusane, 31300 Toulouse, France": {
+    "lat": 43.5989256,
+    "lng": 1.4322422
+  },
+  "5 Place Intérieure Saint-Cyprien, 31300 Toulouse, France": {
+    "lat": 43.5977516,
+    "lng": 1.4318683
+  },
+  "5 Rue du Coq d'Inde, 31000 Toulouse, France": {
+    "lat": 43.599379,
+    "lng": 1.4429989
+  },
+  "17 Rue des Arts, 31000 Toulouse, France": {
+    "lat": 43.601837,
+    "lng": 1.4468505
+  },
+  "19 Rue du Coq d'Inde, 31000 Toulouse, France": {
+    "lat": 43.5995629,
+    "lng": 1.4436712
+  },
+  "11 Rue des Paradoux, 31000 Toulouse, France": {
+    "lat": 43.5985177,
+    "lng": 1.4426187
+  },
+  "19 Rue du Languedoc, 31000 Toulouse, France": {
+    "lat": 43.5968242,
+    "lng": 1.4454697
+  },
+  "9 Rue Saint-Antoine du T, 31000 Toulouse, France": {
+    "lat": 43.6028477,
+    "lng": 1.4470477
+  },
+  "20 Rue de la Pomme, 31000 Toulouse, France": {
+    "lat": 43.602473,
+    "lng": 1.446459
+  },
+  "8 Rue Baronie, 31000 Toulouse, France": {
+    "lat": 43.6017552,
+    "lng": 1.4449808
+  },
+  "19 Rue Croix-Baragnon, 31000 Toulouse, France": {
+    "lat": 43.599651,
+    "lng": 1.4467513
+  },
+  "9 Place du Président Wilson, 31000 Toulouse, France": {
+    "lat": 43.6046825,
+    "lng": 1.446734
+  },
+  "7 Rue Sainte-Ursule, 31000 Toulouse, France": {
+    "lat": 43.601727,
+    "lng": 1.4422064
+  },
+  "39 Rue Peyrolières, 31000 Toulouse, France": {
+    "lat": 43.601624,
+    "lng": 1.4407119
+  },
+  "40 Rue des Potiers, 31000 Toulouse, France": {
+    "lat": 43.5991719,
+    "lng": 1.4541549
+  },
+  "50 Rue des Tourneurs, 31000 Toulouse, France": {
+    "lat": 43.601036,
+    "lng": 1.4451059
+  },
+  "5 Rue des Tourneurs, 31000 Toulouse, France": {
+    "lat": 43.5996719,
+    "lng": 1.4452573
+  },
+  "13 Rue de la Colombette, 31000 Toulouse, France": {
+    "lat": 43.6044206,
+    "lng": 1.4520326
+  },
+  "17 Rue des Blanchers, 31000 Toulouse, France": {
+    "lat": 43.6023364,
+    "lng": 1.437998
+  },
+  "22 Rue Arnaud Bernard, 31000 Toulouse, France": {
+    "lat": 43.6100777,
+    "lng": 1.4392003
+  },
+  "62 Boulevard Lazare Carnot, 31000 Toulouse, France": {
+    "lat": 43.6052887,
+    "lng": 1.4494338
+  },
+  "photon:7 Rue Sainte-Ursule, 31000 Toulouse, France": {
+    "lat": 43.601727,
+    "lng": 1.4422064
+  },
+  "photon:40 Rue des Potiers, 31000 Toulouse, France": {
+    "lat": 43.5991719,
+    "lng": 1.4541549
+  },
+  "photon:39 Rue Peyrolières, 31000 Toulouse, France": {
+    "lat": 43.601624,
+    "lng": 1.4407119
+  },
+  "photon:50 Rue des Tourneurs, 31000 Toulouse, France": {
+    "lat": 43.601036,
+    "lng": 1.4451059
+  },
+  "photon:5 Rue des Tourneurs, 31000 Toulouse, France": {
+    "lat": 43.5996719,
+    "lng": 1.4452573
+  },
+  "photon:Maison Argile, Toulouse, France": {
+    "lat": 43.6018124,
+    "lng": 1.4423137
+  },
+  "photon:13 Rue de la Colombette, 31000 Toulouse, France": {
+    "lat": 43.6044206,
+    "lng": 1.4520326
+  },
+  "photon:17 Rue des Blanchers, 31000 Toulouse, France": {
+    "lat": 43.6023364,
+    "lng": 1.437998
+  },
+  "photon:22 Rue Arnaud Bernard, 31000 Toulouse, France": {
+    "lat": 43.6100777,
+    "lng": 1.4392003
+  },
+  "photon:62 Boulevard Lazare Carnot, 31000 Toulouse, France": {
+    "lat": 43.6052887,
+    "lng": 1.4494338
+  },
+  "photon:7 Place de Damloup, 31000 Toulouse, France": {
+    "lat": 43.60564,
+    "lng": 1.4528685
+  },
+  "photon:22 Rue Peyras, 31000 Toulouse, France": {
+    "lat": 43.6014215,
+    "lng": 1.4448134
+  },
+  "photon:26 Rue du Languedoc, 31000 Toulouse, France": {
+    "lat": 43.5963638,
+    "lng": 1.4457143
+  },
+  "photon:3 Boulevard de Bonrepos, 31000 Toulouse, France": {
+    "lat": 43.6097459,
+    "lng": 1.4532136
+  },
+  "photon:16 Allée de Barcelone, 31000 Toulouse, France": {
+    "lat": 43.6055284,
+    "lng": 1.4340303
+  },
+  "photon:1 Rue André Mercadier, 31000 Toulouse, France": {
+    "lat": 43.6049236,
+    "lng": 1.4547444
+  },
+  "photon:16 Rue Maurice Fonvieille, 31000 Toulouse, France": {
+    "lat": 43.6038277,
+    "lng": 1.4489521
+  },
+  "photon:36 Rue Peyrolières, 31000 Toulouse, France": {
+    "lat": 43.60111,
+    "lng": 1.4406387
+  },
+  "photon:5 Boulevard de Strasbourg, 31000 Toulouse, France": {
+    "lat": 43.6061522,
+    "lng": 1.4479131
+  },
+  "photon:13 Boulevard de l'Embouchure, 31200 Toulouse, France": {
+    "lat": 43.6160222,
+    "lng": 1.4356375
+  },
+  "photon:9 Place du Capitole, 31000 Toulouse, France": {
+    "lat": 43.603921,
+    "lng": 1.4428256
+  },
+  "photon:6 Rue Réclusane, 31300 Toulouse, France": {
+    "lat": 43.5986198,
+    "lng": 1.4336621
+  },
+  "photon:19 Rue Arnaud Bernard, 31000 Toulouse, France": {
+    "lat": 43.6101569,
+    "lng": 1.4391025
+  },
+  "photon:9 Rue du Pont Saint-Pierre, 31300 Toulouse, France": {
+    "lat": 43.5990839,
+    "lng": 1.4326387
+  },
+  "photon:40 Avenue des Minimes, 31200 Toulouse, France": {
+    "lat": 43.6176951,
+    "lng": 1.4369003
+  },
+  "photon:23 Rue des Potiers, 31000 Toulouse, France": {
+    "lat": 43.598625,
+    "lng": 1.4539373
+  },
+  "photon:1 Place Rouaix, 31000 Toulouse, France": {
+    "lat": 43.5989855,
+    "lng": 1.4454665
+  },
+  "photon:54 Allées Jean Jaurès, 31000 Toulouse, France": {
+    "lat": 43.6069428,
+    "lng": 1.4513296
+  },
+  "photon:4 Place Roger Salengro, 31000 Toulouse, France": {
+    "lat": 43.602835,
+    "lng": 1.4450173
+  },
+  "photon:11 Place Saint-Pierre, 31000 Toulouse, France": {
+    "lat": 43.6039986,
+    "lng": 1.4356714
+  },
+  "photon:90 Avenue des Minimes, 31200 Toulouse, France": {
+    "lat": 43.6204698,
+    "lng": 1.4359821
+  },
+  "photon:51 Allées Jean Jaurès, 31000 Toulouse, France": {
+    "lat": 43.6078301,
+    "lng": 1.4512789
+  },
+  "photon:32 Rue des Polinaires, 31000 Toulouse, France": {
+    "lat": 43.597881,
+    "lng": 1.443731
+  },
+  "photon:21 Rue Réclusane, 31300 Toulouse, France": {
+    "lat": 43.5987269,
+    "lng": 1.4328425
+  },
+  "photon:13 Avenue des Minimes, 31200 Toulouse, France": {
+    "lat": 43.616966,
+    "lng": 1.4368011
+  },
+  "photon:4 Avenue Honoré Serres, 31000 Toulouse, France": {
+    "lat": 43.6119682,
+    "lng": 1.4386811
+  },
+  "photon:1 Rue Marthe Varsi, 31300 Toulouse, France": {
+    "lat": 43.5992127,
+    "lng": 1.4291145
+  },
+  "photon:5 Rue Peyras, 31000 Toulouse, France": {
+    "lat": 43.6015202,
+    "lng": 1.44397
+  },
+  "photon:4 Rue Jean Suau, 31000 Toulouse, France": {
+    "lat": 43.6018914,
+    "lng": 1.4404153
+  },
+  "photon:11 Rue Malcousinat, 31000 Toulouse, France": {
+    "lat": 43.6007506,
+    "lng": 1.4431581
+  },
+  "photon:18 Place Victor Hugo, 31000 Toulouse, France": {
+    "lat": 43.6065015,
+    "lng": 1.4470859
+  },
+  "photon:2 Boulevard Lascrosses, 31000 Toulouse, France": {
+    "lat": 43.6097715,
+    "lng": 1.431831
+  },
+  "photon:5 Rue Maury, 31000 Toulouse, France": {
+    "lat": 43.6044726,
+    "lng": 1.4539067
+  },
+  "photon:3 Rue de la Fonderie, 31000 Toulouse, France": {
+    "lat": 43.5945794,
+    "lng": 1.4435789
+  },
+  "photon:3 Rue Léon Gambetta, 31000 Toulouse, France": {
+    "lat": 43.6028833,
+    "lng": 1.4415363
+  },
+  "photon:13 Boulevard Lascrosses, 31000 Toulouse, France": {
+    "lat": 43.6108466,
+    "lng": 1.4371017
+  },
+  "photon:25 Rue Réclusane, 31300 Toulouse, France": {
+    "lat": 43.598681,
+    "lng": 1.4326637
+  },
+  "photon:47 Rue des Couteliers, 31000 Toulouse, France": {
+    "lat": 43.5991971,
+    "lng": 1.4415313
+  },
+  "photon:5 Rue des Prêtres, 31000 Toulouse, France": {
+    "lat": 43.5971485,
+    "lng": 1.4439432
+  },
+  "photon:11 Rue des Gestes, 31000 Toulouse, France": {
+    "lat": 43.6030649,
+    "lng": 1.4430515
+  },
+  "photon:40 Avenue Frédéric Estèbe, 31200 Toulouse, France": {
+    "lat": 43.6210741,
+    "lng": 1.4371401
+  },
+  "photon:2 Rue des Paradoux, 31000 Toulouse, France": {
+    "lat": 43.598133,
+    "lng": 1.4428855
+  },
+  "photon:Les Têtes d'Ail, Toulouse, France": {
+    "lat": 43.5947876,
+    "lng": 1.443582
+  },
+  "photon:Place des Carmes, 31000 Toulouse, France": {
+    "lat": 43.5976347,
+    "lng": 1.4453677
+  },
+  "photon:19 Rue Sainte-Ursule, 31000 Toulouse, France": {
+    "lat": 43.6027489,
+    "lng": 1.4419998
+  },
+  "photon:4 Rue de la République, 31300 Toulouse, France": {
+    "lat": 43.5987686,
+    "lng": 1.4362651
+  },
+  "photon:71 Rue de la Pomme, 31000 Toulouse, France": {
+    "lat": 43.603781,
+    "lng": 1.4444854
+  },
+  "photon:22 Rue des Paradoux, 31000 Toulouse, France": {
+    "lat": 43.5989924,
+    "lng": 1.442846
+  },
+  "photon:62 Rue Lancefoc, 31000 Toulouse, France": {
+    "lat": 43.6093135,
+    "lng": 1.4327705
+  },
+  "photon:20 Rue de la Fonderie, 31000 Toulouse, France": {
+    "lat": 43.5949942,
+    "lng": 1.4434073
+  },
+  "photon:65 Rue Pargaminières, 31000 Toulouse, France": {
+    "lat": 43.604457,
+    "lng": 1.4395994
+  },
+  "photon:12 Rue de Belfort, 31000 Toulouse, France": {
+    "lat": 43.608687,
+    "lng": 1.4513192
+  },
+  "photon:7 Rue de Metz, 31000 Toulouse, France": {
+    "lat": 43.5999766,
+    "lng": 1.4417039
+  },
+  "photon:13 Allée Paul Feuga, 31000 Toulouse, France": {
+    "lat": 43.5930591,
+    "lng": 1.4441549
+  },
+  "photon:52 Rue Léon Gambetta, 31000 Toulouse, France": {
+    "lat": 43.6034698,
+    "lng": 1.4423234
+  },
+  "photon:9 Rue de Toul, 31000 Toulouse, France": {
+    "lat": 43.6119065,
+    "lng": 1.4376591
+  },
+  "photon:52 Rue du Taur, 31000 Toulouse, France": {
+    "lat": 43.6069067,
+    "lng": 1.4423486
+  },
+  "photon:34 Rue Maran, 31400 Toulouse, France": {
+    "lat": 43.5809692,
+    "lng": 1.4476192
+  },
+  "photon:20 Avenue Honoré Serres, 31000 Toulouse, France": {
+    "lat": 43.6127702,
+    "lng": 1.4384327
+  },
+  "photon:40 bis Rue Peyrolières, 31000 Toulouse, France": {
+    "lat": 43.601482,
+    "lng": 1.4407494
+  },
+  "photon:68 Rue Pargaminières, 31000 Toulouse, France": {
+    "lat": 43.6046637,
+    "lng": 1.4407078
+  },
+  "photon:54 Rue Pharaon, 31000 Toulouse, France": {
+    "lat": 43.59707,
+    "lng": 1.4443829
+  },
+  "photon:Avenue de Montauban, 31660 Buzet-sur-Tarn, France": {
+    "lat": 43.7875502,
+    "lng": 1.6225165
+  },
+  "photon:4 Rue Baronie, 31000 Toulouse, France": {
+    "lat": 43.6016167,
+    "lng": 1.4450277
+  },
+  "photon:58 Boulevard Lazare Carnot, 31000 Toulouse, France": {
+    "lat": 43.6050394,
+    "lng": 1.4496977
+  },
+  "photon:8 Rue Maury, 31000 Toulouse, France": {
+    "lat": 43.6050657,
+    "lng": 1.4535199
+  },
+  "photon:6 Rue Baour-Lormian, 31000 Toulouse, France": {
+    "lat": 43.602937,
+    "lng": 1.4440559
+  },
+  "photon:64 Rue Pierre Paul Riquet, 31000 Toulouse, France": {
+    "lat": 43.606259,
+    "lng": 1.4540789
+  },
+  "photon:17 Allée de Brienne, 31000 Toulouse, France": {
+    "lat": 43.6048944,
+    "lng": 1.4336491
+  },
+  "photon:26 Rue Castellane, 31000 Toulouse, France": {
+    "lat": 43.6061034,
+    "lng": 1.4505961
+  },
+  "photon:10 Rue du Pont Montaudran, 31000 Toulouse, France": {
+    "lat": 43.5985982,
+    "lng": 1.4557806
+  },
+  "photon:13 Rue du Rempart Villeneuve, 31000 Toulouse, France": {
+    "lat": 43.6058117,
+    "lng": 1.4463101
+  },
+  "photon:17 Rue Peyrolières, 31000 Toulouse, France": {
+    "lat": 43.6005971,
+    "lng": 1.4407103
+  },
+  "photon:10 Rue Jean Palaprat, 31000 Toulouse, France": {
+    "lat": 43.6049219,
+    "lng": 1.4523464
+  },
+  "photon:35 Rue Léon Gambetta, 31000 Toulouse, France": {
+    "lat": 43.6036633,
+    "lng": 1.4423079
+  },
+  "photon:9 Rue Pierre de Fermat, 31000 Toulouse, France": {
+    "lat": 43.5990895,
+    "lng": 1.4490696
+  },
+  "photon:49 Rue du Taur, 31000 Toulouse, France": {
+    "lat": 43.6063522,
+    "lng": 1.442425
+  },
+  "photon:12 Place de la Trinité, 31000 Toulouse, France": {
+    "lat": 43.5996329,
+    "lng": 1.4443248
+  },
+  "photon:25 Rue Léon Gambetta, 31000 Toulouse, France": {
+    "lat": 43.603303,
+    "lng": 1.4420662
+  },
+  "photon:12 Rue Peyrolières, 31000 Toulouse, France": {
+    "lat": 43.6000863,
+    "lng": 1.4410121
+  },
+  "photon:3 Rue Genty Magre, 31000 Toulouse, France": {
+    "lat": 43.6014896,
+    "lng": 1.4453211
+  },
+  "photon:7 Rue Joutx Aigues, 31000 Toulouse, France": {
+    "lat": 43.5984762,
+    "lng": 1.4438305
+  },
+  "photon:1 Rue Perchepinte, 31000 Toulouse, France": {
+    "lat": 43.5969992,
+    "lng": 1.4475442
+  },
+  "photon:3 Rue Lafayette, 31000 Toulouse, France": {
+    "lat": 43.6049987,
+    "lng": 1.4441233
+  },
+  "photon:18 Rue Nicolas Bachelier, 31000 Toulouse, France": {
+    "lat": 43.60623,
+    "lng": 1.4525199
+  },
+  "photon:16 Rue Pierre de Fermat, 31270 Toulouse, France": {
+    "lat": 43.554235,
+    "lng": 1.365444
+  },
+  "photon:20 Rue du Pont Saint-Pierre, 31300 Toulouse, France": {
+    "lat": 43.5994437,
+    "lng": 1.4327346
+  },
+  "photon:12 Rue de la Colombette, 31000 Toulouse, France": {
+    "lat": 43.6044773,
+    "lng": 1.4510323
+  },
+  "photon:9 Rue Réclusane, 31300 Toulouse, France": {
+    "lat": 43.5986355,
+    "lng": 1.4332843
+  },
+  "photon:13 Rue de la Bourse, 31000 Toulouse, France": {
+    "lat": 43.600605,
+    "lng": 1.4424151
+  },
+  "photon:12 Rue Alexandre Fourtanier, 31000 Toulouse, France": {
+    "lat": 43.6020251,
+    "lng": 1.4485272
+  },
+  "photon:4 Rue Jules Chalande, 31000 Toulouse, France": {
+    "lat": 43.6023282,
+    "lng": 1.4439878
+  },
+  "photon:Lexington café, Toulouse, France": {
+    "lat": 43.5989598,
+    "lng": 1.4363699
+  },
+  "photon:2 Rue d'Aubuisson, 31000 Toulouse, France": {
+    "lat": 43.6038051,
+    "lng": 1.4510708
+  },
+  "photon:Rue du Canard, 31000 Toulouse, France": {
+    "lat": 43.5981138,
+    "lng": 1.4463362
+  },
+  "photon:3 Rue Antoine Idrac, 31000 Toulouse, France": {
+    "lat": 43.6011549,
+    "lng": 1.4525393
+  },
+  "photon:45 Rue Réclusane, 31300 Toulouse, France": {
+    "lat": 43.5988811,
+    "lng": 1.4317217
+  },
+  "photon:12 Avenue des Minimes, 31200 Toulouse, France": {
+    "lat": 43.616676,
+    "lng": 1.4372441
+  },
+  "photon:35 Grande Rue Saint-Nicolas, 31300 Toulouse, France": {
+    "lat": 43.59895,
+    "lng": 1.434147
+  },
+  "photon:7 Rue du May, 31000 Toulouse, France": {
+    "lat": 43.6022608,
+    "lng": 1.4431314
+  },
+  "photon:19 Rue des Changes, 31000 Toulouse, France": {
+    "lat": 43.6008071,
+    "lng": 1.4436933
+  },
+  "photon:54 bis Rue de la Concorde, 31000 Toulouse, France": {
+    "lat": 43.6129149,
+    "lng": 1.4460749
+  },
+  "photon:5 Rue Baronie, 31000 Toulouse, France": {
+    "lat": 43.6018091,
+    "lng": 1.4448536
+  },
+  "photon:11 Rue Antonin Mercié, 31000 Toulouse, France": {
+    "lat": 43.6015066,
+    "lng": 1.4461004
+  },
+  "photon:1 Place du Parlement, 31000 Toulouse, France": {
+    "lat": 43.5932517,
+    "lng": 1.444216
+  },
+  "photon:46 Rue de Metz, 31000 Toulouse, France": {
+    "lat": 43.6005049,
+    "lng": 1.4487382
+  },
+  "photon:7 Rue Malcousinat, 31000 Toulouse, France": {
+    "lat": 43.600677,
+    "lng": 1.44301
+  },
+  "photon:1 Rue d'Alsace-Lorraine, 31000 Toulouse, France": {
+    "lat": 43.5996744,
+    "lng": 1.4455655
+  },
+  "photon:8 Boulevard Lazare Carnot, 31000 Toulouse, France": {
+    "lat": 43.601485,
+    "lng": 1.4522195
+  },
+  "photon:12 Rue des Pénitents Gris, 31000 Toulouse, France": {
+    "lat": 43.6059319,
+    "lng": 1.4419478
+  },
+  "photon:21 Rue Arnaud Bernard, 31000 Toulouse, France": {
+    "lat": 43.6102319,
+    "lng": 1.4390979
+  },
+  "photon:48 Rue Charles de Rémusat, 31000 Toulouse, France": {
+    "lat": 43.6069473,
+    "lng": 1.4450924
+  },
+  "photon:13 Rue de la République, 31300 Toulouse, France": {
+    "lat": 43.5987832,
+    "lng": 1.4357407
+  },
+  "photon:45 Rue du Taur, 31000 Toulouse, France": {
+    "lat": 43.6062364,
+    "lng": 1.4424557
+  },
+  "photon:12 Rue Bertrand de Born, 31000 Toulouse, France": {
+    "lat": 43.6092148,
+    "lng": 1.4510748
+  },
+  "photon:8 Rue du Pont Montaudran, 31000 Toulouse, France": {
+    "lat": 43.598935,
+    "lng": 1.4552565
+  },
+  "photon:4 Rue des Filatiers, 31000 Toulouse, France": {
+    "lat": 43.59811,
+    "lng": 1.4443119
+  },
+  "photon:3 Rue du Languedoc, 31000 Toulouse, France": {
+    "lat": 43.5955689,
+    "lng": 1.4453322
+  },
+  "photon:2 Rue Castellane, 31000 Toulouse, France": {
+    "lat": 43.6047946,
+    "lng": 1.4501422
+  },
+  "photon:13 Place Intérieure Saint-Cyprien, 31300 Toulouse, France": {
+    "lat": 43.598248,
+    "lng": 1.431611
+  },
+  "photon:9 Rue des Puits-Clos, 31000 Toulouse, France": {
+    "lat": 43.6019429,
+    "lng": 1.4443656
+  },
+  "photon:3 Rue Croix-Baragnon, 31000 Toulouse, France": {
+    "lat": 43.5995051,
+    "lng": 1.4458881
+  },
+  "photon:5 Rue de l'Étoile, 31000 Toulouse, France": {
+    "lat": 43.6016696,
+    "lng": 1.4525371
+  },
+  "photon:18 Rue Léon Gambetta, 31000 Toulouse, France": {
+    "lat": 43.6025562,
+    "lng": 1.4412982
+  },
+  "photon:6 Rue Jacqueline Auriol, 31400 Toulouse, France": {
+    "lat": 43.5742566,
+    "lng": 1.4769494
+  },
+  "photon:11 Place Étienne Esquirol, 31000 Toulouse, France": {
+    "lat": 43.6002168,
+    "lng": 1.4445895
+  },
+  "photon:28 Rue Gabriel Péri, 31000 Toulouse, France": {
+    "lat": 43.6061119,
+    "lng": 1.4544426
+  },
+  "photon:22 Rue des Polinaires, 31000 Toulouse, France": {
+    "lat": 43.5978453,
+    "lng": 1.4432243
+  },
+  "nom:Rue de Rémusat, 75016 Paris, France": {
+    "lat": 48.8477601,
+    "lng": 2.2721722
+  },
+  "photon:5 Allée de Brienne, 31000 Toulouse, France": {
+    "lat": 43.6043538,
+    "lng": 1.4340635
+  },
+  "photon:13 Rue Bouquières, 31000 Toulouse, France": {
+    "lat": 43.5990531,
+    "lng": 1.4461741
+  },
+  "photon:36 Rue Sainte-Ursule, 31000 Toulouse, France": {
+    "lat": 43.6030429,
+    "lng": 1.4420758
+  },
+  "photon:18 Rue Jacques Cujas, 31000 Toulouse, France": {
+    "lat": 43.6013047,
+    "lng": 1.4416053
+  },
+  "photon:Léa et Simon opticien/ne, Toulouse, France": {
+    "lat": 43.5984081,
+    "lng": 1.4321802
+  },
+  "photon:12 Rue Léon Gambetta, 31000 Toulouse, France": {
+    "lat": 43.6024048,
+    "lng": 1.4411829
+  },
+  "photon:12 Rue Perchepinte, 31000 Toulouse, France": {
+    "lat": 43.5973469,
+    "lng": 1.4481931
+  },
+  "photon:7 Rue des Lois, 31000 Toulouse, France": {
+    "lat": 43.6052318,
+    "lng": 1.4421275
+  },
+  "photon:10 Grande Rue Nazareth, 31000 Toulouse, France": {
+    "lat": 43.5954857,
+    "lng": 1.4459959
+  },
+  "photon:12 Rue de Bayard, 31000 Toulouse, France": {
+    "lat": 43.6085774,
+    "lng": 1.4474397
+  },
+  "photon:47 Rue de la Pomme, 31000 Toulouse, France": {
+    "lat": 43.6032165,
+    "lng": 1.4454589
+  },
+  "photon:22 Rue Jean Palaprat, 31000 Toulouse, France": {
+    "lat": 43.6054863,
+    "lng": 1.4523485
+  },
+  "photon:29 Rue de Metz, 31000 Toulouse, France": {
+    "lat": 43.6006187,
+    "lng": 1.4479334
+  },
+  "photon:35 Rue de la République, 31300 Toulouse, France": {
+    "lat": 43.5983939,
+    "lng": 1.4335312
+  },
+  "photon:21 Rue Perchepinte, 31000 Toulouse, France": {
+    "lat": 43.5974851,
+    "lng": 1.4482159
+  },
+  "photon:12 Place Intérieure Saint-Cyprien, 31300 Toulouse, France": {
+    "lat": 43.5982864,
+    "lng": 1.4318358
+  },
+  "photon:3 Boulevard de Strasbourg, 31000 Toulouse, France": {
+    "lat": 43.6059482,
+    "lng": 1.4481242
+  },
+  "photon:41 Rue de Bayard, 31000 Toulouse, France": {
+    "lat": 43.6100462,
+    "lng": 1.449786
+  },
+  "photon:4 Rue Victor Hugo, 31000 Toulouse, France": {
+    "lat": 43.6058865,
+    "lng": 1.4471332
+  },
+  "photon:40 Rue des Lois, 31000 Toulouse, France": {
+    "lat": 43.6069881,
+    "lng": 1.4400921
+  },
+  "photon:13 Rue Jean-Antoine Romiguières, 31000 Toulouse, France": {
+    "lat": 43.6047227,
+    "lng": 1.4420182
+  },
+  "photon:37 Rue Croix-Baragnon, 31000 Toulouse, France": {
+    "lat": 43.5997306,
+    "lng": 1.4479394
+  },
+  "photon:6 Avenue Honoré Serres, 31000 Toulouse, France": {
+    "lat": 43.6120751,
+    "lng": 1.4386485
+  },
+  "photon:44 Rue Pharaon, 31000 Toulouse, France": {
+    "lat": 43.5967762,
+    "lng": 1.4443654
+  },
+  "photon:2 Place de la Bourse, 31000 Toulouse, France": {
+    "lat": 43.6015086,
+    "lng": 1.442364
+  },
+  "photon:1 Rue des Trois Renards, 31000 Toulouse, France": {
+    "lat": 43.6074415,
+    "lng": 1.4415726
+  },
+  "photon:15 bis Place du Président Wilson, 31000 Toulouse, France": {
+    "lat": 43.6052792,
+    "lng": 1.4471608
+  },
+  "photon:14 Avenue Paul Séjourné, 31000 Toulouse, France": {
+    "lat": 43.6065821,
+    "lng": 1.4283938
+  },
+  "photon:14 Rue de Périgord, 31000 Toulouse, France": {
+    "lat": 43.6073421,
+    "lng": 1.4438012
+  },
+  "photon:Tête en l'air, Toulouse, France": {
+    "lat": 43.6170968,
+    "lng": 1.4361936
+  },
+  "photon:11 Place de la Daurade, 31000 Toulouse, France": {
+    "lat": 43.6017815,
+    "lng": 1.4394787
+  },
+  "nom:1 Rue Riguepels, 31000 Toulouse, France": {
+    "lat": 43.6002657,
+    "lng": 1.4495486
+  },
+  "photon:43 Rue du Languedoc, 31000 Toulouse, France": {
+    "lat": 43.5988402,
+    "lng": 1.4454776
+  },
+  "photon:5 boulevard Carnot, 31000 Toulouse, France": {
+    "lat": 43.6008369,
+    "lng": 1.4516275
+  },
+  "photon:24 Boulevard Pierre-Paul-Riquet, 31000 Toulouse, France": {
+    "lat": 43.6060845,
+    "lng": 1.4559432
+  },
+  "photon:41 rue des Landes, 31830 Toulouse, France": {
+    "lat": 43.560844,
+    "lng": 1.267362
+  },
+  "nom:1 place du Capitole, 31000 Toulouse, France": {
+    "lat": 43.6041433,
+    "lng": 1.4443378
+  },
+  "nom:21 Place du Salin, 31000 Toulouse, France": {
+    "lat": 43.5949986,
+    "lng": 1.4439362
+  },
+  "photon:78 allée de Barcelone, 31000 Toulouse, France": {
+    "lat": 43.6080899,
+    "lng": 1.426825
+  },
+  "photon:26 allée des foulques, 31000 Toulouse, France": {
+    "lat": 43.6514994,
+    "lng": 1.4211396
+  },
+  "photon:16 place Saint Pierre, 31000 Toulouse, France": {
+    "lat": 43.6038052,
+    "lng": 1.4351898
+  },
+  "nom:Avenue Jean Gonord, 31500 Toulouse, France": {
+    "lat": 43.5937566,
+    "lng": 1.4916928
+  },
+  "photon:6 rue Joutx Aigues, 31000 Toulouse, France": {
+    "lat": 43.5984251,
+    "lng": 1.4436374
+  },
+  "nom:4 place du Parlement, 31000 Toulouse, France": {
+    "lat": 43.5937784,
+    "lng": 1.4438488
+  },
+  "photon:42 rue Pargaminières, 31000 Toulouse, France": {
+    "lat": 43.6044695,
+    "lng": 1.4386635
+  },
+  "photon:18 rue de Toul, 31000 Toulouse, France": {
+    "lat": 43.6116691,
+    "lng": 1.437354
+  },
+  "nom:34 rue des Blanchers, 31000 Toulouse, France": {
+    "lat": 43.6026889,
+    "lng": 1.4373242
+  },
+  "photon:6 rue saint Antoine du T, 31000 Toulouse, France": {
+    "lat": 43.6026489,
+    "lng": 1.4473402
+  },
+  "photon:27 Rue Bouquières, 31000 Toulouse, France": {
+    "lat": 43.598713,
+    "lng": 1.4465963
+  },
+  "nom:28 Rue de la République, 31300 Toulouse, France": {
+    "lat": 43.5985945,
+    "lng": 1.4353356
+  },
+  "nom:51 rue des Couteliers, 31000 Toulouse, France": {
+    "lat": 43.599422,
+    "lng": 1.4414223
+  },
+  "nom:52 Chemin de Gabardie, 31200 Toulouse, France": {
+    "lat": 43.6327178,
+    "lng": 1.4826003
+  },
+  "photon:8 rue du Taur, 31000 Toulouse, France": {
+    "lat": 43.605404,
+    "lng": 1.4427469
+  },
+  "photon:20 rue Léon Gambetta, 31000 Toulouse, France": {
+    "lat": 43.6026144,
+    "lng": 1.4413503
+  },
+  "photon:7 rue Baour Lormian, 31000 Toulouse, France": {
+    "lat": 43.6029972,
+    "lng": 1.4442
+  },
+  "photon:10 rue Saint Pantaléon, 31000 Toulouse, France": {
+    "lat": 43.603174,
+    "lng": 1.444845
+  },
+  "photon:54 rue des Tourneurs, 31000 Toulouse, France": {
+    "lat": 43.601147,
+    "lng": 1.4451066
+  },
+  "nom:2 rue Baronie, 31000 Toulouse, France": {
+    "lat": 43.601557,
+    "lng": 1.4450362
+  },
+  "nom:13 rue des lois, 31000 Toulouse, France": {
+    "lat": 43.6058915,
+    "lng": 1.4413139
+  },
+  "photon:3 rue des Gestes, 31000 Toulouse, France": {
+    "lat": 43.6031014,
+    "lng": 1.44233
+  },
+  "photon:49 rue Pierre-Paul Riquet, 31000 Toulouse, France": {
+    "lat": 43.6042141,
+    "lng": 1.4541138
+  },
+  "nom:1 rue Saint Rome, 31000 Toulouse, France": {
+    "lat": 43.6016159,
+    "lng": 1.4435503
+  },
+  "nom:10 rue Maletache, 31000 Toulouse, France": {
+    "lat": 43.5984347,
+    "lng": 1.4447326
+  },
+  "photon:6 rue Victor Hugo, 31000 Toulouse, France": {
+    "lat": 43.605989,
+    "lng": 1.4471078
+  },
+  "photon:2 rue Jean Suau, 31000 Toulouse, France": {
+    "lat": 43.6017249,
+    "lng": 1.4401239
+  },
+  "photon:19 descente de la Halle aux Poissons, 31000 Toulouse, France": {
+    "lat": 43.5994814,
+    "lng": 1.4410164
+  },
+  "nom:14 avenue des Minimes, 31000 Toulouse, France": {
+    "lat": 43.616768,
+    "lng": 1.4372132
+  },
+  "photon:21 boulevard Armand Duportal, 31000 Toulouse, France": {
+    "lat": 43.6072463,
+    "lng": 1.4346083
+  },
+  "nom:4 place de Damloup, 31000 Toulouse, France": {
+    "lat": 43.6056247,
+    "lng": 1.4530797
+  },
+  "photon:2 rue des Blanchers, 31000 Toulouse, France": {
+    "lat": 43.6021961,
+    "lng": 1.4385361
+  },
+  "photon:21 rue du Pharaon, 31000 Toulouse, France": {
+    "lat": 43.596085,
+    "lng": 1.4441808
+  },
+  "photon:5 place Rouaix, 31000 Toulouse, France": {
+    "lat": 43.5993779,
+    "lng": 1.4453488
+  },
+  "nom:9, rue Réclusane, 31300 Toulouse, France": {
+    "lat": 43.5988938,
+    "lng": 1.4326762
+  },
+  "photon:57 Rue de la Concorde, 31000 Toulouse, France": {
+    "lat": 43.6132107,
+    "lng": 1.446166
+  },
+  "nom:16 Rue des Lois, 31000 Toulouse, France": {
+    "lat": 43.6053489,
+    "lng": 1.4421111
+  },
+  "nom:7 Rue Boulbonne, 31000 Toulouse, France": {
+    "lat": 43.600136,
+    "lng": 1.4484061
+  },
+  "photon:18 rue des Gestes, 31000 Toulouse, France": {
+    "lat": 43.6030418,
+    "lng": 1.4430819
+  },
+  "photon:32 rue des Filatiers, 31000 Toulouse, France": {
+    "lat": 43.59885,
+    "lng": 1.444156
+  },
+  "photon:49 Rue d'Alsace-Lorraine, 31000 Toulouse, France": {
+    "lat": 43.6053712,
+    "lng": 1.4455976
+  },
+  "nom:16 rue des Tourneurs, 31000 Toulouse, France": {
+    "lat": 43.6000021,
+    "lng": 1.4452312
+  },
+  "nom:47 Rue des Filatiers, 31000 Toulouse, France": {
+    "lat": 43.599358,
+    "lng": 1.4439377
+  },
+  "nom:4 Rue Saint-Rome, 31000 Toulouse, France": {
+    "lat": 43.601723,
+    "lng": 1.4436262
+  },
+  "nom:7 Rue Arnaud Bernard, 31000 Toulouse, France": {
+    "lat": 43.6097419,
+    "lng": 1.439102
+  },
+  "nom:8 Rue Boulbonne, 31000 Toulouse, France": {
+    "lat": 43.600117,
+    "lng": 1.448502
+  },
+  "nom:21 bis Rue Croix-Baragnon, 31000 Toulouse, France": {
+    "lat": 43.599704,
+    "lng": 1.4471185
+  },
+  "nom:1 Rue d'Astorg, 31000 Toulouse, France": {
+    "lat": 43.6012163,
+    "lng": 1.4481924
+  },
+  "nom:23 Rue de la Pomme, 31000 Toulouse, France": {
+    "lat": 43.6026877,
+    "lng": 1.4461275
+  },
+  "nom:1 Rue du Coq d'Inde, 31000 Toulouse, France": {
+    "lat": 43.5993403,
+    "lng": 1.4428094
+  },
+  "nom:45 Rue Boulbonne, 31000 Toulouse, France": {
+    "lat": 43.6015938,
+    "lng": 1.4476335
+  },
+  "nom:54 Rue des Filatiers, 31000 Toulouse, France": {
+    "lat": 43.599472,
+    "lng": 1.4439759
+  },
+  "nom:8 Rue d'Astorg, 31000 Toulouse, France": {
+    "lat": 43.6011121,
+    "lng": 1.4484787
+  },
+  "nom:53 Rue de la Pomme, 31000 Toulouse, France": {
+    "lat": 43.603333,
+    "lng": 1.4452254
+  },
+  "nom:66 Rue de la Pomme, 31000 Toulouse, France": {
+    "lat": 43.6035783,
+    "lng": 1.4449431
+  },
+  "nom:70 rue de la Pomme, 31000 Toulouse, France": {
+    "lat": 43.6037351,
+    "lng": 1.4446893
+  },
+  "nom:49 Rue des Filatiers, 31000 Toulouse, France": {
+    "lat": 43.59942,
+    "lng": 1.4439181
+  },
+  "nom:12 Rue Jacques Cujas, 31000 Toulouse, France": {
+    "lat": 43.6012552,
+    "lng": 1.4412071
+  },
+  "nom:4 Rue Rivals, 31000 Toulouse, France": {
+    "lat": 43.606013,
+    "lng": 1.4447451
+  },
+  "nom:42 Rue Boulbonne, 31000 Toulouse, France": {
+    "lat": 43.6012501,
+    "lng": 1.4480145
+  },
+  "nom:10 Rue Croix-Baragnon, 31000 Toulouse, France": {
+    "lat": 43.5997282,
+    "lng": 1.4468138
+  },
+  "nom:7 Rue Bouquières, 31000 Toulouse, France": {
+    "lat": 43.5991599,
+    "lng": 1.445967
+  },
+  "nom:34 Rue Saint-Rome, 31000 Toulouse, France": {
+    "lat": 43.6029894,
+    "lng": 1.443522
+  },
+  "nom:9 Rue Boulbonne, 31000 Toulouse, France": {
+    "lat": 43.6001972,
+    "lng": 1.4483614
+  },
+  "nom:4 Rue Bouquières, 31000 Toulouse, France": {
+    "lat": 43.5989345,
+    "lng": 1.4462461
+  },
+  "nom:Rue de la Colombette, 31000 Toulouse, France": {
+    "lat": 43.6046418,
+    "lng": 1.4543721
+  },
+  "nom:14 rue Cujas, 31000 Toulouse, France": {
+    "lat": 43.6012607,
+    "lng": 1.4412815
+  },
+  "nom:8 rue malaret, 31000 Toulouse, France": {
+    "lat": 43.6009501,
+    "lng": 1.4502234
+  },
+  "nom:39 Rue de la Dalbade, 31000 Toulouse, France": {
+    "lat": 43.5976825,
+    "lng": 1.4421038
+  },
+  "nom:8 Rue Sainte-Ursule, 31000 Toulouse, France": {
+    "lat": 43.6018124,
+    "lng": 1.4423137
+  },
+  "nom:33 Rue de Bayard, 31000 Toulouse, France": {
+    "lat": 43.6097969,
+    "lng": 1.4493366
+  },
+  "nom:17 Rue de la Pomme, 31000 Toulouse, France": {
+    "lat": 43.602563,
+    "lng": 1.4462719
+  },
+  "nom:11 Rue du Lieutenant-Colonel Pélissier, 31000 Toulouse, France": {
+    "lat": 43.6035178,
+    "lng": 1.447042
+  },
+  "nom:36 Rue du Taur, 31000 Toulouse, France": {
+    "lat": 43.6062532,
+    "lng": 1.4425651
+  },
+  "nom:33 Avenue des Minimes, 31200 Toulouse, France": {
+    "lat": 43.618637,
+    "lng": 1.4362856
+  },
+  "nom:45 Rue des Tourneurs, 31000 Toulouse, France": {
+    "lat": 43.601048,
+    "lng": 1.445003
+  },
+  "nom:16 Rue d'Astorg, 31000 Toulouse, France": {
+    "lat": 43.6010505,
+    "lng": 1.4487756
+  },
+  "nom:7 Rue d'Alsace-Lorraine, 31000 Toulouse, France": {
+    "lat": 43.5999866,
+    "lng": 1.4455669
+  },
+  "nom:31 Rue Charles de Rémusat, 31000 Toulouse, France": {
+    "lat": 43.606654,
+    "lng": 1.4447644
+  },
+  "nom:30 Rue Croix-Baragnon, 31000 Toulouse, France": {
+    "lat": 43.5998093,
+    "lng": 1.4484884
+  },
+  "nom:32 Rue de la Pomme, 31000 Toulouse, France": {
+    "lat": 43.6027803,
+    "lng": 1.4461441
+  },
+  "nom:49 Rue de la Pomme, 31000 Toulouse, France": {
+    "lat": 43.603269,
+    "lng": 1.4453586
+  },
+  "nom:15 rue Cujas, 31000 Toulouse, France": {
+    "lat": 43.6013557,
+    "lng": 1.4415508
+  },
+  "nom:44 Rue de la Colombette, 31000 Toulouse, France": {
+    "lat": 43.6045565,
+    "lng": 1.4532736
+  },
+  "nom:6 Rue Pierre Paul Riquet, 31000 Toulouse, France": {
+    "lat": 43.6007072,
+    "lng": 1.4539534
+  },
+  "nom:27 rue Croix Baragnon, 31000 Toulouse, France": {
+    "lat": 43.5997396,
+    "lng": 1.4474654
+  },
+  "nom:3 Rue Peyrolières, 31000 Toulouse, France": {
+    "lat": 43.6001303,
+    "lng": 1.4409174
+  },
+  "nom:3 Rue de la Colombette, 31000 Toulouse, France": {
+    "lat": 43.6044017,
+    "lng": 1.4508683
+  },
+  "nom:12 Rue Baour-Lormian, 31000 Toulouse, France": {
+    "lat": 43.6029716,
+    "lng": 1.4452234
+  },
+  "nom:33 Rue d'Alsace Lorraine, 31000 Toulouse, France": {
+    "lat": 43.6028863,
+    "lng": 1.4455835
+  },
+  "nom:39 Rue des Frères Lion, 31000 Toulouse, France": {
+    "lat": 43.6002057,
+    "lng": 1.4530862
+  },
+  "nom:14 Rue de la Pomme, 31000 Toulouse, France": {
+    "lat": 43.6023423,
+    "lng": 1.4466526
+  },
+  "nom:22 Rue Croix-Baragnon, 31000 Toulouse, France": {
+    "lat": 43.5998218,
+    "lng": 1.4477266
+  },
+  "nom:52 Rue Boulbonne, 31000 Toulouse, France": {
+    "lat": 43.6015318,
+    "lng": 1.4477687
+  },
+  "nom:7 Rue Baour-Lormian, 31000 Toulouse, France": {
+    "lat": 43.6029972,
+    "lng": 1.4442
+  },
+  "nom:31 Rue Saint-Rome, 31000 Toulouse, France": {
+    "lat": 43.60299,
+    "lng": 1.4434533
+  },
+  "nom:22 rue Peyrolières, 31000 Toulouse, France": {
+    "lat": 43.600765,
+    "lng": 1.440683
+  },
+  "nom:13 rue Cujas, 31000 Toulouse, France": {
+    "lat": 43.6013445,
+    "lng": 1.4414876
+  },
+  "nom:2 Rue Jacques Cujas, 31000 Toulouse, France": {
+    "lat": 43.6012527,
+    "lng": 1.4407377
+  },
+  "nom:34 Rue du Rempart Saint-Étienne, 31000 Toulouse, France": {
+    "lat": 43.602547,
+    "lng": 1.4508434
+  },
+  "nom:5 Rue de la Pomme, 31000 Toulouse, France": {
+    "lat": 43.6021077,
+    "lng": 1.4467423
+  },
+  "nom:26 Rue Saint-Antoine du T, 31000 Toulouse, France": {
+    "lat": 43.6040525,
+    "lng": 1.4473988
+  },
+  "nom:1 rue des lois, 31000 Toulouse, France": {
+    "lat": 43.6049964,
+    "lng": 1.4424217
+  },
+  "nom:5 Rue Lafayette, 31000 Toulouse, France": {
+    "lat": 43.6049935,
+    "lng": 1.444281
+  },
+  "nom:20 Rue de la Colombette, 31000 Toulouse, France": {
+    "lat": 43.604487,
+    "lng": 1.4516113
+  },
+  "nom:14 Rue Saint-Antoine du T, 31000 Toulouse, France": {
+    "lat": 43.603106,
+    "lng": 1.4474246
+  },
+  "nom:76 Allées Jean Jaurès, 31000 Toulouse, France": {
+    "lat": 43.6080478,
+    "lng": 1.4527006
+  },
+  "nom:34 Rue du Languedoc, 31000 Toulouse, France": {
+    "lat": 43.5969521,
+    "lng": 1.4457116
+  },
+  "nom:6 Place Rouaix, 31000 Toulouse, France": {
+    "lat": 43.5995603,
+    "lng": 1.4454732
+  },
+  "nom:44 Rue des Tourneurs, 31000 Toulouse, France": {
+    "lat": 43.6009,
+    "lng": 1.4451298
+  },
+  "nom:11 Rue Sainte-Ursule, 31000 Toulouse, France": {
+    "lat": 43.6019331,
+    "lng": 1.4421901
+  },
+  "nom:4 Rue Genty Magre, 31000 Toulouse, France": {
+    "lat": 43.6014411,
+    "lng": 1.4453418
+  },
+  "nom:12 Rue Charles de Rémusat, 31000 Toulouse, France": {
+    "lat": 43.6058353,
+    "lng": 1.4443466
+  },
+  "nom:34 Place Mage, 31000 Toulouse, France": {
+    "lat": 43.5984976,
+    "lng": 1.4469732
+  },
+  "nom:37 rue de Metz, 31000 Toulouse, France": {
+    "lat": 43.6006536,
+    "lng": 1.4492922
+  },
+  "nom:4 Rue Paul Vidal, 31000 Toulouse, France": {
+    "lat": 43.6025593,
+    "lng": 1.4479824
+  },
+  "nom:10 Rue Peyras, 31000 Toulouse, France": {
+    "lat": 43.6014526,
+    "lng": 1.4441391
+  },
+  "nom:22 rue Gambetta, 31000 Toulouse, France": {
+    "lat": 43.6026631,
+    "lng": 1.4414113
+  },
+  "nom:25 Rue de la Pomme, 31000 Toulouse, France": {
+    "lat": 43.6027302,
+    "lng": 1.4460773
+  },
+  "nom:27 rue Bouquières, 31000 Toulouse, France": {
+    "lat": 43.598718,
+    "lng": 1.4466188
+  },
+  "nom:43 Rue Pharaon, 31000 Toulouse, France": {
+    "lat": 43.5968296,
+    "lng": 1.4442821
+  },
+  "nom:17 Boulevard d'Arcole, 31000 Toulouse, France": {
+    "lat": 43.6110986,
+    "lng": 1.4401702
+  },
+  "nom:81 Rue Pargaminières, 31000 Toulouse, France": {
+    "lat": 43.6046028,
+    "lng": 1.4407632
+  },
+  "nom:34 Boulevard Lazare Carnot, 31000 Toulouse, France": {
+    "lat": 43.6039038,
+    "lng": 1.4508827
+  },
+  "nom:6 Route d'Albi, 31180 Rouffiac-Tolosan, France": {
+    "lat": 43.667253,
+    "lng": 1.50887
+  },
+  "nom:2 Rue Saint-Jérôme, 31000 Toulouse, France": {
+    "lat": 43.6034703,
+    "lng": 1.4474843
+  },
+  "nom:30 Rue des Lois, 31000 Toulouse, France": {
+    "lat": 43.6057871,
+    "lng": 1.4415787
+  },
+  "nom:77 rue Pargaminières, 31000 Toulouse, France": {
+    "lat": 43.6045525,
+    "lng": 1.4404032
+  },
+  "nom:17 Rue de Metz, 31000 Toulouse, France": {
+    "lat": 43.6003214,
+    "lng": 1.4431848
+  },
+  "nom:2 Boulevard Lazare Carnot, 31000 Toulouse, France": {
+    "lat": 43.6006926,
+    "lng": 1.4523206
+  },
+  "nom:2 Rue Charles de Rémusat, 31000 Toulouse, France": {
+    "lat": 43.6050863,
+    "lng": 1.4438457
+  },
+  "nom:13 Rue Peyras, 31000 Toulouse, France": {
+    "lat": 43.6014991,
+    "lng": 1.4446603
+  },
+  "nom:17 rue de la Bourse, 31000 Toulouse, France": {
+    "lat": 43.601036,
+    "lng": 1.4422687
+  },
+  "nom:4 Rue des Régans, 31000 Toulouse, France": {
+    "lat": 43.596331,
+    "lng": 1.4445636
+  },
+  "nom:10 Rue Caraman, 31000 Toulouse, France": {
+    "lat": 43.6021874,
+    "lng": 1.4527029
+  },
+  "nom:13 Place Dominique Martin Dupuy, 31000 Toulouse, France": {
+    "lat": 43.599994,
+    "lng": 1.4538314
+  },
+  "nom:93 Rue Pierre Paul Riquet, 31000 Toulouse, France": {
+    "lat": 43.6068354,
+    "lng": 1.453915
+  },
+  "nom:24 Place des Carmes, 31000 Toulouse, France": {
+    "lat": 43.5980464,
+    "lng": 1.4453041
+  },
+  "nom:33 Rue de la Colombette, 31000 Toulouse, France": {
+    "lat": 43.6044885,
+    "lng": 1.4533365
+  },
+  "nom:11 Place Olivier, 31300 Toulouse, France": {
+    "lat": 43.598342,
+    "lng": 1.4347927
+  },
+  "nom:12 Rue Tolosane, 31000 Toulouse, France": {
+    "lat": 43.5990364,
+    "lng": 1.4470525
+  },
+  "nom:15 Rue Sainte-Ursule, 31000 Toulouse, France": {
+    "lat": 43.6025288,
+    "lng": 1.4420174
+  },
+  "nom:19 rue du Fourbastard, 31000 Toulouse, France": {
+    "lat": 43.6025203,
+    "lng": 1.4459558
+  },
+  "nom:4 Rue Ninau, 31000 Toulouse, France": {
+    "lat": 43.5980694,
+    "lng": 1.4491222
+  },
+  "nom:20 Place Roger Salengro, 31000 Toulouse, France": {
+    "lat": 43.6028482,
+    "lng": 1.4449008
+  }
+}
