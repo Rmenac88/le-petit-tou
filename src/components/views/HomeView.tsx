@@ -46,6 +46,44 @@ import * as Icons from 'lucide-react-native';
 
 import { supabase } from '../../lib/supabase';
 import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
+import dataset from '../../constants/dataset.json';
+
+const ALL_EXPANDED_CATEGORIES = [
+  { id: 'all', name: 'Toutes les adresses 🌟', icon_name: 'Compass', color: '#1E293B', badge: '790' },
+  { id: 'gourmand-gourmet', name: 'Gourmand & Restauration', icon_name: 'Utensils', color: '#C52824', badge: '🍴' },
+  { id: 'trinquer-danser', name: 'Trinquer & Bars', icon_name: 'Wine', color: '#E5A93B', badge: '🍷' },
+  { id: 'brunch-douceurs', name: 'Brunch & Douceurs', icon_name: 'Coffee', color: '#D97706', badge: '🥐' },
+  { id: 'shopping-beaute', name: 'Shopping & Déco', icon_name: 'ShoppingBag', color: '#8B5CF6', badge: '🛍️' },
+  { id: 'beaute-bien-etre', name: 'Beauté & Bien-être', icon_name: 'Sparkles', color: '#EC4899', badge: '💅' },
+  { id: 'culture-loisirs', name: 'Culture & Spectacles', icon_name: 'Film', color: '#3B82F6', badge: '🎭' },
+  { id: 'sport-activites', name: 'Sport & Outdoor', icon_name: 'Activity', color: '#10B981', badge: '🏃' },
+  { id: 'terrasse', name: 'Terrasse & Rooftop', icon_name: 'Sun', color: '#F59E0B', badge: '☀️' },
+  { id: 'bio-local', name: 'Bio & Écoresponsable', icon_name: 'Leaf', color: '#059669', badge: '🌿' },
+  { id: 'fait-maison', name: 'Fait Maison', icon_name: 'ChefHat', color: '#DC2626', badge: '👨‍🍳' },
+  { id: 'vie-pratique', name: 'Vie Pratique & Services', icon_name: 'Home', color: '#64748B', badge: '🏠' },
+];
+
+const FILTER_KEYWORDS_MAP: Record<string, string[]> = {
+  'gourmand-gourmet': ['gourmand', 'restauran', 'bistrot', 'brasserie', 'gastrono', 'manger', 'plat', 'recette', 'nourriture'],
+  'trinquer-danser': ['trinquer', 'bar', 'biere', 'vin', 'cocktail', 'pub', 'apero', 'fete', 'nuit', 'club', 'cave'],
+  'brunch-douceurs': ['brunch', 'patisser', 'boulanger', 'douceur', 'sucre', 'gateau', 'salon de the', 'coffee', 'cafe', 'petit-dejeuner'],
+  'shopping-beaute': ['shopping', 'boutique', 'mode', 'vetement', 'deco', 'maison', 'accessoire', 'friperie', 'bijou', 'beaute'],
+  'beaute-bien-etre': ['beaute', 'bien-etre', 'coiffeur', 'spa', 'massage', 'soin', 'institut', 'esthetique', 'barbier', 'coiffure'],
+  'culture-loisirs': ['culture', 'loisir', 'musee', 'theatre', 'cinema', 'escape', 'exposition', 'art', 'spectacle', 'jeux'],
+  'sport-activites': ['sport', 'outdoor', 'fitness', 'yoga', 'pilates', 'escalade', 'danse', 'salle de sport', 'activite'],
+  'terrasse': ['terrasse', 'rooftop', 'exterieur', 'patio', 'jardin'],
+  'bio-local': ['bio', 'local', 'eco', 'circuit court', 'vegetar', 'vege', 'ecoresponsable'],
+  'fait-maison': ['maison', 'artisan', 'traditionnel', 'fait maison'],
+  'vie-pratique': ['pratique', 'service', 'coworking', 'transport', 'artisan', 'auto', 'imprimerie', 'pressing', 'reparation'],
+};
+
+const normalizeText = (str: string) => {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+};
 
 const { width, height } = Dimensions.get('window');
 const APPLE_EASE = Easing.bezier(0.25, 0.1, 0.25, 1);
@@ -56,6 +94,7 @@ const SNAP_FULL = 0;
 interface Category {
   id: string;
   name: string;
+  slug?: string;
   icon_name: string; // Lucide icon name string e.g. 'UtensilsCrossed'
   color: string; // Hex color string
 }
@@ -151,6 +190,15 @@ export default function HomeView({
     };
   });
   
+  // View Mode for Home vs See All pages
+  const [viewMode, setViewMode] = useState<'home' | 'see_all_recommended' | 'see_all_new'>('home');
+
+  const resetAllFilters = () => {
+    setSelectedCategoryFilter(null);
+    setSearchQuery('');
+    setViewMode('home');
+  };
+
   // Supabase states
   const [categories, setCategories] = useState<Category[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -214,8 +262,8 @@ export default function HomeView({
         .select('*');
       if (addrError) throw addrError;
 
-      setCategories(catData || []);
-      setAddresses(addrData || []);
+      setCategories(catData && catData.length > 0 ? catData : (dataset.categories as any));
+      setAddresses(addrData && addrData.length > 0 ? (addrData as any) : (dataset.addresses as any));
 
       // Fetch Events
       try {
@@ -251,6 +299,8 @@ export default function HomeView({
     } catch (err: any) {
       console.warn('loadSupabaseData failed:', err);
       // Fallback
+      setCategories(dataset.categories as any);
+      setAddresses(dataset.addresses as any);
       setEvents(MOCK_EVENTS);
       setIsConfigured(false);
       setLoading(false);
@@ -271,10 +321,23 @@ export default function HomeView({
     );
   }, []);
 
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
+
   const closeDrawer = () => {
-    drawerY.value = withTiming(height, { duration: 300, easing: APPLE_EASE });
-    overlayOpacity.value = withTiming(0, { duration: 250, easing: APPLE_EASE });
-    setShowAllCategories(false);
+    drawerY.value = withTiming(height, { duration: 250, easing: APPLE_EASE });
+    overlayOpacity.value = withTiming(0, { duration: 200, easing: APPLE_EASE });
+    setTimeout(() => {
+      setShowAllCategories(false);
+    }, 220);
+  };
+
+  const handleSelectCategoryFromModal = (catItem: any) => {
+    if (catItem.id === 'all') {
+      setSelectedCategoryFilter(null);
+    } else {
+      setSelectedCategoryFilter(catItem.id);
+    }
+    closeDrawer();
   };
 
   useEffect(() => {
@@ -354,11 +417,42 @@ export default function HomeView({
     }
   };
 
-  const filteredAddresses = addresses.filter(addr =>
-    addr.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    addr.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    addr.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredAddresses = addresses.filter(addr => {
+    if (searchQuery.trim()) {
+      const q = normalizeText(searchQuery);
+      const titleNorm = normalizeText(addr.title);
+      const locNorm = normalizeText(addr.location);
+      const descNorm = normalizeText(addr.description);
+      const tagsNorm = normalizeText(((addr as any).tags || []).join(' '));
+      const matchSearch =
+        titleNorm.includes(q) ||
+        locNorm.includes(q) ||
+        descNorm.includes(q) ||
+        tagsNorm.includes(q);
+      if (!matchSearch) return false;
+    }
+
+    if (selectedCategoryFilter) {
+      const catId = addr.category_id;
+      const catObj = categories.find(c => c.id === catId);
+      const catSlug = catObj?.slug || '';
+      const catName = catObj?.name || '';
+
+      if (selectedCategoryFilter === catId || selectedCategoryFilter === catSlug) {
+        return true;
+      }
+
+      const keywords = FILTER_KEYWORDS_MAP[selectedCategoryFilter] || [selectedCategoryFilter];
+      const fullSearchableBlob = normalizeText(
+        `${addr.title} ${addr.description} ${(addr as any).full_description || ''} ${((addr as any).tags || []).join(' ')} ${((addr as any).breadcrumbs || []).join(' ')} ${catName} ${catSlug}`
+      );
+
+      const matchKeyword = keywords.some(kw => fullSearchableBlob.includes(normalizeText(kw)));
+      if (!matchKeyword) return false;
+    }
+
+    return true;
+  });
 
   const recommendedAddresses = filteredAddresses.filter(addr => addr.is_recommended);
   const newAddresses = filteredAddresses.filter(addr => addr.is_new);
@@ -426,272 +520,515 @@ export default function HomeView({
           {/* Config Alert Banner (Visible only if Supabase environment variables are missing) */}
           {!isConfigured && !loading && (
             <View style={styles.alertBanner}>
-              <View style={styles.alertBannerHeader}>
-                <Icons.AlertTriangle color="#E5A93B" size={20} strokeWidth={2} />
-                <Text style={styles.alertTitle}>Supabase non connecté</Text>
-              </View>
               <Text style={styles.alertText}>
                 Veuillez configurer votre fichier `.env` avec vos identifiants Supabase pour synchroniser vos adresses de Toulouse.
               </Text>
             </View>
           )}
 
-          {/* Popular Categories Section */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Catégories populaires</Text>
-            {categories.length > 0 && (
-              <Pressable onPress={() => setShowAllCategories(true)}>
-                <Text style={styles.seeAllText}>Voir tout</Text>
-              </Pressable>
-            )}
-          </View>
-
-          {loading ? (
-            /* Categories Skeleton Pulse */
-            <Animated.View style={[styles.categoriesScroll, pulseStyle, { flexDirection: 'row' }]}>
-              {Array.from({ length: 4 }).map((_, idx) => (
-                <View key={idx} style={styles.categorySkeleton} />
-              ))}
-            </Animated.View>
-          ) : categories.length === 0 ? (
-            <Text style={styles.emptyText}>Aucune catégorie trouvée</Text>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesScroll}
-            >
-              {categories.map(category => (
-                <Pressable key={category.id} style={styles.categoryCard}>
-                  <View style={[styles.categoryIconBg, { backgroundColor: `${category.color}15` }]}>
-                    <DynamicIcon name={category.icon_name} color={category.color} size={20} />
-                  </View>
-                  <Text style={styles.categoryName}>{category.name}</Text>
+          {/* DYNAMIC VIEW ROUTING BASED ON FILTERING & VIEW MODE */}
+          {(selectedCategoryFilter || searchQuery.trim().length > 0) ? (
+            /* ── 1. ACTIVE FILTERED RESULTS VIEW ── */
+            <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40 }}>
+              <View style={styles.activeFilterBanner}>
+                <View style={styles.activeFilterLeft}>
+                  <Icons.Filter size={18} color="#C52824" style={{ marginRight: 8 }} />
+                  <Text style={styles.activeFilterText}>
+                    {selectedCategoryFilter
+                      ? `Filtre : ${ALL_EXPANDED_CATEGORIES.find(c => c.id === selectedCategoryFilter)?.name || categories.find(c => c.id === selectedCategoryFilter)?.name || selectedCategoryFilter}`
+                      : `Recherche : "${searchQuery}"`}
+                    <Text style={{ fontWeight: '900', color: '#1E293B' }}> ({filteredAddresses.length} adresses)</Text>
+                  </Text>
+                </View>
+                <Pressable style={styles.clearFilterBtn} onPress={resetAllFilters}>
+                  <Icons.X size={16} color="#1E293B" strokeWidth={2.5} />
                 </Pressable>
-              ))}
-            </ScrollView>
-          )}
+              </View>
 
-          {/* Recommendations of the Moment (Large Cards) */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recommandations du moment</Text>
-          </View>
+              {/* Reset to Initial Home CTA */}
+              <Pressable style={styles.resetHomeCtaBtn} onPress={resetAllFilters}>
+                <Icons.RotateCcw size={14} color="#C52824" style={{ marginRight: 6 }} />
+                <Text style={styles.resetHomeCtaText}>Réinitialiser et afficher la page d'accueil d'origine</Text>
+              </Pressable>
 
-          {loading ? (
-            /* Recommendations Skeleton Pulse */
-            <Animated.View style={[styles.cardsScroll, pulseStyle, { flexDirection: 'row' }]}>
-              {Array.from({ length: 2 }).map((_, idx) => (
-                <View key={idx} style={styles.largeCardSkeleton} />
-              ))}
-            </Animated.View>
-          ) : recommendedAddresses.length === 0 ? (
-            <Text style={styles.emptyText}>Aucune recommandation pour l'instant</Text>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.cardsScroll}
-            >
-              {recommendedAddresses.map(addr => {
-                const isFav = favorites.includes(addr.id);
-                return (
-                  <Pressable
-                    key={addr.id}
-                    style={styles.largeCard}
-                    onPress={() => {
-                      setSelectedSpotDetail({
-                        id: addr.id,
-                        title: addr.title,
-                        description: addr.description,
-                        image_url: addr.image_url,
-                        rating: addr.rating,
-                        category: categories.find(c => c.id === addr.category_id)?.name || 'Lieu',
-                        price_level: addr.price_level,
-                        location: addr.location,
-                        address: `${addr.location}, Toulouse`,
-                      });
-                    }}
-                  >
-                    <Image source={{ uri: addr.image_url }} style={styles.largeCardImage} resizeMode="cover" />
-                    
-                    {/* Carousel Paginator Dot Indicator Badge */}
-                    <View style={styles.carouselPaginatorBadge}>
-                      <View style={[styles.paginatorDot, styles.paginatorDotActive]} />
-                      <View style={styles.paginatorDot} />
-                      <View style={styles.paginatorDot} />
-                    </View>
-
-                    <View style={styles.ratingBadge}>
-                      <Icons.Star color="#E5A93B" size={13} fill="#E5A93B" />
-                      <Text style={styles.ratingText}>{typeof addr.rating === 'number' ? addr.rating.toFixed(1) : addr.rating}</Text>
-                    </View>
-
-                    <View style={styles.largeCardInfo}>
-                      <View style={styles.cardHeaderRow}>
-                        <Text style={styles.cardCategoryText}>
-                          {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'}
-                        </Text>
-                        <Text style={styles.cardPriceText}>{addr.price_level}</Text>
-                      </View>
-                      
-                      <Text style={styles.cardTitle} numberOfLines={1}>{addr.title}</Text>
-                      
-                      <View style={styles.cardFooterRow}>
-                        <View style={styles.locationRow}>
-                          <Icons.MapPin color="#64748B" size={14} strokeWidth={2} />
-                          <Text style={styles.locationText}>{addr.location}</Text>
+              {/* Grid of Filtered Addresses */}
+              {filteredAddresses.length === 0 ? (
+                <View style={styles.emptyResultsBox}>
+                  <Icons.Sparkles size={32} color="#CBD5E1" style={{ marginBottom: 8 }} />
+                  <Text style={styles.emptyText}>Aucune adresse ne correspond à ce filtre.</Text>
+                </View>
+              ) : (
+                <View style={styles.verticalGridContainer}>
+                  {filteredAddresses.map(addr => {
+                    const isFav = favorites.includes(addr.id);
+                    return (
+                      <Pressable
+                        key={addr.id}
+                        style={styles.gridCardItem}
+                        onPress={() => {
+                          const gallery = (addr as any).gallery_urls || [];
+                          const allPhotos = addr.image_url ? [addr.image_url, ...gallery] : gallery;
+                          setSelectedSpotDetail({
+                            id: addr.id,
+                            title: addr.title,
+                            description: (addr as any).full_description || addr.description,
+                            full_description: (addr as any).full_description || addr.description,
+                            breadcrumbs: (addr as any).breadcrumbs || [],
+                            tags: (addr as any).tags || [],
+                            image_url: addr.image_url,
+                            photos: allPhotos,
+                            rating: addr.rating,
+                            category: categories.find(c => c.id === addr.category_id)?.name || ((addr as any).tags ? (addr as any).tags[0] : 'Lieu'),
+                            price_level: addr.price_level,
+                            location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
+                            address: (addr as any).address || addr.location || 'Toulouse',
+                            phone: (addr as any).telephone || '',
+                            website: (addr as any).site_web || '',
+                          });
+                        }}
+                      >
+                        <Image source={{ uri: addr.image_url }} style={styles.gridCardImage} resizeMode="cover" />
+                        <View style={styles.ratingBadgeGrid}>
+                          <Icons.Star color="#E5A93B" size={11} fill="#E5A93B" />
+                          <Text style={styles.ratingTextSmall}>{typeof addr.rating === 'number' ? addr.rating.toFixed(1) : addr.rating}</Text>
                         </View>
-                        
-                        <Pressable onPress={() => toggleFavorite(addr.id)} style={styles.favoriteButton}>
-                          <Icons.Heart
-                            color={isFav ? '#C52824' : '#94A3B8'}
-                            fill={isFav ? '#C52824' : 'transparent'}
-                            size={18}
-                            strokeWidth={2}
-                          />
-                        </Pressable>
-                      </View>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          )}
-
-          {/* Novelties section (Smaller Cards) */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Nouveautés toulousaines</Text>
-          </View>
-
-          {loading ? (
-            /* Novelties Skeleton Pulse */
-            <Animated.View style={[styles.cardsScroll, pulseStyle, { flexDirection: 'row' }]}>
-              {Array.from({ length: 3 }).map((_, idx) => (
-                <View key={idx} style={styles.smallCardSkeleton} />
-              ))}
-            </Animated.View>
-          ) : newAddresses.length === 0 ? (
-            <Text style={styles.emptyText}>Aucune nouveauté pour l'instant</Text>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.cardsScroll}
-            >
-              {newAddresses.map(addr => {
-                const isFav = favorites.includes(addr.id);
-                return (
-                  <Pressable
-                    key={addr.id}
-                    style={styles.smallCard}
-                    onPress={() => {
-                      setSelectedSpotDetail({
-                        id: addr.id,
-                        title: addr.title,
-                        description: addr.description,
-                        image_url: addr.image_url,
-                        rating: addr.rating,
-                        category: categories.find(c => c.id === addr.category_id)?.name || 'Lieu',
-                        price_level: addr.price_level,
-                        location: addr.location,
-                        address: `${addr.location}, Toulouse`,
-                      });
-                    }}
-                  >
-                    <Image source={{ uri: addr.image_url }} style={styles.smallCardImage} resizeMode="cover" />
-                    
-                    {/* Carousel Paginator Dot Indicator Badge */}
-                    <View style={styles.carouselPaginatorBadgeSmall}>
-                      <View style={[styles.paginatorDotSmall, styles.paginatorDotActive]} />
-                      <View style={styles.paginatorDotSmall} />
-                      <View style={styles.paginatorDotSmall} />
-                    </View>
-
-                    <View style={styles.ratingBadge}>
-                      <Icons.Star color="#E5A93B" size={11} fill="#E5A93B" />
-                      <Text style={styles.ratingTextSmall}>{typeof addr.rating === 'number' ? addr.rating.toFixed(1) : addr.rating}</Text>
-                    </View>
-
-                    <View style={styles.smallCardInfo}>
-                      <Text style={styles.smallCardCategory}>
-                        {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'} • {addr.price_level}
-                      </Text>
-                      <Text style={styles.smallCardTitle} numberOfLines={1}>{addr.title}</Text>
-                      
-                      <View style={styles.cardFooterRow}>
-                        <View style={styles.locationRow}>
-                          <Icons.MapPin color="#64748B" size={12} strokeWidth={2} />
-                          <Text style={styles.locationTextSmall}>{addr.location}</Text>
+                        <View style={styles.gridCardBody}>
+                          <Text style={styles.gridCardCategory}>
+                            {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'} • {addr.price_level}
+                          </Text>
+                          <Text style={styles.gridCardTitle} numberOfLines={1}>{addr.title}</Text>
+                          <View style={styles.cardFooterRow}>
+                            <View style={styles.locationRow}>
+                              <Icons.MapPin color="#64748B" size={12} strokeWidth={2} />
+                              <Text style={styles.locationTextSmall}>{addr.location}</Text>
+                            </View>
+                            <Pressable onPress={() => toggleFavorite(addr.id)} style={styles.favoriteButtonSmall}>
+                              <Icons.Heart
+                                color={isFav ? '#C52824' : '#94A3B8'}
+                                fill={isFav ? '#C52824' : 'transparent'}
+                                size={16}
+                                strokeWidth={2}
+                              />
+                            </Pressable>
+                          </View>
                         </View>
-                        
-                        <Pressable onPress={() => toggleFavorite(addr.id)} style={styles.favoriteButtonSmall}>
-                          <Icons.Heart
-                            color={isFav ? '#C52824' : '#94A3B8'}
-                            fill={isFav ? '#C52824' : 'transparent'}
-                            size={16}
-                            strokeWidth={2}
-                          />
-                        </Pressable>
-                      </View>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          )}
-
-          {/* Association Events Section (Calquée sur la capture) */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Événements de l'association</Text>
-          </View>
-
-          {loading ? (
-            <ActivityIndicator size="small" color="#C52824" style={{ marginVertical: 20 }} />
-          ) : events.length === 0 ? (
-            <Text style={styles.emptyText}>Aucun événement pour l'instant</Text>
-          ) : (
-            <View style={styles.eventsContainer}>
-              {events.map((event) => {
-                const dateParts = new Date(event.event_date);
-                const day = isNaN(dateParts.getDate()) ? 24 : dateParts.getDate();
-                const months = ['JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC'];
-                const monthStr = months[isNaN(dateParts.getMonth()) ? 4 : dateParts.getMonth()];
-
-                return (
-                  <GlassView key={event.id} glassEffectStyle="regular" tintColor="#ffffff" style={styles.eventCard}>
-                    {/* Left Date Box */}
-                    <View style={styles.eventDateBlock}>
-                      <Text style={styles.eventDateDay}>{day}</Text>
-                      <Text style={styles.eventDateMonth}>{monthStr}</Text>
-                    </View>
-
-                    {/* Details Column */}
-                    <View style={styles.eventDetails}>
-                      <Text style={styles.eventTitle} numberOfLines={1}>{event.title}</Text>
-                      <Text style={styles.eventMeta}>{event.event_time} • {event.location}</Text>
-                      <Text style={styles.eventDesc} numberOfLines={2}>{event.description}</Text>
-                      
-                      {/* Price & Book Row */}
-                      <View style={styles.eventFooter}>
-                        <Text style={styles.eventPrice}>
-                          {parseFloat(event.price) === 0 ? 'Gratuit' : `€${parseFloat(event.price).toFixed(2)}`}
-                        </Text>
-                        
-                        <Pressable 
-                          style={({ pressed }) => [
-                            styles.bookBtn,
-                            pressed && styles.bookBtnPressed
-                          ]}
-                          onPress={() => handleBookEvent(event)}
-                        >
-                          <Text style={styles.bookBtnText}>Réserver</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  </GlassView>
-                );
-              })}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
             </View>
+          ) : viewMode === 'see_all_recommended' ? (
+            /* ── 2. SEE ALL RECOMMENDED VIEW (CAPPED AT 50) ── */
+            <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40 }}>
+              <View style={styles.seeAllHeaderRow}>
+                <Pressable style={styles.backBtn} onPress={() => setViewMode('home')}>
+                  <Icons.ArrowLeft size={18} color="#1E293B" strokeWidth={2.5} style={{ marginRight: 6 }} />
+                  <Text style={styles.backBtnText}>Retour</Text>
+                </Pressable>
+                <Text style={styles.seeAllTitle}>⭐ Recommandations ({Math.min(50, recommendedAddresses.length)})</Text>
+              </View>
+
+              <View style={styles.verticalGridContainer}>
+                {recommendedAddresses.slice(0, 50).map(addr => {
+                  const isFav = favorites.includes(addr.id);
+                  return (
+                    <Pressable
+                      key={addr.id}
+                      style={styles.gridCardItem}
+                      onPress={() => {
+                        const gallery = (addr as any).gallery_urls || [];
+                        const allPhotos = addr.image_url ? [addr.image_url, ...gallery] : gallery;
+                        setSelectedSpotDetail({
+                          id: addr.id,
+                          title: addr.title,
+                          description: (addr as any).full_description || addr.description,
+                          full_description: (addr as any).full_description || addr.description,
+                          breadcrumbs: (addr as any).breadcrumbs || [],
+                          tags: (addr as any).tags || [],
+                          image_url: addr.image_url,
+                          photos: allPhotos,
+                          rating: addr.rating,
+                          category: categories.find(c => c.id === addr.category_id)?.name || ((addr as any).tags ? (addr as any).tags[0] : 'Lieu'),
+                          price_level: addr.price_level,
+                          location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
+                          address: (addr as any).address || addr.location || 'Toulouse',
+                          phone: (addr as any).telephone || '',
+                          website: (addr as any).site_web || '',
+                        });
+                      }}
+                    >
+                      <Image source={{ uri: addr.image_url }} style={styles.gridCardImage} resizeMode="cover" />
+                      <View style={styles.ratingBadgeGrid}>
+                        <Icons.Star color="#E5A93B" size={11} fill="#E5A93B" />
+                        <Text style={styles.ratingTextSmall}>{typeof addr.rating === 'number' ? addr.rating.toFixed(1) : addr.rating}</Text>
+                      </View>
+                      <View style={styles.gridCardBody}>
+                        <Text style={styles.gridCardCategory}>
+                          {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'} • {addr.price_level}
+                        </Text>
+                        <Text style={styles.gridCardTitle} numberOfLines={1}>{addr.title}</Text>
+                        <View style={styles.cardFooterRow}>
+                          <View style={styles.locationRow}>
+                            <Icons.MapPin color="#64748B" size={12} strokeWidth={2} />
+                            <Text style={styles.locationTextSmall}>{addr.location}</Text>
+                          </View>
+                          <Pressable onPress={() => toggleFavorite(addr.id)} style={styles.favoriteButtonSmall}>
+                            <Icons.Heart
+                              color={isFav ? '#C52824' : '#94A3B8'}
+                              fill={isFav ? '#C52824' : 'transparent'}
+                              size={16}
+                              strokeWidth={2}
+                            />
+                          </Pressable>
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ) : viewMode === 'see_all_new' ? (
+            /* ── 3. SEE ALL NEWEST VIEW (CAPPED AT 50) ── */
+            <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40 }}>
+              <View style={styles.seeAllHeaderRow}>
+                <Pressable style={styles.backBtn} onPress={() => setViewMode('home')}>
+                  <Icons.ArrowLeft size={18} color="#1E293B" strokeWidth={2.5} style={{ marginRight: 6 }} />
+                  <Text style={styles.backBtnText}>Retour</Text>
+                </Pressable>
+                <Text style={styles.seeAllTitle}>🔥 Nouveautés toulousaines ({Math.min(50, newAddresses.length)})</Text>
+              </View>
+
+              <View style={styles.verticalGridContainer}>
+                {newAddresses.slice(0, 50).map(addr => {
+                  const isFav = favorites.includes(addr.id);
+                  return (
+                    <Pressable
+                      key={addr.id}
+                      style={styles.gridCardItem}
+                      onPress={() => {
+                        const gallery = (addr as any).gallery_urls || [];
+                        const allPhotos = addr.image_url ? [addr.image_url, ...gallery] : gallery;
+                        setSelectedSpotDetail({
+                          id: addr.id,
+                          title: addr.title,
+                          description: (addr as any).full_description || addr.description,
+                          full_description: (addr as any).full_description || addr.description,
+                          breadcrumbs: (addr as any).breadcrumbs || [],
+                          tags: (addr as any).tags || [],
+                          image_url: addr.image_url,
+                          photos: allPhotos,
+                          rating: addr.rating,
+                          category: categories.find(c => c.id === addr.category_id)?.name || ((addr as any).tags ? (addr as any).tags[0] : 'Lieu'),
+                          price_level: addr.price_level,
+                          location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
+                          address: (addr as any).address || addr.location || 'Toulouse',
+                          phone: (addr as any).telephone || '',
+                          website: (addr as any).site_web || '',
+                        });
+                      }}
+                    >
+                      <Image source={{ uri: addr.image_url }} style={styles.gridCardImage} resizeMode="cover" />
+                      <View style={styles.ratingBadgeGrid}>
+                        <Icons.Star color="#E5A93B" size={11} fill="#E5A93B" />
+                        <Text style={styles.ratingTextSmall}>{typeof addr.rating === 'number' ? addr.rating.toFixed(1) : addr.rating}</Text>
+                      </View>
+                      <View style={styles.gridCardBody}>
+                        <Text style={styles.gridCardCategory}>
+                          {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'} • {addr.price_level}
+                        </Text>
+                        <Text style={styles.gridCardTitle} numberOfLines={1}>{addr.title}</Text>
+                        <View style={styles.cardFooterRow}>
+                          <View style={styles.locationRow}>
+                            <Icons.MapPin color="#64748B" size={12} strokeWidth={2} />
+                            <Text style={styles.locationTextSmall}>{addr.location}</Text>
+                          </View>
+                          <Pressable onPress={() => toggleFavorite(addr.id)} style={styles.favoriteButtonSmall}>
+                            <Icons.Heart
+                              color={isFav ? '#C52824' : '#94A3B8'}
+                              fill={isFav ? '#C52824' : 'transparent'}
+                              size={16}
+                              strokeWidth={2}
+                            />
+                          </Pressable>
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ) : (
+            /* ── 4. INITIAL HOME PAGE LAYOUT ── */
+            <>
+              {/* Popular Categories Section */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Catégories populaires</Text>
+                {categories.length > 0 && (
+                  <Pressable onPress={() => setShowAllCategories(true)}>
+                    <Text style={styles.seeAllText}>Voir tout</Text>
+                  </Pressable>
+                )}
+              </View>
+
+              {loading ? (
+                /* Categories Skeleton Pulse */
+                <Animated.View style={[styles.categoriesScroll, pulseStyle, { flexDirection: 'row' }]}>
+                  {Array.from({ length: 4 }).map((_, idx) => (
+                    <View key={idx} style={styles.categorySkeleton} />
+                  ))}
+                </Animated.View>
+              ) : categories.length === 0 ? (
+                <Text style={styles.emptyText}>Aucune catégorie trouvée</Text>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoriesScroll}
+                >
+                  {categories.map(category => {
+                    const isSelected = selectedCategoryFilter === category.id;
+                    return (
+                      <Pressable
+                        key={category.id}
+                        style={[styles.categoryCard, isSelected && styles.categoryCardActive]}
+                        onPress={() => setSelectedCategoryFilter(isSelected ? null : category.id)}
+                      >
+                        <View style={[styles.categoryIconBg, { backgroundColor: `${category.color}15` }]}>
+                          <DynamicIcon name={category.icon_name} color={category.color} size={20} />
+                        </View>
+                        <Text style={[styles.categoryName, isSelected && styles.categoryNameActive]}>{category.name}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
+
+              {/* Recommendations of the Moment (Large Cards) */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Recommandations du moment</Text>
+                <Pressable onPress={() => setViewMode('see_all_recommended')}>
+                  <Text style={styles.seeAllText}>Voir tout ({Math.min(50, recommendedAddresses.length)})</Text>
+                </Pressable>
+              </View>
+
+              {loading ? (
+                /* Recommendations Skeleton Pulse */
+                <Animated.View style={[styles.cardsScroll, pulseStyle, { flexDirection: 'row' }]}>
+                  {Array.from({ length: 2 }).map((_, idx) => (
+                    <View key={idx} style={styles.largeCardSkeleton} />
+                  ))}
+                </Animated.View>
+              ) : recommendedAddresses.length === 0 ? (
+                <Text style={styles.emptyText}>Aucune recommandation pour l'instant</Text>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.cardsScroll}
+                >
+                  {recommendedAddresses.map(addr => {
+                    const isFav = favorites.includes(addr.id);
+                    return (
+                      <Pressable
+                        key={addr.id}
+                        style={styles.largeCard}
+                        onPress={() => {
+                          const gallery = (addr as any).gallery_urls || [];
+                          const allPhotos = addr.image_url ? [addr.image_url, ...gallery] : gallery;
+                          setSelectedSpotDetail({
+                            id: addr.id,
+                            title: addr.title,
+                            description: (addr as any).full_description || addr.description,
+                            full_description: (addr as any).full_description || addr.description,
+                            breadcrumbs: (addr as any).breadcrumbs || [],
+                            tags: (addr as any).tags || [],
+                            image_url: addr.image_url,
+                            photos: allPhotos,
+                            rating: addr.rating,
+                            category: categories.find(c => c.id === addr.category_id)?.name || ((addr as any).tags ? (addr as any).tags[0] : 'Lieu'),
+                            price_level: addr.price_level,
+                            location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
+                            address: (addr as any).address || addr.location || 'Toulouse',
+                            phone: (addr as any).telephone || '',
+                            website: (addr as any).site_web || '',
+                          });
+                        }}
+                      >
+                        <Image source={{ uri: addr.image_url }} style={styles.largeCardImage} resizeMode="cover" />
+                        <View style={styles.carouselPaginatorBadge}>
+                          <View style={[styles.paginatorDot, styles.paginatorDotActive]} />
+                          <View style={styles.paginatorDot} />
+                          <View style={styles.paginatorDot} />
+                        </View>
+                        <View style={styles.ratingBadge}>
+                          <Icons.Star color="#E5A93B" size={13} fill="#E5A93B" />
+                          <Text style={styles.ratingText}>{typeof addr.rating === 'number' ? addr.rating.toFixed(1) : addr.rating}</Text>
+                        </View>
+                        <View style={styles.largeCardInfo}>
+                          <View style={styles.cardHeaderRow}>
+                            <Text style={styles.cardCategoryText}>
+                              {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'}
+                            </Text>
+                            <Text style={styles.cardPriceText}>{addr.price_level}</Text>
+                          </View>
+                          <Text style={styles.cardTitle} numberOfLines={1}>{addr.title}</Text>
+                          <View style={styles.cardFooterRow}>
+                            <View style={styles.locationRow}>
+                              <Icons.MapPin color="#64748B" size={14} strokeWidth={2} />
+                              <Text style={styles.locationText}>{addr.location}</Text>
+                            </View>
+                            <Pressable onPress={() => toggleFavorite(addr.id)} style={styles.favoriteButton}>
+                              <Icons.Heart
+                                color={isFav ? '#C52824' : '#94A3B8'}
+                                fill={isFav ? '#C52824' : 'transparent'}
+                                size={18}
+                                strokeWidth={2}
+                              />
+                            </Pressable>
+                          </View>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
+
+              {/* Novelties section (Smaller Cards) */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Nouveautés toulousaines</Text>
+                <Pressable onPress={() => setViewMode('see_all_new')}>
+                  <Text style={styles.seeAllText}>Voir tout ({Math.min(50, newAddresses.length)})</Text>
+                </Pressable>
+              </View>
+
+              {loading ? (
+                /* Novelties Skeleton Pulse */
+                <Animated.View style={[styles.cardsScroll, pulseStyle, { flexDirection: 'row' }]}>
+                  {Array.from({ length: 3 }).map((_, idx) => (
+                    <View key={idx} style={styles.smallCardSkeleton} />
+                  ))}
+                </Animated.View>
+              ) : newAddresses.length === 0 ? (
+                <Text style={styles.emptyText}>Aucune nouveauté pour l'instant</Text>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.cardsScroll}
+                >
+                  {newAddresses.map(addr => {
+                    const isFav = favorites.includes(addr.id);
+                    return (
+                      <Pressable
+                        key={addr.id}
+                        style={styles.smallCard}
+                        onPress={() => {
+                          const gallery = (addr as any).gallery_urls || [];
+                          const allPhotos = addr.image_url ? [addr.image_url, ...gallery] : gallery;
+                          setSelectedSpotDetail({
+                            id: addr.id,
+                            title: addr.title,
+                            description: (addr as any).full_description || addr.description,
+                            full_description: (addr as any).full_description || addr.description,
+                            breadcrumbs: (addr as any).breadcrumbs || [],
+                            tags: (addr as any).tags || [],
+                            image_url: addr.image_url,
+                            photos: allPhotos,
+                            rating: addr.rating,
+                            category: categories.find(c => c.id === addr.category_id)?.name || ((addr as any).tags ? (addr as any).tags[0] : 'Lieu'),
+                            price_level: addr.price_level,
+                            location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
+                            address: (addr as any).address || addr.location || 'Toulouse',
+                            phone: (addr as any).telephone || '',
+                            website: (addr as any).site_web || '',
+                          });
+                        }}
+                      >
+                        <Image source={{ uri: addr.image_url }} style={styles.smallCardImage} resizeMode="cover" />
+                        <View style={styles.carouselPaginatorBadgeSmall}>
+                          <View style={[styles.paginatorDotSmall, styles.paginatorDotActive]} />
+                          <View style={styles.paginatorDotSmall} />
+                          <View style={styles.paginatorDotSmall} />
+                        </View>
+                        <View style={styles.ratingBadge}>
+                          <Icons.Star color="#E5A93B" size={11} fill="#E5A93B" />
+                          <Text style={styles.ratingTextSmall}>{typeof addr.rating === 'number' ? addr.rating.toFixed(1) : addr.rating}</Text>
+                        </View>
+                        <View style={styles.smallCardInfo}>
+                          <Text style={styles.smallCardCategory}>
+                            {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'} • {addr.price_level}
+                          </Text>
+                          <Text style={styles.smallCardTitle} numberOfLines={1}>{addr.title}</Text>
+                          <View style={styles.cardFooterRow}>
+                            <View style={styles.locationRow}>
+                              <Icons.MapPin color="#64748B" size={12} strokeWidth={2} />
+                              <Text style={styles.locationTextSmall}>{addr.location}</Text>
+                            </View>
+                            <Pressable onPress={() => toggleFavorite(addr.id)} style={styles.favoriteButtonSmall}>
+                              <Icons.Heart
+                                color={isFav ? '#C52824' : '#94A3B8'}
+                                fill={isFav ? '#C52824' : 'transparent'}
+                                size={16}
+                                strokeWidth={2}
+                              />
+                            </Pressable>
+                          </View>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
+
+              {/* Association Events Section */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Événements de l'association</Text>
+              </View>
+
+              {loading ? (
+                <ActivityIndicator size="small" color="#C52824" style={{ marginVertical: 20 }} />
+              ) : events.length === 0 ? (
+                <Text style={styles.emptyText}>Aucun événement pour l'instant</Text>
+              ) : (
+                <View style={styles.eventsContainer}>
+                  {events.map((event) => {
+                    const dateParts = new Date(event.event_date);
+                    const day = isNaN(dateParts.getDate()) ? 24 : dateParts.getDate();
+                    const months = ['JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC'];
+                    const monthStr = months[isNaN(dateParts.getMonth()) ? 4 : dateParts.getMonth()];
+
+                    return (
+                      <GlassView key={event.id} glassEffectStyle="regular" tintColor="#ffffff" style={styles.eventCard}>
+                        <View style={styles.eventDateBlock}>
+                          <Text style={styles.eventDateDay}>{day}</Text>
+                          <Text style={styles.eventDateMonth}>{monthStr}</Text>
+                        </View>
+                        <View style={styles.eventDetails}>
+                          <Text style={styles.eventTitle} numberOfLines={1}>{event.title}</Text>
+                          <Text style={styles.eventMeta}>{event.event_time || '19:00'} • {event.location || 'Toulouse'}</Text>
+                          <Text style={styles.eventDesc} numberOfLines={2}>{event.description}</Text>
+                          <View style={styles.eventFooter}>
+                            <Text style={styles.eventPrice}>
+                              {parseFloat(event.price) === 0 ? 'Gratuit' : `€${parseFloat(event.price).toFixed(2)}`}
+                            </Text>
+                            <Pressable 
+                              style={({ pressed }) => [
+                                styles.bookBtn,
+                                pressed && styles.bookBtnPressed
+                              ]}
+                              onPress={() => handleBookEvent(event)}
+                            >
+                              <Text style={styles.bookBtnText}>Réserver</Text>
+                            </Pressable>
+                          </View>
+                        </View>
+                      </GlassView>
+                    );
+                  })}
+                </View>
+              )}
+            </>
           )}
         </ScrollView>
       </SafeAreaView>
@@ -927,46 +1264,61 @@ export default function HomeView({
       )}
 
       {/* Categories Drawer - Apple-like Glassmorphic slide up */}
-      <Animated.View style={[styles.overlay, overlayStyle]}>
-        <Pressable style={styles.overlayDismiss} onPress={closeDrawer} />
-        
-        <Animated.View style={[styles.drawerContainer, drawStyle]}>
-          <GlassView
-            glassEffectStyle="regular"
-            tintColor="#ffffff"
-            style={styles.drawerGlass}
-          >
-            <View {...drawerPanResponder.panHandlers} style={styles.drawerDragZone}>
-              <View style={styles.grabHandle} />
-              <View style={styles.drawerHeader}>
-                <Text style={styles.drawerTitle}>Toutes les catégories</Text>
-                <Pressable style={styles.closeButton} onPress={closeDrawer}>
-                  <Icons.X color="#1E293B" size={20} strokeWidth={2.5} />
-                </Pressable>
-              </View>
-            </View>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              style={{ flex: 1 }}
-              contentContainerStyle={styles.categoriesGrid}
+      {showAllCategories && (
+        <Animated.View style={[styles.overlay, overlayStyle]}>
+          <Pressable style={styles.overlayDismiss} onPress={closeDrawer} />
+          
+          <Animated.View style={[styles.drawerContainer, drawStyle]}>
+            <GlassView
+              glassEffectStyle="regular"
+              tintColor="#ffffff"
+              style={styles.drawerGlass}
             >
-              {categories.map(category => (
-                <Pressable
-                  key={category.id}
-                  style={styles.gridItem}
-                  onPress={() => setShowAllCategories(false)}
-                >
-                  <View style={[styles.gridIconBg, { backgroundColor: `${category.color}15` }]}>
-                    <DynamicIcon name={category.icon_name} color={category.color} size={24} />
+              <View {...drawerPanResponder.panHandlers} style={styles.drawerDragZone}>
+                <View style={styles.grabHandle} />
+                <View style={styles.drawerHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={styles.drawerTitle}>Toutes les catégories 📂</Text>
+                    <View style={styles.categoryCountBadge}>
+                      <Text style={styles.categoryCountBadgeText}>{ALL_EXPANDED_CATEGORIES.length}</Text>
+                    </View>
                   </View>
-                  <Text style={styles.gridItemLabel}>{category.name}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </GlassView>
+                  <Pressable style={styles.closeButton} onPress={closeDrawer}>
+                    <Icons.X color="#1E293B" size={20} strokeWidth={2.5} />
+                  </Pressable>
+                </View>
+              </View>
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                style={{ flex: 1 }}
+                contentContainerStyle={styles.categoriesGrid}
+              >
+                {ALL_EXPANDED_CATEGORIES.map(category => {
+                  const isSelected = selectedCategoryFilter === category.id;
+                  return (
+                    <Pressable
+                      key={category.id}
+                      style={[styles.gridItem, isSelected && styles.gridItemSelected]}
+                      onPress={() => handleSelectCategoryFromModal(category)}
+                    >
+                      <View style={[styles.gridIconBg, { backgroundColor: `${category.color}20` }]}>
+                        <DynamicIcon name={category.icon_name} color={category.color} size={24} />
+                      </View>
+                      <Text style={[styles.gridItemLabel, isSelected && styles.gridItemLabelSelected]}>{category.name}</Text>
+                      {category.badge && (
+                        <View style={styles.gridItemBadge}>
+                          <Text style={styles.gridItemBadgeText}>{category.badge}</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </GlassView>
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
+      )}
     </View>
   );
 }
@@ -980,306 +1332,336 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 130,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 10,
-    height: 60,
+    paddingTop: 12,
+    height: 56,
   },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F8FAFC',
-    justifyContent: 'center',
+  logoRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
   },
   logo: {
-    height: 42,
-    width: 120,
-    backgroundColor: '#FAF5EF',
+    width: 140,
+    height: 40,
   },
-  hookContainer: {
-    paddingHorizontal: 20,
-    marginTop: 12,
-    marginBottom: 8,
+  logoT: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#C52824',
   },
-  hookText: {
-    fontSize: 24,
-    fontWeight: '800',
+  logoText: {
+    fontSize: 20,
+    fontWeight: '900',
     color: '#1E293B',
     letterSpacing: -0.5,
   },
+  headerButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 2,
+    borderColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+  },
+  hookContainer: {
+    paddingHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  hookText: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#1E293B',
+    letterSpacing: -0.8,
+    lineHeight: 32,
+  },
   hookSubtitle: {
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: 28,
+    fontWeight: '900',
     color: '#C52824',
-    letterSpacing: -0.5,
-    marginTop: -2,
+    letterSpacing: -0.8,
+    lineHeight: 32,
   },
   brutalistWrapper: {
-    marginHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    marginBottom: 24,
   },
   brutalistContainer: {
     position: 'relative',
-    width: '100%',
+    height: 54,
   },
   shadowLayer: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    zIndex: -1,
+    width: '100%',
+    height: 54,
+    borderRadius: 14,
+    borderWidth: 2.5,
+    borderColor: '#000000',
   },
   brutalistInputContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
     width: '100%',
-    height: 52,
+    height: 54,
+    borderRadius: 14,
+    borderWidth: 2.5,
     backgroundColor: '#FFFFFF',
-    borderWidth: 4,
-    borderColor: '#000000',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 15,
+    paddingHorizontal: 16,
+    zIndex: 10,
   },
   brutalistSearchIcon: {
     marginRight: 10,
   },
   brutalistInput: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000000',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
     height: '100%',
-    ...Platform.select({
-      web: {
-        outlineStyle: 'none',
-        outlineColor: 'transparent',
-        boxShadow: 'none',
-      } as any
-    }),
   },
   brutalistLabel: {
     position: 'absolute',
-    left: 0,
-    top: -20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    top: -12,
+    right: 20,
+    borderRadius: 6,
     borderWidth: 2,
     borderColor: '#000000',
-    zIndex: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    zIndex: 20,
   },
   brutalistLabelText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
     color: '#FFFFFF',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    letterSpacing: 1,
   },
   alertBanner: {
     marginHorizontal: 20,
-    marginTop: 18,
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: '#FAF8F5',
-    borderWidth: 1,
-    borderColor: 'rgba(229, 169, 59, 0.25)',
+    marginBottom: 20,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 2.5,
+    borderColor: '#1E293B',
+    borderRadius: 14,
+    padding: 14,
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
   },
   alertBannerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   alertTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#A16207',
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#1E293B',
   },
   alertText: {
-    fontSize: 13,
-    color: '#713F12',
-    lineHeight: 18,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400E',
+    lineHeight: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginTop: 28,
-    marginBottom: 14,
+    marginTop: 20,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '900',
     color: '#1E293B',
-    letterSpacing: -0.2,
+    letterSpacing: -0.4,
   },
   seeAllText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '800',
     color: '#C52824',
   },
   categoriesScroll: {
-    paddingLeft: 20,
-    paddingRight: 8,
+    paddingHorizontal: 20,
+    gap: 12,
   },
   categoryCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#1E293B',
+    borderRadius: 24,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginRight: 12,
     gap: 10,
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+  },
+  categoryCardActive: {
+    backgroundColor: '#1E293B',
+    borderColor: '#1E293B',
   },
   categoryIconBg: {
     width: 32,
     height: 32,
-    borderRadius: 8,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   categoryName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#334155',
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  categoryNameActive: {
+    color: '#FFFFFF',
+  },
+  categorySkeleton: {
+    width: 120,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E2E8F0',
+    marginRight: 12,
   },
   cardsScroll: {
-    paddingLeft: 20,
-    paddingRight: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#94A3B8',
     paddingHorizontal: 20,
-    fontStyle: 'italic',
+    gap: 16,
   },
   largeCard: {
-    width: 250,
-    height: 270,
+    width: 280,
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    marginRight: 16,
-    borderWidth: 1.5,
-    borderColor: '#F1F5F9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
+    borderRadius: 16,
+    borderWidth: 2.5,
+    borderColor: '#1E293B',
     overflow: 'hidden',
-    position: 'relative',
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
   },
   largeCardImage: {
     width: '100%',
-    height: 140,
-    backgroundColor: '#F1F5F9',
+    height: 170,
+  },
+  largeCardSkeleton: {
+    width: 280,
+    height: 260,
+    borderRadius: 16,
+    backgroundColor: '#E2E8F0',
+    marginRight: 16,
   },
   carouselPaginatorBadge: {
     position: 'absolute',
-    bottom: 146,
-    left: 10,
+    top: 12,
+    left: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 8,
-    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
   carouselPaginatorBadgeSmall: {
     position: 'absolute',
-    bottom: 126,
-    left: 8,
+    top: 10,
+    left: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 6,
-    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
   paginatorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+  },
+  paginatorDotSmall: {
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  paginatorDotSmall: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: 'rgba(255,255,255,0.4)',
   },
   paginatorDotActive: {
-    width: 12,
     backgroundColor: '#FFFFFF',
+    width: 14,
   },
   ratingBadge: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 12,
+    right: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 10,
-    paddingVertical: 3,
-    paddingHorizontal: 7,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     gap: 4,
-    zIndex: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(30, 41, 59, 0.1)',
   },
   ratingText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '900',
+    color: '#1E293B',
+  },
+  ratingTextSmall: {
+    fontSize: 11,
+    fontWeight: '900',
     color: '#1E293B',
   },
   largeCardInfo: {
     padding: 14,
-    flex: 1,
-    justifyContent: 'space-between',
   },
   cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 4,
   },
   cardCategoryText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#475569',
+    color: '#C52824',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   cardPriceText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
+    fontWeight: '800',
+    color: '#64748B',
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '900',
     color: '#1E293B',
-    marginTop: 2,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   cardFooterRow: {
     flexDirection: 'row',
@@ -1292,202 +1674,75 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   locationText: {
-    fontSize: 13,
+    fontSize: 12,
+    fontWeight: '600',
     color: '#64748B',
-    fontWeight: '500',
+  },
+  locationTextSmall: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
   },
   favoriteButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FAF5EF',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+  },
+  favoriteButtonSmall: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FAF5EF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
   },
   smallCard: {
-    width: 180,
-    height: 220,
+    width: 200,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    marginRight: 14,
-    borderWidth: 1.5,
-    borderColor: '#F1F5F9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.03,
-    shadowRadius: 12,
+    borderWidth: 2.5,
+    borderColor: '#1E293B',
     overflow: 'hidden',
-    position: 'relative',
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
   },
   smallCardImage: {
     width: '100%',
-    height: 100,
-    backgroundColor: '#F1F5F9',
+    height: 120,
   },
-  ratingTextSmall: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#1E293B',
+  smallCardSkeleton: {
+    width: 200,
+    height: 190,
+    borderRadius: 16,
+    backgroundColor: '#E2E8F0',
+    marginRight: 16,
   },
   smallCardInfo: {
-    padding: 10,
-    flex: 1,
-    justifyContent: 'space-between',
+    padding: 12,
   },
   smallCardCategory: {
     fontSize: 10,
-    fontWeight: '600',
-    color: '#94A3B8',
+    fontWeight: '800',
+    color: '#C52824',
     textTransform: 'uppercase',
+    marginBottom: 2,
   },
   smallCardTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginTop: 1,
-  },
-  locationTextSmall: {
-    fontSize: 11,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  favoriteButtonSmall: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#F8FAFC',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-
-  // Skeleton Loader Styles
-  categorySkeleton: {
-    width: 110,
-    height: 44,
-    borderRadius: 16,
-    backgroundColor: '#E2E8F0',
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    marginRight: 12,
-  },
-  largeCardSkeleton: {
-    width: 250,
-    height: 270,
-    borderRadius: 20,
-    backgroundColor: '#E2E8F0',
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    marginRight: 16,
-  },
-  smallCardSkeleton: {
-    width: 180,
-    height: 220,
-    borderRadius: 16,
-    backgroundColor: '#E2E8F0',
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    marginRight: 14,
-  },
-
-  // Drawer overlay styles
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(15, 23, 42, 0.25)',
-    zIndex: 9999,
-  },
-  overlayDismiss: {
-    flex: 1,
-  },
-  drawerContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: DRAWER_HEIGHT,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-  },
-  drawerGlass: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingBottom: Platform.OS === 'ios' ? 44 : 24,
-    backgroundColor: Platform.OS === 'ios' ? 'rgba(255, 255, 255, 0.75)' : '#FFFFFF',
-    borderTopWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-  },
-  drawerDragZone: {
-    paddingTop: 12,
-  },
-  grabHandle: {
-    width: 54,
-    height: 6,
-    backgroundColor: '#94A3B8',
-    borderRadius: 3,
-    alignSelf: 'center',
-    marginBottom: 16,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 1,
-  },
-  drawerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  drawerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1E293B',
-    letterSpacing: -0.3,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  categoriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 16,
-    paddingBottom: 24,
-  },
-  gridItem: {
-    width: (width - 48 - 16) / 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 12,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  gridIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  gridItemLabel: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#334155',
+    fontWeight: '900',
+    color: '#1E293B',
+    marginBottom: 8,
   },
-  
-  // Association Events Styling
   eventsContainer: {
     paddingHorizontal: 20,
     gap: 16,
@@ -1507,47 +1762,50 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   eventDateBlock: {
-    width: 60,
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#1E293B',
+    backgroundColor: '#FAF5EF',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRightWidth: 1.5,
-    borderColor: '#CBD5E1',
-    paddingRight: 10,
     marginRight: 12,
   },
   eventDateDay: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '900',
     color: '#C52824',
+    lineHeight: 20,
   },
   eventDateMonth: {
     fontSize: 10,
-    fontWeight: '800',
-    color: '#64748B',
+    fontWeight: '900',
+    color: '#1E293B',
     textTransform: 'uppercase',
-    marginTop: 2,
   },
   eventDetails: {
     flex: 1,
+    justifyContent: 'center',
   },
   eventTitle: {
     fontSize: 15,
     fontWeight: '900',
     color: '#1E293B',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   eventMeta: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     color: '#64748B',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   eventDesc: {
-    fontSize: 11,
-    color: '#64748B',
+    fontSize: 12,
     fontWeight: '500',
-    lineHeight: 14,
-    marginBottom: 10,
+    color: '#475569',
+    lineHeight: 16,
+    marginBottom: 6,
   },
   eventFooter: {
     flexDirection: 'row',
@@ -1556,41 +1814,43 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   eventPrice: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '900',
-    color: '#1E293B',
+    color: '#C52824',
   },
   bookBtn: {
-    height: 30,
-    paddingHorizontal: 16,
-    borderRadius: 15,
-    borderWidth: 1.8,
+    backgroundColor: '#1E293B',
+    borderRadius: 8,
+    borderWidth: 1.5,
     borderColor: '#1E293B',
-    backgroundColor: '#E5A93B', // Golden background color
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 1.5, height: 1.5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   bookBtnPressed: {
-    transform: [{ translateX: 1 }, { translateY: 1 }],
-    shadowOffset: { width: 0.5, height: 0.5 },
+    backgroundColor: '#C52824',
   },
   bookBtnText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     color: '#FFFFFF',
   },
-  
-  // Custom Booking Dialog Modal styling (Toulouse Neo-Brutalist)
+  emptyText: {
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginVertical: 20,
+  },
   modalBackdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(30, 41, 59, 0.65)',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 999,
+    zIndex: 9999,
   },
   confirmCard: {
     width: '90%',
@@ -1624,28 +1884,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '900',
     color: '#1E293B',
     textAlign: 'center',
     marginBottom: 8,
-    lineHeight: 20,
   },
   confirmDesc: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: 13,
     fontWeight: '600',
+    color: '#64748B',
     textAlign: 'center',
     marginBottom: 16,
+    lineHeight: 18,
   },
   confirmPricePill: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#1E293B',
-    backgroundColor: '#E5A93B', // Golden Capitole color
-    marginBottom: 16,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    marginBottom: 12,
     shadowColor: '#1E293B',
     shadowOffset: { width: 2, height: 2 },
     shadowOpacity: 1,
@@ -1654,22 +1914,20 @@ const styles = StyleSheet.create({
   confirmPriceText: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: '#C52824',
   },
   confirmHint: {
-    fontSize: 10,
-    color: '#94A3B8',
+    fontSize: 11,
+    color: '#64748B',
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: 20,
-    lineHeight: 14,
+    lineHeight: 15,
   },
   confirmActionsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
     width: '100%',
-    gap: 12,
   },
   confirmCancelBtn: {
     flex: 1,
@@ -1680,10 +1938,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
   },
   confirmCancelBtnText: {
     fontSize: 12,
@@ -1696,7 +1950,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 2,
     borderColor: '#1E293B',
-    backgroundColor: '#C52824', // Toulouse Red
+    backgroundColor: '#C52824',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#1E293B',
@@ -1713,15 +1967,13 @@ const styles = StyleSheet.create({
     transform: [{ translateX: 1.5 }, { translateY: 1.5 }],
     shadowOffset: { width: 0.5, height: 0.5 },
   },
-  
-  // Custom Booking Success Modal styling (Neo-Brutalist Green accent)
   successCard: {
     width: '90%',
     maxWidth: 320,
     borderRadius: 16,
     borderWidth: 3,
     borderColor: '#1E293B',
-    shadowColor: '#10B981', // Premium green shadow indicating success
+    shadowColor: '#10B981',
     shadowOffset: { width: 6, height: 6 },
     shadowOpacity: 1,
     shadowRadius: 0,
@@ -1783,7 +2035,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 2,
     borderColor: '#1E293B',
-    backgroundColor: '#E5A93B', // Golden Capitole color
+    backgroundColor: '#E5A93B',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#1E293B',
@@ -1800,8 +2052,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#FFFFFF',
   },
-  
-  // Custom Alert Info/Warning Card styling
   infoCard: {
     width: '90%',
     maxWidth: 320,
@@ -1871,7 +2121,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 2,
     borderColor: '#1E293B',
-    backgroundColor: '#E5A93B', // Golden Capitole color
+    backgroundColor: '#E5A93B',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#1E293B',
@@ -1900,7 +2150,280 @@ const styles = StyleSheet.create({
   },
   infoCloseBtnSecondaryText: {
     fontSize: 12,
+    fontWeight: '900',
+    color: '#1E293B',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 1000,
+  },
+  overlayDismiss: {
+    flex: 1,
+  },
+  drawerContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '75%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderRightWidth: 3,
+    borderColor: '#1E293B',
+  },
+  drawerGlass: {
+    flex: 1,
+    backgroundColor: '#FAF5EF',
+  },
+  drawerDragZone: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  grabHandle: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#CBD5E1',
+  },
+  drawerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: '#1E293B',
+  },
+  drawerTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#1E293B',
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#1E293B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categoriesGrid: {
+    padding: 20,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  gridItem: {
+    width: '47%',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#1E293B',
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+  },
+  gridIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gridItemLabel: {
+    fontSize: 13,
     fontWeight: '800',
+    color: '#1E293B',
+    flex: 1,
+  },
+  activeFilterBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2.5,
+    borderColor: '#1E293B',
+    borderRadius: 14,
+    marginHorizontal: 20,
+    marginTop: 12,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    boxShadow: '3px 3px 0px #1E293B' as any,
+  },
+  activeFilterLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  activeFilterText: {
+    fontSize: 13,
     color: '#64748B',
+    fontWeight: '600',
+  },
+  clearFilterBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  categoryCountBadge: {
+    backgroundColor: '#C52824',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  categoryCountBadgeText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  gridItemSelected: {
+    backgroundColor: '#FAF5EF',
+    borderColor: '#C52824',
+    borderWidth: 3,
+  },
+  gridItemLabelSelected: {
+    color: '#C52824',
+    fontWeight: '900',
+  },
+  gridItemBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  gridItemBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  emptyResultsBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  resetHomeCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FAF5EF',
+    borderWidth: 2,
+    borderColor: '#C52824',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 20,
+    borderStyle: 'dashed',
+  },
+  resetHomeCtaText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#C52824',
+  },
+  verticalGridContainer: {
+    gap: 14,
+  },
+  gridCardItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 2.5,
+    borderColor: '#1E293B',
+    overflow: 'hidden',
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
+    marginBottom: 4,
+  },
+  gridCardImage: {
+    width: '100%',
+    height: 160,
+  },
+  ratingBadgeGrid: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  gridCardBody: {
+    padding: 14,
+  },
+  gridCardCategory: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#C52824',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  gridCardTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#1E293B',
+    marginBottom: 8,
+  },
+  seeAllHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  seeAllTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#1E293B',
+    flex: 1,
+  },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#1E293B',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    boxShadow: '2px 2px 0px #1E293B' as any,
+  },
+  backBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1E293B',
   },
 });
+

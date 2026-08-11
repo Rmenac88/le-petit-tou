@@ -12,12 +12,17 @@ import {
 import { Search, Sparkles, TrendingUp, MapPin, Star, Utensils, Coffee, ShoppingBag, Dumbbell, Tag } from 'lucide-react-native';
 import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
 
+import dataset from '../../constants/dataset.json';
+
 const QUICK_TAGS = [
-  { id: '1', name: 'Restaurants', cat: 'food', icon: Utensils },
-  { id: '2', name: 'Bars & Cafés', cat: 'drinks', icon: Coffee },
-  { id: '3', name: 'Shopping', cat: 'shopping', icon: ShoppingBag },
-  { id: '4', name: 'Activités & Sport', cat: 'sport', icon: Dumbbell },
-  { id: '5', name: 'Gratuit / Bons plans', cat: 'free', icon: Tag },
+  { id: '1', name: 'Restaurants 🍴', tag: 'Restaurants', icon: Utensils },
+  { id: '2', name: 'Bars & Cafés ☕', tag: 'Bars & Cafés', icon: Coffee },
+  { id: '3', name: 'Brunch & Douceurs 🥐', tag: 'Brunch & Douceurs', icon: Coffee },
+  { id: '4', name: 'Shopping & Déco 🛍️', tag: 'Shopping & Déco', icon: ShoppingBag },
+  { id: '5', name: 'Beauté 💆', tag: 'Beauté & Bien-être', icon: Sparkles },
+  { id: '6', name: 'Culture & Loisirs 🎨', tag: 'Culture & Loisirs', icon: Dumbbell },
+  { id: '7', name: 'Terrasse ☀️', tag: 'Terrasse ☀️', icon: Tag },
+  { id: '8', name: 'Bio & Local 🌿', tag: 'Bio & Local 🌿', icon: Tag },
 ];
 
 const POPULAR_SEARCHES = [
@@ -28,56 +33,7 @@ const POPULAR_SEARCHES = [
   "Tapas toulousains ambiance chaleureuse",
 ];
 
-const MOCK_SEARCH_SPOTS = [
-  {
-    id: '1',
-    title: "Pont Neuf Crêperie",
-    category: "Restauration",
-    cat: "food",
-    location: "Capitole, Toulouse",
-    address: "Pont Neuf, 31000 Toulouse",
-    rating: 4.8,
-    price_level: "€10-20",
-    description: "Crêpes artisanales au bord de la Garonne avec produits locaux bio.",
-    image_url: "https://images.unsplash.com/photo-1551024601-bec78aea704b?w=500&auto=format&fit=crop"
-  },
-  {
-    id: '2',
-    title: "Place du Capitole Café",
-    category: "Bars & Cafés",
-    cat: "drinks",
-    location: "Capitole, Toulouse",
-    address: "Place du Capitole, 31000 Toulouse",
-    rating: 4.6,
-    price_level: "€5-15",
-    description: "Le café mythique historique au cœur de Toulouse.",
-    image_url: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=500&auto=format&fit=crop"
-  },
-  {
-    id: '3',
-    title: "Carmes Tapas Bar",
-    category: "Restauration",
-    cat: "food",
-    location: "Carmes, Toulouse",
-    address: "Rue des Filatiers, 31000 Toulouse",
-    rating: 4.9,
-    price_level: "€20-45",
-    description: "Meilleurs tapas toulousains ambiance chaleureuse et vins bio.",
-    image_url: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=500&auto=format&fit=crop"
-  },
-  {
-    id: '4',
-    title: "Saint-Cyprien Concept Store",
-    category: "Shopping",
-    cat: "shopping",
-    location: "Saint-Cyprien, Toulouse",
-    address: "Place Saint-Cyprien, 31300 Toulouse",
-    rating: 4.7,
-    price_level: "€15-50",
-    description: "Boutique créateur écoresponsable et friperie vintage.",
-    image_url: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500&auto=format&fit=crop"
-  }
-];
+const ALL_SPOTS = dataset.addresses || [];
 
 export default function SearchView({
   onSelectSpot,
@@ -88,18 +44,18 @@ export default function SearchView({
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedSpotDetail, setSelectedSpotDetail] = useState<SpotDetail | null>(null);
 
-  // Dynamic search filtering
-  const filteredSpots = MOCK_SEARCH_SPOTS.filter(s => {
-    if (selectedTag && selectedTag !== 'free') {
-      if (s.cat !== selectedTag) return false;
+  // Dynamic search filtering across 790 spots
+  const filteredSpots = ALL_SPOTS.filter(s => {
+    if (selectedTag) {
+      if (!s.tags || !s.tags.includes(selectedTag)) return false;
     }
-    if (!query.trim()) return true;
+    if (!query.trim()) return selectedTag ? true : false;
     const q = query.toLowerCase();
     return (
       s.title.toLowerCase().includes(q) ||
       s.description.toLowerCase().includes(q) ||
-      s.category.toLowerCase().includes(q) ||
-      s.location.toLowerCase().includes(q)
+      s.location.toLowerCase().includes(q) ||
+      (s.tags && s.tags.some(t => t.toLowerCase().includes(q)))
     );
   });
 
@@ -138,12 +94,12 @@ export default function SearchView({
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagsScroll}>
             {QUICK_TAGS.map(tag => {
               const IconComp = tag.icon;
-              const isSelected = selectedTag === tag.cat;
+              const isSelected = selectedTag === tag.tag;
               return (
                 <Pressable
                   key={tag.id}
                   style={[styles.tagPill, isSelected && styles.tagPillSelected]}
-                  onPress={() => setSelectedTag(isSelected ? null : tag.cat)}
+                  onPress={() => setSelectedTag(isSelected ? null : tag.tag)}
                 >
                   <IconComp size={14} color={isSelected ? '#FFFFFF' : '#1E293B'} strokeWidth={2.2} />
                   <Text style={[styles.tagPillText, isSelected && styles.tagPillTextSelected]}>{tag.name}</Text>
@@ -171,12 +127,21 @@ export default function SearchView({
                 <Pressable
                   key={spot.id}
                   style={styles.resultCard}
-                  onPress={() => setSelectedSpotDetail(spot)}
+                  onPress={() => setSelectedSpotDetail({
+                    ...spot,
+                    description: (spot as any).full_description || spot.description,
+                    full_description: (spot as any).full_description || spot.description,
+                    breadcrumbs: (spot as any).breadcrumbs || [],
+                    tags: spot.tags || [],
+                    photos: spot.image_url ? [spot.image_url, ...((spot as any).gallery_urls || [])] : ((spot as any).gallery_urls || []),
+                    phone: (spot as any).telephone || '',
+                    website: (spot as any).site_web || '',
+                  })}
                 >
                   <Image source={{ uri: spot.image_url }} style={styles.resultImage} />
                   <View style={styles.resultInfo}>
                     <View style={styles.resultBadgeRow}>
-                      <Text style={styles.resultCategory}>{spot.category}</Text>
+                      <Text style={styles.resultCategory}>{spot.tags ? spot.tags[0] : 'Adresse'}</Text>
                       <View style={styles.ratingBadge}>
                         <Star size={12} color="#E5A93B" fill="#E5A93B" />
                         <Text style={styles.ratingText}>{spot.rating}</Text>

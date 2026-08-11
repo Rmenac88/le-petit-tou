@@ -25,6 +25,9 @@ export interface SpotDetail {
   rating?: number;
   price_level?: string;
   description?: string;
+  full_description?: string;
+  breadcrumbs?: string[];
+  tags?: string[];
   image_url?: string;
   photos?: string[];
   phone?: string;
@@ -53,14 +56,11 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
 
   if (!spot) return null;
 
-  // Carousel photos (fallback images if spot only has 1 main image)
+  // Carousel photos (only actual photos of the spot, no generic fallbacks)
   const galleryPhotos = spot.photos && spot.photos.length > 0 
-    ? spot.photos 
-    : [
-        spot.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800&auto=format&fit=crop&q=80',
-      ];
+    ? spot.photos.filter(p => !!p)
+    : (spot.image_url ? [spot.image_url] : []);
+
 
   const handleScroll = (event: any) => {
     const slideSize = event.nativeEvent.layoutMeasurement.width;
@@ -149,7 +149,9 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
             <View style={styles.addressLineRow}>
               <Icons.MapPin size={18} color="#C52824" style={{ marginRight: 6 }} />
               <Text style={styles.addressLineText}>
-                {spot.address || '46 Bd Matabiau, 31000 Toulouse'}
+                {spot.address && spot.address !== 'Toulouse' && spot.address !== 'Toulouse Centre'
+                  ? spot.address 
+                  : `${spot.title}, Toulouse`}
               </Text>
             </View>
 
@@ -158,14 +160,17 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
               <Pressable
                 style={styles.primaryCtaBtn}
                 onPress={() => {
-                  const targetAddress = spot.address || `${spot.title}, Toulouse`;
+                  const fullAddress = spot.address && spot.address !== 'Toulouse' && spot.address !== 'Toulouse Centre'
+                    ? spot.address
+                    : 'Toulouse';
+                  const targetQuery = `${spot.title}, ${fullAddress}`;
                   const scheme = Platform.select({
-                    ios: `maps://?q=${encodeURIComponent(targetAddress)}`,
-                    android: `geo:0,0?q=${encodeURIComponent(targetAddress)}`,
-                    default: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(targetAddress)}`
+                    ios: `maps://?q=${encodeURIComponent(targetQuery)}`,
+                    android: `geo:0,0?q=${encodeURIComponent(targetQuery)}`,
+                    default: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(targetQuery)}`
                   });
                   Linking.openURL(scheme).catch(() => {
-                    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(targetAddress)}`);
+                    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(targetQuery)}`);
                   });
                 }}
               >
@@ -185,14 +190,42 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
               </Pressable>
             </View>
 
-            {/* Description Section */}
-            <View style={styles.sectionBox}>
-              <Text style={styles.sectionHeaderTitle}>À propos</Text>
-              <Text style={styles.descriptionText}>
-                {spot.description ||
+            {/* Breadcrumb Category Chips */}
+            {spot.breadcrumbs && spot.breadcrumbs.length > 0 && (
+              <View style={styles.breadcrumbChipsRow}>
+                {spot.breadcrumbs.map((crumb, idx) => (
+                  <View key={idx} style={styles.crumbChip}>
+                    <Text style={styles.crumbChipText}>{crumb}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* L'avis du Petit Tou Card */}
+            <View style={styles.petitTouReviewCard}>
+              <View style={styles.petitTouReviewHeader}>
+                <Icons.Quote size={20} color="#E5A93B" style={{ marginRight: 8 }} />
+                <Text style={styles.petitTouReviewTitle}>L'avis du Petit Tou</Text>
+              </View>
+              <Text style={styles.petitTouReviewText}>
+                {spot.full_description || spot.description ||
                   "Une adresse incontournable sélectionnée avec soin par l'équipe du Petit Tou. Venez vivre une expérience authentique au cœur de Toulouse."}
               </Text>
             </View>
+
+            {/* Feature Tags Badges */}
+            {spot.tags && spot.tags.length > 0 && (
+              <View style={styles.tagsSectionBox}>
+                <Text style={styles.sectionHeaderTitle}>Équipements & Services</Text>
+                <View style={styles.tagsWrapRow}>
+                  {spot.tags.map((tag, idx) => (
+                    <View key={idx} style={styles.featureTagBadge}>
+                      <Text style={styles.featureTagText}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
 
             {/* Practical Info (Hours, Phone, Web) */}
             <View style={styles.sectionBox}>
@@ -565,5 +598,80 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 18,
+  },
+  breadcrumbChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+  },
+  crumbChip: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    boxShadow: '1.5px 1.5px 0px #1E293B',
+  },
+  crumbChipText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  petitTouReviewCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2.5,
+    borderColor: '#1E293B',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 6,
+    borderLeftColor: '#E5A93B',
+    boxShadow: '3px 3px 0px #1E293B',
+  },
+  petitTouReviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  petitTouReviewTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#1E293B',
+    letterSpacing: 0.2,
+  },
+  petitTouReviewText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#334155',
+    lineHeight: 22,
+  },
+  tagsSectionBox: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#1E293B',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  tagsWrapRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  featureTagBadge: {
+    backgroundColor: '#FAF5EF',
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  featureTagText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#1E293B',
   },
 });

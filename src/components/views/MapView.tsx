@@ -34,6 +34,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { BACKGROUND_LOCATION_TASK } from '../../app/_layout';
 import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
+import dataset from '../../constants/dataset.json';
 
 // Conditional dynamic imports to prevent native modules breaking the web bundle
 let NativeMapView: any = null;
@@ -53,13 +54,30 @@ const TOULOUSE_LAT = 43.6047;
 const TOULOUSE_LNG = 1.4442;
 const { height } = Dimensions.get('window');
 
-// Le Petit Tou recommended mock spots in Toulouse
-const PT_SPOTS = [
-  { id: '1', name: "Pont Neuf Crêperie", lat: 43.5999, lng: 1.4406, cat: 'food', desc: "Crêpes artisanales au bord de la Garonne.", price_max: 20, ambiance: 'trendy', is_open_now: true },
-  { id: '2', name: "Place du Capitole Café", lat: 43.6044, lng: 1.4435, cat: 'shopping', desc: "Le café mythique historique de Toulouse.", price_max: 35, ambiance: 'calm', is_open_now: true },
-  { id: '3', name: "Carmes Tapas Bar", lat: 43.5965, lng: 1.4455, cat: 'food', desc: "Meilleurs tapas toulousains ambiance chaleureuse.", price_max: 50, ambiance: 'cosy', is_open_now: true },
-  { id: '4', name: "Saint-Cyprien Concept Store", lat: 43.5985, lng: 1.4325, cat: 'shopping', desc: "Boutique créateur écoresponsable.", price_max: 30, ambiance: 'rooftop', is_open_now: false }
-];
+// All 790 Le Petit Tou establishments with BAN geocoded coordinates
+const PT_SPOTS = (dataset.addresses || []).map((addr: any) => ({
+  id: addr.id,
+  name: addr.title,
+  title: addr.title,
+  lat: addr.lat || TOULOUSE_LAT,
+  lng: addr.lng || TOULOUSE_LNG,
+  cat: addr.category_id === 'cat_gourmand' ? 'food' : addr.category_id === 'cat_trinquer' ? 'drinks' : addr.category_id === 'cat_shopping' ? 'shopping' : addr.category_id === 'cat_culture' ? 'culture' : 'food',
+  category: addr.tags ? addr.tags[0] : 'Adresse',
+  desc: addr.description,
+  description: addr.full_description || addr.description,
+  image_url: addr.image_url,
+  gallery_urls: addr.gallery_urls || [],
+  photos: addr.image_url ? [addr.image_url, ...(addr.gallery_urls || [])] : (addr.gallery_urls || []),
+  rating: addr.rating || 4.8,
+  price_level: addr.price_level || '€',
+  location: addr.location || 'Toulouse',
+  address: addr.address || `${addr.location}, Toulouse`,
+  phone: addr.telephone || '',
+  website: addr.site_web || '',
+  tags: addr.tags || [],
+  is_recommended: addr.is_recommended || false,
+  is_new: addr.is_new || false,
+}));
 
 // Beautiful custom stylized theme for Google Maps (Cream/Slate/Red palette)
 const customGoogleMapStyle = [
@@ -120,34 +138,55 @@ const getWebMapHtml = () => `
       color: #64748B !important;
       box-shadow: 1px 1px 0px #1E293B !important;
     }
-    
-    /* Custom Neo-Brutalist Categorized Markers */
+
+    /* Custom Circular Photo Pins matching official Le Petit Tou site */
     .custom-marker {
       display: flex;
       justify-content: center;
       align-items: center;
-      width: 32px;
-      height: 32px;
-      border-radius: 16px;
-      border: 2.5px solid #1E293B;
-      box-shadow: 2px 2px 0px #1E293B;
-      color: #FFFFFF;
+      width: 30px;
+      height: 30px;
+      border-radius: 15px;
+      border: 2px solid #FFFFFF;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+      background: #FFFFFF;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .custom-marker img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 15px;
+    }
+    .custom-marker .fallback-icon {
+      font-size: 13px;
       font-weight: 900;
-      font-size: 14px;
-      transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.25s ease;
+      color: #FFFFFF;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .custom-marker:hover {
+      transform: scale(1.3) translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+      z-index: 8888 !important;
     }
     .custom-marker.active-marker {
-      transform: scale(1.35) translateY(-4px);
-      box-shadow: 4px 6px 0px #1E293B;
-      border-color: #1E293B;
+      transform: scale(1.45) translateY(-4px);
+      border: 2.5px solid #C52824;
+      box-shadow: 0 6px 16px rgba(197, 40, 36, 0.5);
       z-index: 9999 !important;
     }
-    .custom-marker.cat-food { background: #C52824; }
-    .custom-marker.cat-drinks { background: #E5A93B; }
-    .custom-marker.cat-shopping { background: #3B82F6; }
-    .custom-marker.cat-beauty { background: #EC4899; }
-    .custom-marker.cat-culture { background: #10B981; }
-    .custom-marker.cat-sport { background: #6366F1; }
+    .custom-marker.cat-food .fallback-icon { background: #C52824; }
+    .custom-marker.cat-drinks .fallback-icon { background: #E5A93B; }
+    .custom-marker.cat-shopping .fallback-icon { background: #3B82F6; }
+    .custom-marker.cat-beauty .fallback-icon { background: #EC4899; }
+    .custom-marker.cat-culture .fallback-icon { background: #10B981; }
+    .custom-marker.cat-sport .fallback-icon { background: #6366F1; }
     
     /* Pulse Ring for User Live Location */
     .user-location-marker {
@@ -170,11 +209,11 @@ const getWebMapHtml = () => `
 <body>
   <div id="map"></div>
   <script>
-    var map = L.map('map', { zoomControl: false }).setView([${TOULOUSE_LAT}, ${TOULOUSE_LNG}], 14);
+    var map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([${TOULOUSE_LAT}, ${TOULOUSE_LNG}], 14);
     
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap',
-      keepBuffer: 2,
+      keepBuffer: 3,
       updateWhenIdle: true,
       maxNativeZoom: 19
     }).addTo(map);
@@ -200,13 +239,15 @@ const getWebMapHtml = () => `
         var catClass = 'cat-' + (s.cat || s.category || 'food');
         var isActive = s.id === currentSelectedId;
         var activeClass = isActive ? ' active-marker' : '';
-        var symbol = getIconSvg(s.cat || s.category);
+        var innerHtml = s.image_url 
+          ? '<img src="' + s.image_url + '" alt="spot" />'
+          : '<div class="fallback-icon">' + symbol + '</div>';
 
         var customIcon = L.divIcon({
           className: 'custom-icon-wrapper',
-          html: '<div class="custom-marker ' + catClass + activeClass + '">' + symbol + '</div>',
-          iconSize: [32, 32],
-          iconAnchor: [16, 16]
+          html: '<div class="custom-marker ' + catClass + activeClass + '">' + innerHtml + '</div>',
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
         });
 
         L.marker([s.lat, s.lng], { icon: customIcon, zIndexOffset: isActive ? 1000 : 0 })
@@ -458,51 +499,64 @@ export default function MapView({
   }, [searchQuery, category, ambiance, budget, openOnly]);
 
   const loadAndFilterSpots = async () => {
-    // 1. Try to fetch and query from Supabase table 'spots'
+    let rawSpots: any[] = [];
     try {
       if (supabase) {
-        let query = supabase.from('spots').select('*');
-
-        if (searchQuery) query = query.ilike('name', `%${searchQuery}%`);
-        if (category) query = query.eq('category', category);
-        if (ambiance) query = query.eq('ambiance', ambiance);
-        if (budget < 50) query = query.lte('price_max', budget);
-        if (openOnly) query = query.eq('is_open_now', true);
-
-        const { data, error } = await query;
-        if (!error && data) {
-          setSpots(data);
-          setFilteredSpots(data);
-          return;
+        const { data, error } = await supabase.from('addresses').select('*');
+        if (!error && data && data.length > 0) {
+          rawSpots = data;
         }
       }
     } catch (err) {
-      console.log('DEBUG: spots table does not exist or fetch failed. Falling back to local data.');
+      console.log('DEBUG: addresses table fetch failed. Falling back to dataset.');
     }
 
-    // 2. Local fallback filtering if Supabase table is not configured yet
-    let results = PT_SPOTS.filter((s: any) => {
-      if (searchQuery && !s.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-      
-      // Category filter mapping
-      if (category) {
-        const spotCat = s.cat || s.category || 'food';
-        if (category !== spotCat) return false;
+    if (rawSpots.length === 0) {
+      rawSpots = dataset.addresses || [];
+    }
+
+    const formattedSpots = rawSpots.map((addr: any) => {
+      const gallery = addr.gallery_urls || [];
+      const photos = addr.image_url ? [addr.image_url, ...gallery] : gallery;
+      return {
+        id: addr.id,
+        name: addr.title,
+        title: addr.title,
+        lat: addr.lat || TOULOUSE_LAT,
+        lng: addr.lng || TOULOUSE_LNG,
+        cat: addr.category_id === 'cat_gourmand' ? 'food' : addr.category_id === 'cat_trinquer' ? 'drinks' : addr.category_id === 'cat_shopping' ? 'shopping' : addr.category_id === 'cat_culture' ? 'culture' : 'food',
+        category: addr.tags ? addr.tags[0] : 'Adresse',
+        desc: addr.description,
+        description: addr.full_description || addr.description,
+        image_url: addr.image_url,
+        gallery_urls: gallery,
+        photos: photos,
+        rating: addr.rating || 4.8,
+        price_level: addr.price_level || '€',
+        location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
+        address: addr.address || (addr.location ? addr.location : 'Toulouse'),
+        phone: addr.telephone || '',
+        website: addr.site_web || '',
+        tags: addr.tags || [],
+        is_recommended: addr.is_recommended || false,
+        is_new: addr.is_new || false,
+      };
+    });
+
+    let results = formattedSpots.filter((s: any) => {
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matchesName = s.name.toLowerCase().includes(q);
+        const matchesDesc = s.description.toLowerCase().includes(q);
+        const matchesTag = s.tags && s.tags.some((t: string) => t.toLowerCase().includes(q));
+        if (!matchesName && !matchesDesc && !matchesTag) return false;
       }
-
-      // Ambiance filter mapping
-      if (ambiance && s.ambiance !== ambiance) return false;
-
-      // Budget filter mapping
-      if (budget < 50 && s.price_max > budget) return false;
-
-      // Open now filter mapping
+      if (category && s.cat !== category) return false;
       if (openOnly && !s.is_open_now) return false;
-
       return true;
     });
 
-    setSpots(PT_SPOTS);
+    setSpots(formattedSpots);
     setFilteredSpots(results);
   };
 
@@ -782,18 +836,19 @@ export default function MapView({
   };
 
   const handleOpenItinerary = (spot: any) => {
-    const lat = parseFloat(spot.lat);
-    const lng = parseFloat(spot.lng);
-    const validLat = isNaN(lat) ? 43.6047 : lat;
-    const validLng = isNaN(lng) ? 1.4442 : lng;
+    const spotName = spot.name || spot.title || 'Établissement';
+    const fullAddress = spot.address && spot.address !== 'Toulouse' && spot.address !== 'Toulouse Centre'
+      ? spot.address
+      : `${spotName}, Toulouse`;
+    const targetQuery = `${spotName}, ${fullAddress}`;
 
     const scheme = Platform.select({
-      ios: `maps://?daddr=${validLat},${validLng}&q=${encodeURIComponent(spot.name)}`,
-      android: `geo:0,0?q=${validLat},${validLng}(${encodeURIComponent(spot.name)})`,
-      default: `https://www.google.com/maps/dir/?api=1&destination=${validLat},${validLng}`
+      ios: `maps://?q=${encodeURIComponent(targetQuery)}`,
+      android: `geo:0,0?q=${encodeURIComponent(targetQuery)}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(targetQuery)}`
     });
     Linking.openURL(scheme).catch(() => {
-      Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${validLat},${validLng}`);
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(targetQuery)}`);
     });
   };
 
@@ -1053,13 +1108,19 @@ export default function MapView({
           spot={{
             id: selectedSpot.id,
             title: selectedSpot.name || selectedSpot.title,
-            description: selectedSpot.description || selectedSpot.desc,
+            description: selectedSpot.full_description || selectedSpot.description || selectedSpot.desc,
+            full_description: selectedSpot.full_description || selectedSpot.description || selectedSpot.desc,
+            breadcrumbs: selectedSpot.breadcrumbs || [],
+            tags: selectedSpot.tags || [],
             category: getCategoryLabel(selectedSpot.cat || selectedSpot.category),
             location: selectedSpot.location || 'Toulouse',
             address: selectedSpot.address || `${selectedSpot.name}, Toulouse`,
             rating: selectedSpot.rating || 4.8,
             price_level: selectedSpot.price_max ? `Jusqu'à ${selectedSpot.price_max}€` : '€€',
             image_url: selectedSpot.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80',
+            photos: selectedSpot.gallery_urls && selectedSpot.gallery_urls.length > 0 ? [selectedSpot.image_url, ...selectedSpot.gallery_urls] : (selectedSpot.image_url ? [selectedSpot.image_url] : []),
+            phone: selectedSpot.telephone || '',
+            website: selectedSpot.site_web || '',
           }}
           onClose={() => setShowFullAddressModal(false)}
           onGoToMap={() => {
