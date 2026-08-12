@@ -263,7 +263,20 @@ export default function HomeView({
       if (addrError) throw addrError;
 
       setCategories(catData && catData.length > 0 ? catData : (dataset.categories as any));
-      setAddresses(addrData && addrData.length > 0 ? (addrData as any) : (dataset.addresses as any));
+      
+      const localMap = new Map((dataset.addresses as any[]).map(a => [a.id, a]));
+      const rawAddresses = addrData && addrData.length > 0 ? addrData : (dataset.addresses as any);
+      const mergedAddresses = rawAddresses.map((dbAddr: any) => {
+        const local = localMap.get(dbAddr.id) || {};
+        return {
+          ...local,
+          ...dbAddr,
+          telephone: dbAddr.telephone || local.telephone || '',
+          site_web: dbAddr.site_web || local.site_web || '',
+          horaires: local.horaires || dbAddr.horaires || '',
+        };
+      });
+      setAddresses(mergedAddresses as any);
 
       // Fetch Events
       try {
