@@ -53,8 +53,20 @@ interface AddressDetailModalProps {
 export default function AddressDetailModal({ spot, onClose, onGoToMap }: AddressDetailModalProps) {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   if (!spot) return null;
+
+  // Clean full review text
+  const rawReviewText = spot.full_description || spot.description ||
+    "Une adresse incontournable sélectionnée avec soin par l'équipe du Petit Tou. Venez vivre une expérience authentique au cœur de Toulouse.";
+  
+  // Clean any trailing truncation dots if present
+  const cleanedReviewText = rawReviewText.replace(/[\.\…\s]+$/, '').trim();
+  const isLongDescription = cleanedReviewText.length > 180;
+  const displayText = (!isDescriptionExpanded && isLongDescription)
+    ? `${cleanedReviewText.slice(0, 180)}...`
+    : cleanedReviewText;
 
   // Carousel photos (only actual photos of the spot, no generic fallbacks)
   const galleryPhotos = spot.photos && spot.photos.length > 0 
@@ -208,9 +220,19 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
                 <Text style={styles.petitTouReviewTitle}>L'avis du Petit Tou</Text>
               </View>
               <Text style={styles.petitTouReviewText}>
-                {spot.full_description || spot.description ||
-                  "Une adresse incontournable sélectionnée avec soin par l'équipe du Petit Tou. Venez vivre une expérience authentique au cœur de Toulouse."}
+                {displayText}
               </Text>
+
+              {isLongDescription && (
+                <Pressable
+                  style={styles.expandToggleBtn}
+                  onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                >
+                  <Text style={styles.expandToggleText}>
+                    {isDescriptionExpanded ? 'Voir moins ▲' : 'Voir plus ▼'}
+                  </Text>
+                </Pressable>
+              )}
             </View>
 
             {/* Feature Tags Badges */}
@@ -646,6 +668,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#334155',
     lineHeight: 22,
+  },
+  expandToggleBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    backgroundColor: '#FAF5EF',
+    borderWidth: 1.5,
+    borderColor: '#C52824',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  expandToggleText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#C52824',
   },
   tagsSectionBox: {
     backgroundColor: '#FFFFFF',
