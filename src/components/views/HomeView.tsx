@@ -582,8 +582,9 @@ export default function HomeView({
                             price_level: addr.price_level,
                             location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
                             address: (addr as any).address || addr.location || 'Toulouse',
-                            phone: (addr as any).telephone || '',
-                            website: (addr as any).site_web || '',
+                            phone: (addr as any).telephone || (addr as any).phone || '',
+                            website: (addr as any).site_web || (addr as any).website || '',
+                            hours: (addr as any).horaires || (addr as any).hours || '',
                           });
                         }}
                       >
@@ -653,8 +654,9 @@ export default function HomeView({
                           price_level: addr.price_level,
                           location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
                           address: (addr as any).address || addr.location || 'Toulouse',
-                          phone: (addr as any).telephone || '',
-                          website: (addr as any).site_web || '',
+                          phone: (addr as any).telephone || (addr as any).phone || '',
+                          website: (addr as any).site_web || (addr as any).website || '',
+                          hours: (addr as any).horaires || (addr as any).hours || '',
                         });
                       }}
                     >
@@ -723,8 +725,9 @@ export default function HomeView({
                           price_level: addr.price_level,
                           location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
                           address: (addr as any).address || addr.location || 'Toulouse',
-                          phone: (addr as any).telephone || '',
-                          website: (addr as any).site_web || '',
+                          phone: (addr as any).telephone || (addr as any).phone || '',
+                          website: (addr as any).site_web || (addr as any).website || '',
+                          hours: (addr as any).horaires || (addr as any).hours || '',
                         });
                       }}
                     >
@@ -850,8 +853,9 @@ export default function HomeView({
                             price_level: addr.price_level,
                             location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
                             address: (addr as any).address || addr.location || 'Toulouse',
-                            phone: (addr as any).telephone || '',
-                            website: (addr as any).site_web || '',
+                            phone: (addr as any).telephone || (addr as any).phone || '',
+                            website: (addr as any).site_web || (addr as any).website || '',
+                            hours: (addr as any).horaires || (addr as any).hours || '',
                           });
                         }}
                       >
@@ -940,8 +944,9 @@ export default function HomeView({
                             price_level: addr.price_level,
                             location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
                             address: (addr as any).address || addr.location || 'Toulouse',
-                            phone: (addr as any).telephone || '',
-                            website: (addr as any).site_web || '',
+                            phone: (addr as any).telephone || (addr as any).phone || '',
+                            website: (addr as any).site_web || (addr as any).website || '',
+                            hours: (addr as any).horaires || (addr as any).hours || '',
                           });
                         }}
                       >

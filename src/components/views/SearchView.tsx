@@ -134,8 +134,9 @@ export default function SearchView({
                     breadcrumbs: (spot as any).breadcrumbs || [],
                     tags: spot.tags || [],
                     photos: spot.image_url ? [spot.image_url, ...((spot as any).gallery_urls || [])] : ((spot as any).gallery_urls || []),
-                    phone: (spot as any).telephone || '',
-                    website: (spot as any).site_web || '',
+                    phone: (spot as any).telephone || (spot as any).phone || '',
+                    website: (spot as any).site_web || (spot as any).website || '',
+                    hours: (spot as any).horaires || (spot as any).hours || '',
                   })}
                 >
                   <Image source={{ uri: spot.image_url }} style={styles.resultImage} />

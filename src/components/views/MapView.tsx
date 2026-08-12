@@ -74,6 +74,7 @@ const PT_SPOTS = (dataset.addresses || []).map((addr: any) => ({
   address: addr.address || `${addr.location}, Toulouse`,
   phone: addr.telephone || '',
   website: addr.site_web || '',
+  hours: addr.horaires || '',
   tags: addr.tags || [],
   is_recommended: addr.is_recommended || false,
   is_new: addr.is_new || false,
@@ -537,6 +538,7 @@ export default function MapView({
         address: addr.address || (addr.location ? addr.location : 'Toulouse'),
         phone: addr.telephone || '',
         website: addr.site_web || '',
+        hours: addr.horaires || '',
         tags: addr.tags || [],
         is_recommended: addr.is_recommended || false,
         is_new: addr.is_new || false,
@@ -1119,8 +1121,9 @@ export default function MapView({
             price_level: selectedSpot.price_max ? `Jusqu'à ${selectedSpot.price_max}€` : '€€',
             image_url: selectedSpot.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80',
             photos: selectedSpot.gallery_urls && selectedSpot.gallery_urls.length > 0 ? [selectedSpot.image_url, ...selectedSpot.gallery_urls] : (selectedSpot.image_url ? [selectedSpot.image_url] : []),
-            phone: selectedSpot.telephone || '',
-            website: selectedSpot.site_web || '',
+            phone: selectedSpot.telephone || selectedSpot.phone || '',
+            website: selectedSpot.site_web || selectedSpot.website || '',
+            hours: selectedSpot.horaires || selectedSpot.hours || '',
           }}
           onClose={() => setShowFullAddressModal(false)}
           onGoToMap={() => {

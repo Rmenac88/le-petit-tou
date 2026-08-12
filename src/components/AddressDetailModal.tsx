@@ -255,18 +255,61 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
               
               <View style={styles.infoRow}>
                 <Icons.Clock size={18} color="#64748B" style={styles.infoIcon} />
-                <Text style={styles.infoText}>{spot.hours || 'Mardi - Dimanche : 10:00 - 19:00'}</Text>
+                <Text style={styles.infoText}>
+                  {spot.hours && spot.hours.trim() ? spot.hours : 'Horaires non communiqués'}
+                </Text>
               </View>
 
-              <View style={styles.infoRow}>
-                <Icons.Phone size={18} color="#64748B" style={styles.infoIcon} />
-                <Text style={styles.infoText}>{spot.phone || '+33 5 61 23 45 67'}</Text>
-              </View>
+              {spot.phone ? (
+                <Pressable
+                  style={styles.infoRow}
+                  onPress={() => {
+                    const clean = spot.phone?.replace(/[^\d\+]/g, '');
+                    if (clean) Linking.openURL(`tel:${clean}`);
+                  }}
+                >
+                  <Icons.Phone size={18} color="#C52824" style={styles.infoIcon} />
+                  <Text style={[styles.infoText, { color: '#C52824', textDecorationLine: 'underline' }]}>
+                    {spot.phone}
+                  </Text>
+                </Pressable>
+              ) : (
+                <View style={styles.infoRow}>
+                  <Icons.Phone size={18} color="#64748B" style={styles.infoIcon} />
+                  <Text style={[styles.infoText, { color: '#94A3B8' }]}>
+                    Téléphone non renseigné
+                  </Text>
+                </View>
+              )}
 
-              <View style={styles.infoRow}>
-                <Icons.Globe size={18} color="#64748B" style={styles.infoIcon} />
-                <Text style={styles.infoText}>{spot.website || 'www.lepetittou.com'}</Text>
-              </View>
+              {spot.website ? (
+                <Pressable
+                  style={styles.infoRow}
+                  onPress={() => {
+                    let url = spot.website?.trim() || '';
+                    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                      url = 'https://' + url;
+                    }
+                    Linking.openURL(url).catch(() => {});
+                  }}
+                >
+                  <Icons.Globe size={18} color="#C52824" style={styles.infoIcon} />
+                  <Text
+                    style={[styles.infoText, { color: '#C52824', textDecorationLine: 'underline' }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {spot.website.replace(/^https?:\/\//i, '')}
+                  </Text>
+                </Pressable>
+              ) : (
+                <View style={styles.infoRow}>
+                  <Icons.Globe size={18} color="#64748B" style={styles.infoIcon} />
+                  <Text style={[styles.infoText, { color: '#94A3B8' }]}>
+                    Site web non renseigné
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Reviews / Avis (Mock / Future Google/TripAdvisor sync) */}
