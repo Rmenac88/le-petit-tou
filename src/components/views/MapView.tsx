@@ -15,7 +15,6 @@ import {
   PanResponder,
 } from 'react-native';
 import * as Location from 'expo-location';
-import * as TaskManager from 'expo-task-manager';
 import {
   Compass,
   Navigation,
@@ -30,20 +29,38 @@ import {
   Sparkles,
   Trophy,
   Smile,
+  ChevronRight,
+  Wine,
+  Scissors,
+  Landmark,
+  Dumbbell,
+  CakeSlice,
+  MapPin,
 } from 'lucide-react-native';
+import { getCategoryIcon } from '../../lib/categoryIcons';
 import { supabase } from '../../lib/supabase';
-import { BACKGROUND_LOCATION_TASK } from '../../app/_layout';
+import { appCache } from '../../lib/dataCache';
 import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
-import dataset from '../../constants/dataset.json';
+import PlaceDetailSheet from '../PlaceDetailSheet';
+import { classifySpot, getBudgetInfo } from '../../lib/categoryResolver';
+import { placesRepository } from '../../lib/placesRepository';
+import {
+  loadDeviceLikedSpotIds,
+  fetchGlobalLikesMap,
+  toggleSpotLike,
+} from '../../lib/likesStore';
+import { discoveryStore } from '../../lib/discoveryStore';
 
 // Conditional dynamic imports to prevent native modules breaking the web bundle
 let NativeMapView: any = null;
 let NativeMarker: any = null;
+let NativePolyline: any = null;
 if (Platform.OS !== 'web') {
   try {
     const Maps = require('react-native-maps');
     NativeMapView = Maps.default;
     NativeMarker = Maps.Marker;
+    NativePolyline = Maps.Polyline;
   } catch (e) {
     console.warn('Native maps not loaded', e);
   }
@@ -52,32 +69,22 @@ if (Platform.OS !== 'web') {
 // Toulouse Default Center Coordinates
 const TOULOUSE_LAT = 43.6047;
 const TOULOUSE_LNG = 1.4442;
+const MAPBOX_ACCESS_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
 const { height } = Dimensions.get('window');
 
-// All 790 Le Petit Tou establishments with BAN geocoded coordinates
-const PT_SPOTS = (dataset.addresses || []).map((addr: any) => ({
-  id: addr.id,
-  name: addr.title,
-  title: addr.title,
-  lat: addr.lat || TOULOUSE_LAT,
-  lng: addr.lng || TOULOUSE_LNG,
-  cat: addr.category_id === 'cat_gourmand' ? 'food' : addr.category_id === 'cat_trinquer' ? 'drinks' : addr.category_id === 'cat_shopping' ? 'shopping' : addr.category_id === 'cat_culture' ? 'culture' : 'food',
-  category: addr.tags ? addr.tags[0] : 'Adresse',
-  desc: addr.description,
-  description: addr.full_description || addr.description,
-  image_url: addr.image_url,
-  gallery_urls: addr.gallery_urls || [],
-  photos: addr.image_url ? [addr.image_url, ...(addr.gallery_urls || [])] : (addr.gallery_urls || []),
-  rating: addr.rating || 4.8,
-  price_level: addr.price_level || '€',
-  location: addr.location || 'Toulouse',
-  address: addr.address || `${addr.location}, Toulouse`,
-  phone: addr.telephone || '',
-  website: addr.site_web || '',
-  hours: addr.horaires || '',
-  tags: addr.tags || [],
-  is_recommended: addr.is_recommended || false,
-  is_new: addr.is_new || false,
+
+export const estimateSpotBudget = (addr: any) => getBudgetInfo(addr);
+
+const PT_SPOTS = placesRepository.getAllSpotsBaseline();
+
+// Ultra-lean DTO for Web Leaflet map (reduces inline HTML payload from 1.2MB to ~40KB)
+const LEAN_MAP_MARKERS = PT_SPOTS.map((s: any) => ({
+  id: s.id,
+  name: s.name,
+  lat: s.lat,
+  lng: s.lng,
+  cat: s.cat,
+  image_url: s.image_url,
 }));
 
 // Beautiful custom stylized theme for Google Maps (Cream/Slate/Red palette)
@@ -109,210 +116,7 @@ const triggerHaptic = () => {
       }
     }
   } catch (e) {}
-};
-
-// Beautiful customized HTML Map for Web rendering (using CartoDB light cream tiles & Leaflet)
-const getWebMapHtml = () => `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>
-    body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; font-family: -apple-system, sans-serif; }
-    .leaflet-container { background: #FAF5EF !important; }
-    
-    /* Reposition attribution away from bottom navigation & floating buttons */
-    .leaflet-bottom.leaflet-right {
-      bottom: 110px !important;
-      right: 12px !important;
-    }
-    .leaflet-control-attribution {
-      background: rgba(250, 245, 239, 0.85) !important;
-      padding: 3px 8px !important;
-      border-radius: 6px !important;
-      border: 1px solid #1E293B !important;
-      font-size: 10px !important;
-      font-weight: 600 !important;
-      color: #64748B !important;
-      box-shadow: 1px 1px 0px #1E293B !important;
-    }
-
-    /* Custom Circular Photo Pins matching official Le Petit Tou site */
-    .custom-marker {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      width: 30px;
-      height: 30px;
-      border-radius: 15px;
-      border: 2px solid #FFFFFF;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-      background: #FFFFFF;
-      overflow: hidden;
-      cursor: pointer;
-      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    .custom-marker img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: 15px;
-    }
-    .custom-marker .fallback-icon {
-      font-size: 13px;
-      font-weight: 900;
-      color: #FFFFFF;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    .custom-marker:hover {
-      transform: scale(1.3) translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
-      z-index: 8888 !important;
-    }
-    .custom-marker.active-marker {
-      transform: scale(1.45) translateY(-4px);
-      border: 2.5px solid #C52824;
-      box-shadow: 0 6px 16px rgba(197, 40, 36, 0.5);
-      z-index: 9999 !important;
-    }
-    .custom-marker.cat-food .fallback-icon { background: #C52824; }
-    .custom-marker.cat-drinks .fallback-icon { background: #E5A93B; }
-    .custom-marker.cat-shopping .fallback-icon { background: #3B82F6; }
-    .custom-marker.cat-beauty .fallback-icon { background: #EC4899; }
-    .custom-marker.cat-culture .fallback-icon { background: #10B981; }
-    .custom-marker.cat-sport .fallback-icon { background: #6366F1; }
-    
-    /* Pulse Ring for User Live Location */
-    .user-location-marker {
-      width: 14px;
-      height: 14px;
-      border-radius: 7px;
-      background: #3B82F6;
-      border: 2px solid #FFFFFF;
-      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.4);
-      animation: pulse 1.5s infinite;
-    }
-    
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0.7); }
-      70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-      100% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0); }
-    }
-  </style>
-</head>
-<body>
-  <div id="map"></div>
-  <script>
-    var map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([${TOULOUSE_LAT}, ${TOULOUSE_LNG}], 14);
-    
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap',
-      keepBuffer: 3,
-      updateWhenIdle: true,
-      maxNativeZoom: 19
-    }).addTo(map);
-
-    var userMarker = null;
-    var markersGroup = L.layerGroup().addTo(map);
-    var currentSelectedId = null;
-
-    function getIconSvg(cat) {
-      if (cat === 'food' || cat === 'brunch' || cat === 'lunch' || cat === 'dinner') return '🍴';
-      if (cat === 'drinks' || cat === 'bars' || cat === 'cafe') return '☕';
-      if (cat === 'shopping' || cat === 'mode') return '🛍️';
-      if (cat === 'sport' || cat === 'activites') return '🏋️';
-      if (cat === 'culture' || cat === 'loisirs') return '🎨';
-      return '📍';
-    }
-
-    // Function to render markers from array
-    function renderSpots(spotsArray, activeId) {
-      currentSelectedId = activeId || currentSelectedId;
-      markersGroup.clearLayers();
-      spotsArray.forEach(function(s) {
-        var catClass = 'cat-' + (s.cat || s.category || 'food');
-        var isActive = s.id === currentSelectedId;
-        var activeClass = isActive ? ' active-marker' : '';
-        var innerHtml = s.image_url 
-          ? '<img src="' + s.image_url + '" alt="spot" />'
-          : '<div class="fallback-icon">' + symbol + '</div>';
-
-        var customIcon = L.divIcon({
-          className: 'custom-icon-wrapper',
-          html: '<div class="custom-marker ' + catClass + activeClass + '">' + innerHtml + '</div>',
-          iconSize: [30, 30],
-          iconAnchor: [15, 15]
-        });
-
-        L.marker([s.lat, s.lng], { icon: customIcon, zIndexOffset: isActive ? 1000 : 0 })
-          .addTo(markersGroup)
-          .on('click', function() {
-            currentSelectedId = s.id;
-            renderSpots(spotsArray, s.id);
-            window.parent.postMessage(JSON.stringify({ type: 'SPOT_CLICKED', id: s.id }), '*');
-          });
-      });
-    }
-
-    // Initial load
-    renderSpots(${JSON.stringify(PT_SPOTS)});
-
-    // Handle incoming postMessages
-    window.addEventListener('message', function(event) {
-      try {
-        var data = JSON.parse(event.data);
-        if (data.type === 'USER_LOCATION') {
-          var lat = data.lat;
-          var lng = data.lng;
-          
-          if (userMarker) {
-            userMarker.setLatLng([lat, lng]);
-          } else {
-            var userIcon = L.divIcon({
-              className: 'user-icon-wrapper',
-              html: '<div class="user-location-marker"></div>',
-              iconSize: [14, 14],
-              iconAnchor: [7, 7]
-            });
-            userMarker = L.marker([lat, lng], { icon: userIcon }).addTo(map);
-          }
-          map.setView([lat, lng], 15);
-        } else if (data.type === 'RESET_TOULOUSE') {
-          map.setView([${TOULOUSE_LAT}, ${TOULOUSE_LNG}], 13);
-        } else if (data.type === 'FOCUS_SPOT') {
-          map.setView([data.lat, data.lng], 15);
-          renderSpots(data.spots || [], data.id);
-        } else if (data.type === 'SELECT_SPOT') {
-          currentSelectedId = data.id;
-          renderSpots(data.spots || [], data.id);
-        } else if (data.type === 'DESELECT_SPOT') {
-          currentSelectedId = null;
-          renderSpots(data.spots || [], null);
-        } else if (data.type === 'UPDATE_SPOTS') {
-          renderSpots(data.spots, currentSelectedId);
-        }
-      } catch(e) {}
-    });
-
-    // Signal parent that Map is loaded and ready
-    window.parent.postMessage(JSON.stringify({ type: 'MAP_READY' }), '*');
-
-    // Dismiss selected card when clicking anywhere on the background map (Web)
-    map.on('click', function(e) {
-      currentSelectedId = null;
-      window.parent.postMessage(JSON.stringify({ type: 'MAP_CLICKED' }), '*');
-    });
-  </script>
-</body>
-</html>
-`;
+};import { getWebMapHtml } from './map/mapboxHtmlTemplate';
 
 export const getMarkerColor = (category: string) => {
   switch (category || 'food') {
@@ -341,15 +145,8 @@ export const getCategoryLabel = (category: string) => {
 export const renderCategoryIcon = (category: string) => {
   const size = 11;
   const color = "#FFFFFF";
-  switch (category || 'food') {
-    case 'food': return <Utensils size={size} color={color} />;
-    case 'drinks': return <Coffee size={size} color={color} />;
-    case 'shopping': return <ShoppingBag size={size} color={color} />;
-    case 'beauty': return <Sparkles size={size} color={color} />;
-    case 'culture': return <Compass size={size} color={color} />;
-    case 'sport': return <Trophy size={size} color={color} />;
-    default: return <Smile size={size} color={color} />;
-  }
+  const IconComponent = getCategoryIcon(category, category);
+  return <IconComponent size={size} color={color} strokeWidth={2.4} />;
 };
 
 export default function MapView({
@@ -365,13 +162,58 @@ export default function MapView({
 }) {
   const [locationPermission, setLocationPermission] = useState<'checking' | 'granted' | 'denied'>('checking');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const userLocationRef = useRef<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedSpot, setSelectedSpot] = useState<any | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [activeRoute, setActiveRoute] = useState<{
+    spotId: string;
+    spotName: string;
+    distanceKm: string;
+    durationMin: string;
+    isFromUserLocation?: boolean;
+    routeCoordinates?: { latitude: number; longitude: number }[];
+  } | null>(null);
+  const [is3dMode, setIs3dMode] = useState(false);
 
   // Supabase User Interactions States
   const [session, setSession] = useState<any>(null);
   const [likedSpotIds, setLikedSpotIds] = useState<string[]>([]);
+  const [likesMap, setLikesMap] = useState<Record<string, number>>({});
   const [visitedSpotIds, setVisitedSpotIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadDeviceLikedSpotIds().then(setLikedSpotIds);
+    fetchGlobalLikesMap().then(setLikesMap);
+    setVisitedSpotIds(discoveryStore.getDiscoveredSpotIds());
+
+    const unsubDiscovery = discoveryStore.subscribe((_stats, discoveredIds) => {
+      setVisitedSpotIds(discoveredIds);
+    });
+
+    const onLikesUpdated = (e: any) => {
+      if (e.detail?.spotId) {
+        setLikesMap(prev => ({
+          ...prev,
+          [e.detail.spotId]: e.detail.newCount,
+        }));
+        setLikedSpotIds(prev => {
+          if (e.detail.wasLiked && !prev.includes(e.detail.spotId)) {
+            return [...prev, e.detail.spotId];
+          } else if (!e.detail.wasLiked && prev.includes(e.detail.spotId)) {
+            return prev.filter(id => id !== e.detail.spotId);
+          }
+          return prev;
+        });
+      }
+    };
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('pt_likes_updated', onLikesUpdated);
+      return () => {
+        window.removeEventListener('pt_likes_updated', onLikesUpdated);
+      };
+    }
+  }, []);
 
   // Real-time Database loaded/filtered spots list
   const [spots, setSpots] = useState<any[]>(PT_SPOTS);
@@ -379,6 +221,7 @@ export default function MapView({
 
   // Filters State Properties (Matching your design screenshot!)
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [subTab, setSubTab] = useState<'tout' | 'adresses' | 'evenements' | 'articles'>('tout');
   const [budget, setBudget] = useState(50); // €10 to €50+
   const [category, setCategory] = useState<string | null>(null); // 'brunch', 'lunch', 'dinner', 'drinks'
@@ -388,7 +231,7 @@ export default function MapView({
   // Drawer Animation States
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
   const [showFullAddressModal, setShowFullAddressModal] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
+
 
   useEffect(() => {
     if (onToggleDock) {
@@ -404,33 +247,15 @@ export default function MapView({
   useEffect(() => {
     checkPermission();
 
-    // Setup Auth Listener and Load user data from Supabase
-    if (supabase) {
-      supabase.auth.getSession().then(({ data: { session } }: any) => {
-        setSession(session);
-        if (session) {
-          fetchUserInteractions(session.user.id);
-        }
-      });
-
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-        setSession(session);
-        if (session) {
-          fetchUserInteractions(session.user.id);
-        } else {
-          setLikedSpotIds([]);
-          setVisitedSpotIds([]);
-        }
-      });
-
-      // Listen to Leaflet marker clicks on Web
+    // Listen to Leaflet marker clicks on Web
       const handleWebMessage = (event: MessageEvent) => {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'SPOT_CLICKED') {
             const spot = spots.find(s => s.id === data.id);
             if (spot) {
-              handleSelectSpot(spot);
+              // skipMapFly=true car l'iframe a déjà fait flyTo depuis le click du marqueur
+              handleSelectSpot(spot, true);
             }
           } else if (data.type === 'MAP_CLICKED') {
             handleCloseCard();
@@ -440,17 +265,44 @@ export default function MapView({
                 JSON.stringify({ type: 'UPDATE_SPOTS', spots: filteredSpots }),
                 '*'
               );
+              const currentPos = userLocationRef.current || userLocation;
+              if (currentPos) {
+                iframeRef.current.contentWindow?.postMessage(
+                  JSON.stringify({ type: 'USER_LOCATION', ...currentPos, center: false }),
+                  '*'
+                );
+              }
             }
+          } else if (data.type === 'ROUTE_READY') {
+            // Réponse de l'iframe après fetch Mapbox Directions (CORS-free)
+            const distMeters = data.distance || 0;
+            const durSec = data.duration || 0;
+            const distanceKm = distMeters < 1000
+              ? `${Math.round(distMeters)} m`
+              : `${(distMeters / 1000).toFixed(1)} km`;
+            const durationMin = `${Math.round(durSec / 60)} min`;
+            setRouteLoading(false);
+            setActiveRoute({
+              spotId: data.spotId || '',
+              spotName: data.spotName || '',
+              distanceKm,
+              durationMin,
+              isFromUserLocation: !!data.isFromUserLocation,
+            });
+          } else if (data.type === 'ROUTE_ERROR') {
+            setRouteLoading(false);
+            // Fallback vers Google Maps externe si l'API Mapbox échoue
+            console.warn('ROUTE_ERROR from iframe:', data.message);
+          } else if (data.type === 'PITCH_CHANGED') {
+            setIs3dMode(!!data.is3d);
           }
         } catch (e) {}
       };
       window.addEventListener('message', handleWebMessage);
 
       return () => {
-        subscription.unsubscribe();
         window.removeEventListener('message', handleWebMessage);
       };
-    }
   }, [spots]);
 
   // Handle auto-focus from Profile view favorites selection
@@ -494,104 +346,133 @@ export default function MapView({
     }
   }, [filteredSpots]);
 
-  // Load spots initially and run filtering query
+
+  // 1. Initial load of spots from Supabase or repository (runs only once)
   useEffect(() => {
-    loadAndFilterSpots();
-  }, [searchQuery, category, ambiance, budget, openOnly]);
+    const initSpots = async () => {
+      // 0ms SWR memory cache check (already populated by HomeView)
+      const cached = appCache.get<any[]>('addresses');
+      if (cached && cached.length > 0) {
+        setSpots(formatRawSpots(cached));
+        return;
+      }
 
-  const loadAndFilterSpots = async () => {
-    let rawSpots: any[] = [];
-    try {
-      if (supabase) {
-        const { data, error } = await supabase.from('addresses').select('*');
-        if (!error && data && data.length > 0) {
-          rawSpots = data;
+      let rawSpots: any[] = [];
+      try {
+        if (supabase) {
+          const { data, error } = await supabase
+            .from('addresses')
+            .select('id, title, category_id, location, address, image_url, rating, price_level, is_recommended, is_new, lat, lng, tags, telephone, site_web, horaires, description, gallery_urls, full_description');
+          if (!error && data && data.length > 0) {
+            rawSpots = data;
+            appCache.set('addresses', data);
+          }
         }
+      } catch (err) {
+        console.log('DEBUG: addresses table fetch fallback.');
       }
-    } catch (err) {
-      console.log('DEBUG: addresses table fetch failed. Falling back to dataset.');
+
+      if (rawSpots.length === 0) {
+        setSpots(placesRepository.getAllSpotsBaseline());
+      } else {
+        setSpots(formatRawSpots(rawSpots));
+      }
+    };
+
+    initSpots();
+
+    const onAddressesChanged = (e: any) => {
+      if (e.detail && Array.isArray(e.detail) && e.detail.length > 0) {
+        setSpots(formatRawSpots(e.detail));
+      } else {
+        initSpots();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pt_addresses_changed', onAddressesChanged);
     }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('pt_addresses_changed', onAddressesChanged);
+      }
+    };
+  }, []);
 
-    if (rawSpots.length === 0) {
-      rawSpots = dataset.addresses || [];
-    }
+  const formatRawSpots = (rawSpots: any[]) => {
+    return rawSpots.map((addr: any) => placesRepository.formatRawAddress(addr));
+  };
 
-    const formattedSpots = rawSpots.map((addr: any) => {
-      const gallery = addr.gallery_urls || [];
-      const photos = addr.image_url ? [addr.image_url, ...gallery] : gallery;
-      return {
-        id: addr.id,
-        name: addr.title,
-        title: addr.title,
-        lat: addr.lat || TOULOUSE_LAT,
-        lng: addr.lng || TOULOUSE_LNG,
-        cat: addr.category_id === 'cat_gourmand' ? 'food' : addr.category_id === 'cat_trinquer' ? 'drinks' : addr.category_id === 'cat_shopping' ? 'shopping' : addr.category_id === 'cat_culture' ? 'culture' : 'food',
-        category: addr.tags ? addr.tags[0] : 'Adresse',
-        desc: addr.description,
-        description: addr.full_description || addr.description,
-        image_url: addr.image_url,
-        gallery_urls: gallery,
-        photos: photos,
-        rating: addr.rating || 4.8,
-        price_level: addr.price_level || '€',
-        location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
-        address: addr.address || (addr.location ? addr.location : 'Toulouse'),
-        phone: addr.telephone || '',
-        website: addr.site_web || '',
-        hours: addr.horaires || '',
-        tags: addr.tags || [],
-        is_recommended: addr.is_recommended || false,
-        is_new: addr.is_new || false,
-      };
-    });
-
-    let results = formattedSpots.filter((s: any) => {
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        const matchesName = s.name.toLowerCase().includes(q);
-        const matchesDesc = s.description.toLowerCase().includes(q);
+  // 2. Synchronous Instant 0ms Filter Engine (Search, Category, Ambiance, Budget, SubTabs)
+  useEffect(() => {
+    let results = spots.filter((s: any) => {
+      // A. Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesName = (s.name || '').toLowerCase().includes(q);
+        const matchesDesc = (s.description || '').toLowerCase().includes(q);
         const matchesTag = s.tags && s.tags.some((t: string) => t.toLowerCase().includes(q));
-        if (!matchesName && !matchesDesc && !matchesTag) return false;
+        const matchesCrumbs = s.breadcrumbs && s.breadcrumbs.some((b: string) => b.toLowerCase().includes(q));
+        const matchesLoc = (s.location || '').toLowerCase().includes(q);
+        if (!matchesName && !matchesDesc && !matchesTag && !matchesCrumbs && !matchesLoc) return false;
       }
+
+      // B. SubTabs Filter
+      if (subTab === 'articles' && !s.is_recommended) return false;
+      if (subTab === 'evenements' && !s.tags?.some((t: string) => ['fete', 'nuit', 'evenement', 'concert', 'spectacle'].some(w => t.toLowerCase().includes(w)))) return false;
+
+      // C. Category Filter
       if (category && s.cat !== category) return false;
+
+      // D. Ambiance Filter
+      if (ambiance) {
+        const ambTerms: Record<string, string[]> = {
+          cosy: ['cosy', 'chaleureux', 'calme', 'intimiste', 'the', 'bistrot', 'salon'],
+          rooftop: ['rooftop', 'terrasse', 'vue', 'exterieur', 'patio', 'jardin'],
+          trendy: ['tendance', 'trendy', 'concept', 'moderne', 'nouveau', 'jeune', 'style'],
+          calm: ['calme', 'detente', 'zen', 'repos', 'paisible', 'coworking', 'lecture'],
+        };
+        const terms = ambTerms[ambiance] || [];
+        const fullBlob = `${s.name} ${s.description} ${(s.tags || []).join(' ')} ${(s.breadcrumbs || []).join(' ')}`.toLowerCase();
+        if (!terms.some(t => fullBlob.includes(t))) return false;
+      }
+
+      // E. Budget Filter (Exact real-time budget comparison)
+      if (budget < 50) {
+        if (s.estimated_budget > budget) return false;
+      }
+
+      // F. Open Only
       if (openOnly && !s.is_open_now) return false;
+
       return true;
     });
 
-    setSpots(formattedSpots);
     setFilteredSpots(results);
-  };
+  }, [spots, searchQuery, subTab, category, ambiance, budget, openOnly]);
 
-  const fetchUserInteractions = async (userId: string) => {
-    try {
-      const { data: favs } = await supabase
-        .from('user_favorites')
-        .select('spot_id')
-        .eq('user_id', userId);
-      if (favs) {
-        setLikedSpotIds(favs.map((f: any) => f.spot_id));
-      }
-
-      const { data: visits } = await supabase
-        .from('user_visits')
-        .select('spot_id')
-        .eq('user_id', userId);
-      if (visits) {
-        setVisitedSpotIds(visits.map((v: any) => v.spot_id));
-      }
-    } catch (err) {
-      console.warn('Error fetching user interactions:', err);
-    }
-  };
-
-  const handleSelectSpot = (spot: any) => {
+  const handleSelectSpot = (spot: any, skipMapFly = false) => {
     triggerHaptic();
     setSelectedSpot(spot);
     if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
-        JSON.stringify({ type: 'SELECT_SPOT', id: spot.id, spots: filteredSpots }),
+        JSON.stringify({
+          type: 'SELECT_SPOT',
+          id: spot.id,
+          lat: spot.lat,
+          lng: spot.lng,
+          skipFly: skipMapFly, // l'iframe ne refait pas flyTo si déjà fait par le click du marqueur
+          spots: filteredSpots,
+        }),
         '*'
       );
+    } else if (mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: spot.lat,
+        longitude: spot.lng,
+        latitudeDelta: 0.008,
+        longitudeDelta: 0.008,
+      }, 600);
     }
     Animated.spring(slideAnim, {
       toValue: 0,
@@ -601,7 +482,27 @@ export default function MapView({
     }).start();
   };
 
+  // Bouton flèche = reset vue macro Toulouse (pas cycle adresse)
+  const handleResetToulouseView = () => {
+    triggerHaptic();
+    handleCloseCard();
+    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ type: 'RESET_TOULOUSE' }),
+        '*'
+      );
+    } else if (mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: TOULOUSE_LAT,
+        longitude: TOULOUSE_LNG,
+        latitudeDelta: 0.07,
+        longitudeDelta: 0.07,
+      }, 700);
+    }
+  };
+
   const handleCloseCard = () => {
+    setIsSearchFocused(false);
     if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({ type: 'DESELECT_SPOT', spots: filteredSpots }),
@@ -621,6 +522,7 @@ export default function MapView({
 
   const handleOpenFilters = () => {
     triggerHaptic();
+    if (onToggleDock) onToggleDock(false);
     setFilterSheetVisible(true);
     Animated.spring(filterAnim, {
       toValue: FILTER_SNAP_HALF,
@@ -635,7 +537,10 @@ export default function MapView({
       toValue: Dimensions.get('window').height,
       duration: 250,
       useNativeDriver: true,
-    }).start(() => setFilterSheetVisible(false));
+    }).start(() => {
+      setFilterSheetVisible(false);
+      if (onToggleDock) onToggleDock(true);
+    });
   };
 
   const filterDragStart = useRef(0);
@@ -643,7 +548,8 @@ export default function MapView({
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 5,
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 12 && Math.abs(g.dy) > Math.abs(g.dx),
+        onPanResponderTerminationRequest: () => true,
         onPanResponderGrant: () => {
           filterAnim.stopAnimation((val) => {
             filterDragStart.current = val;
@@ -708,32 +614,135 @@ export default function MapView({
     setOpenOnly(false);
   };
 
+  // Récupération rigoureuse de la position GPS de l'utilisateur en temps réel
+  const getPreciseUserLocation = async (timeoutMs = 7000): Promise<{ lat: number; lng: number } | null> => {
+    if (userLocationRef.current) {
+      return userLocationRef.current;
+    }
+
+    // 1. Sur Web : tentative directe via navigator.geolocation avec HighAccuracy
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+        try {
+          const coords = await new Promise<{ lat: number; lng: number } | null>((resolve) => {
+            const timeoutId = setTimeout(() => {
+              resolve(null);
+            }, timeoutMs);
+
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                clearTimeout(timeoutId);
+                const c = {
+                  lat: pos.coords.latitude,
+                  lng: pos.coords.longitude,
+                };
+                resolve(c);
+              },
+              (err) => {
+                clearTimeout(timeoutId);
+                console.warn('[Geolocation Web Warning]', err.message);
+                resolve(null);
+              },
+              {
+                enableHighAccuracy: true,
+                timeout: timeoutMs,
+                maximumAge: 5000,
+              }
+            );
+          });
+
+          if (coords) {
+            userLocationRef.current = coords;
+            setUserLocation(coords);
+            if (iframeRef.current?.contentWindow) {
+              iframeRef.current.contentWindow.postMessage(
+                JSON.stringify({ type: 'USER_LOCATION', ...coords, center: false }),
+                '*'
+              );
+            }
+            return coords;
+          }
+        } catch (e) {
+          console.warn('Navigator geolocation error:', e);
+        }
+      }
+    }
+
+    // 2. Sur Mobile natif ou si le navigateur Web a renvoyé null
+    try {
+      let { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        const req = await Location.requestForegroundPermissionsAsync();
+        status = req.status;
+      }
+
+      if (status === 'granted') {
+        setLocationPermission('granted');
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+        const coords = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        };
+        userLocationRef.current = coords;
+        setUserLocation(coords);
+        if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage(
+            JSON.stringify({ type: 'USER_LOCATION', ...coords, center: false }),
+            '*'
+          );
+        }
+        return coords;
+      } else {
+        setLocationPermission('denied');
+        return null;
+      }
+    } catch (err) {
+      console.warn('Expo Location error:', err);
+      return null;
+    }
+  };
+
   const checkPermission = async () => {
     try {
+      if (Platform.OS === 'web') {
+        setLocationPermission('granted');
+        getUserLocation(false);
+        return;
+      }
+
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status === 'granted') {
         setLocationPermission('granted');
-        getUserLocation();
-        startBackgroundLocationUpdates();
+        await getUserLocation(false);
       } else {
         setLocationPermission('denied');
       }
     } catch (e) {
       console.warn('Error checking location permission', e);
-      setLocationPermission('denied');
+      setLocationPermission('granted');
     }
   };
 
   const requestPermission = async () => {
     try {
       setLoading(true);
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
-        setLocationPermission('granted');
-        await getUserLocation();
-        await startBackgroundLocationUpdates();
+      if (Platform.OS === 'web') {
+        const coords = await getPreciseUserLocation(8000);
+        if (coords) {
+          setLocationPermission('granted');
+        } else {
+          setLocationPermission('denied');
+        }
       } else {
-        setLocationPermission('denied');
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          setLocationPermission('granted');
+          await getUserLocation(false);
+        } else {
+          setLocationPermission('denied');
+        }
       }
     } catch (e) {
       console.warn('Error requesting location permission', e);
@@ -743,56 +752,26 @@ export default function MapView({
     }
   };
 
-  const getUserLocation = async () => {
+  const getUserLocation = async (centerMap = false) => {
     try {
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      const coords = {
-        lat: location.coords.latitude,
-        lng: location.coords.longitude,
-      };
-      setUserLocation(coords);
-
-      if (Platform.OS === 'web' && iframeRef.current) {
-        iframeRef.current.contentWindow?.postMessage(
-          JSON.stringify({ type: 'USER_LOCATION', ...coords }),
-          '*'
-        );
+      const coords = await getPreciseUserLocation(6000);
+      if (coords && centerMap) {
+        if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage(
+            JSON.stringify({ type: 'USER_LOCATION', ...coords, center: true }),
+            '*'
+          );
+        } else if (mapRef.current) {
+          mapRef.current.animateToRegion({
+            latitude: coords.lat,
+            longitude: coords.lng,
+            latitudeDelta: 0.015,
+            longitudeDelta: 0.015,
+          });
+        }
       }
     } catch (e) {
       console.warn('Error getting position', e);
-    }
-  };
-
-  const startBackgroundLocationUpdates = async () => {
-    if (Platform.OS === 'web') return;
-    try {
-      const { status: backgroundStatus } = await Location.getBackgroundPermissionsAsync();
-      let finalStatus = backgroundStatus;
-      if (backgroundStatus !== 'granted') {
-        const { status } = await Location.requestBackgroundPermissionsAsync();
-        finalStatus = status;
-      }
-      
-      if (finalStatus === 'granted') {
-        const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
-        if (!isRegistered) {
-          await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
-            accuracy: Location.Accuracy.Balanced,
-            timeInterval: 60000,
-            distanceInterval: 10,
-            foregroundService: {
-              notificationTitle: "Le Petit Tou",
-              notificationBody: "Suivi H24 de vos visites actif",
-              notificationColor: "#C52824"
-            }
-          });
-          console.log('DEBUG: Background location updates started.');
-        }
-      }
-    } catch (err) {
-      console.warn('Could not start background location tracking:', err);
     }
   };
 
@@ -815,69 +794,262 @@ export default function MapView({
     handleCloseCard();
   };
 
-  const handleCenterOnMe = () => {
-    if (userLocation) {
+  const handleCenterOnMe = async () => {
+    triggerHaptic();
+    let coords = userLocationRef.current || userLocation;
+    if (!coords) {
+      coords = await getPreciseUserLocation(6000);
+    }
+
+    if (coords) {
       if (Platform.OS === 'web') {
-        if (iframeRef.current) {
-          iframeRef.current.contentWindow?.postMessage(
-            JSON.stringify({ type: 'USER_LOCATION', ...userLocation }),
+        if (iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage(
+            JSON.stringify({ type: 'USER_LOCATION', ...coords, center: true }),
             '*'
           );
         }
       } else if (mapRef.current) {
         mapRef.current.animateToRegion({
-          latitude: userLocation.lat,
-          longitude: userLocation.lng,
+          latitude: coords.lat,
+          longitude: coords.lng,
           latitudeDelta: 0.015,
           longitudeDelta: 0.015,
         });
       }
     } else {
-      getUserLocation();
+      Alert.alert(
+        'Position indisponible',
+        'Veuillez autoriser la géolocalisation pour centrer la carte sur votre position exacte.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
+  const handleToggle3D = () => {
+    triggerHaptic();
+    const next = !is3dMode;
+    setIs3dMode(next);
+    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ type: 'SET_3D_MODE', enabled: next }),
+        '*'
+      );
+    } else if (mapRef.current) {
+      mapRef.current.animateCamera({
+        pitch: next ? 55 : 0,
+        heading: next ? -15 : 0,
+      });
+    }
+  };
+
+  // Calcul d'itinéraire hyper rigoureux : basé strictement sur la position GPS de l'utilisateur
+  const handleCalculateRoute = async (spot: any) => {
+    triggerHaptic();
+    setRouteLoading(true);
+
+    // 1. Obtenir impérativement la position exacte en temps réel de l'utilisateur
+    let coords = userLocationRef.current || userLocation;
+    if (!coords) {
+      coords = await getPreciseUserLocation(6000);
+    }
+
+    // 2. Si la position est introuvable (refus ou indisponible), ne JAMAIS feindre Capitole silencieusement !
+    if (!coords) {
+      setRouteLoading(false);
+      Alert.alert(
+        'Position GPS requise',
+        'Pour calculer un itinéraire précis depuis votre position exacte, la géolocalisation doit être activée.\n\nQue souhaitez-vous faire ?',
+        [
+          {
+            text: 'Annuler',
+            style: 'cancel',
+          },
+          {
+            text: 'Ouvrir dans Maps',
+            onPress: () => handleOpenItinerary(spot),
+          },
+          {
+            text: 'Départ Capitole',
+            onPress: () => {
+              performRouteCalculation(
+                { lat: TOULOUSE_LAT, lng: TOULOUSE_LNG },
+                spot,
+                false
+              );
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    // 3. Position GPS confirmée : calcul rigoureux depuis la position réelle
+    await performRouteCalculation(coords, spot, true);
+  };
+
+  const performRouteCalculation = async (
+    startCoord: { lat: number; lng: number },
+    spot: any,
+    isFromUser: boolean
+  ) => {
+    setRouteLoading(true);
+    const endCoord = { lat: spot.lat, lng: spot.lng };
+
+    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+      // Mettre à jour le point de position utilisateur sur la carte web
+      if (isFromUser) {
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ type: 'USER_LOCATION', lat: startCoord.lat, lng: startCoord.lng, center: false }),
+          '*'
+        );
+      }
+
+      // Délègue le fetch Mapbox à l'iframe pour éviter le CORS
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({
+          type: 'FETCH_ROUTE',
+          startLng: startCoord.lng,
+          startLat: startCoord.lat,
+          endLng: endCoord.lng,
+          endLat: endCoord.lat,
+          spotId: spot.id,
+          spotName: spot.name || spot.title || '',
+          isFromUserLocation: isFromUser,
+        }),
+        '*'
+      );
+      // setRouteLoading sera remis à false par ROUTE_READY ou ROUTE_ERROR
+    } else {
+      // Sur mobile natif (iOS / Android), fetch Mapbox direct
+      try {
+        const res = await fetch(
+          `https://api.mapbox.com/directions/v5/mapbox/walking/${startCoord.lng},${startCoord.lat};${endCoord.lng},${endCoord.lat}?geometries=geojson&overview=full&access_token=${MAPBOX_ACCESS_TOKEN}`
+        );
+        if (!res.ok) throw new Error('Route request failed');
+        const data = await res.json();
+        if (!data.routes || data.routes.length === 0) throw new Error('Aucun itinéraire trouvé');
+        const route = data.routes[0];
+        const distMeters = route.distance;
+        const durSec = route.duration;
+        const coordsList = (route.geometry?.coordinates || []).map((pt: [number, number]) => ({
+          latitude: pt[1],
+          longitude: pt[0],
+        }));
+
+        setActiveRoute({
+          spotId: spot.id,
+          spotName: spot.name || spot.title,
+          distanceKm: distMeters < 1000 ? `${Math.round(distMeters)} m` : `${(distMeters / 1000).toFixed(1)} km`,
+          durationMin: `${Math.round(durSec / 60)} min`,
+          isFromUserLocation: isFromUser,
+          routeCoordinates: coordsList,
+        });
+
+        // Ajuster la vue carte pour afficher l'utilisateur et la destination
+        if (mapRef.current && coordsList.length > 0) {
+          mapRef.current.fitToCoordinates(coordsList, {
+            edgePadding: { top: 120, right: 50, bottom: 250, left: 50 },
+            animated: true,
+          });
+        }
+      } catch (err: any) {
+        console.warn('Error computing itinerary on native:', err);
+        handleOpenItinerary(spot);
+      } finally {
+        setRouteLoading(false);
+      }
+    }
+  };
+
+  const handleClearRoute = () => {
+    triggerHaptic();
+    setActiveRoute(null);
+    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ type: 'CLEAR_ROUTE' }),
+        '*'
+      );
+    }
+  };
+
+  // Ouverture dans Maps externe avec mode piéton et point de départ = position utilisateur
   const handleOpenItinerary = (spot: any) => {
     const spotName = spot.name || spot.title || 'Établissement';
+    const lat = spot.lat;
+    const lng = spot.lng;
+    const currentLoc = userLocationRef.current || userLocation;
+
+    if (lat && lng) {
+      if (Platform.OS === 'ios') {
+        // iOS Apple Maps avec mode piéton et départ Current Location
+        const url = `maps://?saddr=Current%20Location&daddr=${lat},${lng}&dirflg=w`;
+        Linking.canOpenURL(url).then((supported) => {
+          if (supported) {
+            Linking.openURL(url);
+          } else {
+            const webUrl = currentLoc
+              ? `https://www.google.com/maps/dir/?api=1&origin=${currentLoc.lat},${currentLoc.lng}&destination=${lat},${lng}&travelmode=walking`
+              : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=walking`;
+            Linking.openURL(webUrl);
+          }
+        }).catch(() => {
+          const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=walking`;
+          Linking.openURL(webUrl);
+        });
+        return;
+      } else if (Platform.OS === 'android') {
+        // Android Google Maps avec mode piéton
+        const url = `google.navigation:q=${lat},${lng}&mode=w`;
+        Linking.canOpenURL(url).then((supported) => {
+          if (supported) {
+            Linking.openURL(url);
+          } else {
+            const webUrl = currentLoc
+              ? `https://www.google.com/maps/dir/?api=1&origin=${currentLoc.lat},${currentLoc.lng}&destination=${lat},${lng}&travelmode=walking`
+              : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=walking`;
+            Linking.openURL(webUrl);
+          }
+        }).catch(() => {
+          const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=walking`;
+          Linking.openURL(webUrl);
+        });
+        return;
+      } else {
+        // Web Google Maps piéton avec coordonnées utilisateur si dispo
+        const webUrl = currentLoc
+          ? `https://www.google.com/maps/dir/?api=1&origin=${currentLoc.lat},${currentLoc.lng}&destination=${lat},${lng}&travelmode=walking`
+          : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=walking`;
+        Linking.openURL(webUrl);
+        return;
+      }
+    }
+
+    // Fallback par adresse si lat/lng absents
     const fullAddress = spot.address && spot.address !== 'Toulouse' && spot.address !== 'Toulouse Centre'
       ? spot.address
       : `${spotName}, Toulouse`;
     const targetQuery = `${spotName}, ${fullAddress}`;
 
     const scheme = Platform.select({
-      ios: `maps://?q=${encodeURIComponent(targetQuery)}`,
-      android: `geo:0,0?q=${encodeURIComponent(targetQuery)}`,
-      default: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(targetQuery)}`
+      ios: `maps://?saddr=Current%20Location&daddr=${encodeURIComponent(targetQuery)}&dirflg=w`,
+      android: `google.navigation:q=${encodeURIComponent(targetQuery)}&mode=w`,
+      default: `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(targetQuery)}&travelmode=walking`
     });
     Linking.openURL(scheme).catch(() => {
-      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(targetQuery)}`);
+      Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(targetQuery)}&travelmode=walking`);
     });
   };
 
   const handleToggleLike = async (spotId: string) => {
-    if (!session) {
-      setShowLoginModal(true);
-      return;
-    }
-    const isLiked = likedSpotIds.includes(spotId);
-    try {
-      if (isLiked) {
-        const { error } = await supabase
-          .from('user_favorites')
-          .delete()
-          .match({ user_id: session.user.id, spot_id: spotId });
-        if (error) throw error;
-        setLikedSpotIds(prev => prev.filter(id => id !== spotId));
-      } else {
-        const { error } = await supabase
-          .from('user_favorites')
-          .insert({ user_id: session.user.id, spot_id: spotId });
-        if (error) throw error;
-        setLikedSpotIds(prev => [...prev, spotId]);
-      }
-    } catch (e: any) {
-      console.warn('Error toggling like:', e.message);
-    }
+    triggerHaptic();
+    const { updatedLikedIds, updatedLikesMap } = await toggleSpotLike(
+      spotId,
+      likesMap,
+      likedSpotIds
+    );
+    setLikedSpotIds(updatedLikedIds);
+    setLikesMap(updatedLikesMap);
   };
 
   // --- 1. Asking Location Permission Screen ---
@@ -903,7 +1075,7 @@ export default function MapView({
               ]}
               onPress={requestPermission}
             >
-              <Text style={styles.permissionBtnText}>Géolocalisez-moi 🧭</Text>
+              <Text style={styles.permissionBtnText}>Géolocalisez-moi</Text>
             </Pressable>
           )}
 
@@ -927,9 +1099,25 @@ export default function MapView({
       {Platform.OS === 'web' ? (
         <iframe
           ref={iframeRef}
-          srcDoc={getWebMapHtml()}
-          style={styles.webMap}
-          title="Petit Tou Web Map"
+          srcDoc={getWebMapHtml(MAPBOX_ACCESS_TOKEN)}
+          onLoad={() => {
+            setTimeout(() => {
+              iframeRef.current?.contentWindow?.postMessage(
+                JSON.stringify({ type: 'UPDATE_SPOTS', spots: filteredSpots }),
+                '*'
+              );
+            }, 200);
+          }}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            zIndex: 0,
+          } as any}
+          tabIndex={-1}
         />
       ) : (
         NativeMapView && (
@@ -956,153 +1144,292 @@ export default function MapView({
                   coordinate={{ latitude: s.lat, longitude: s.lng }}
                   onPress={() => handleSelectSpot(s)}
                   zIndex={isSelected ? 99 : 1}
+                  tracksViewChanges={isSelected}
                 >
                   <View
                     style={[
                       styles.nativeMarker,
                       { backgroundColor: getMarkerColor(s.cat || s.category) },
+                      visitedSpotIds.includes(s.id) && styles.nativeMarkerDiscovered,
                       isSelected && styles.nativeMarkerSelected,
                     ]}
                   >
                     {renderCategoryIcon(s.cat || s.category)}
+                    {visitedSpotIds.includes(s.id) && (
+                      <View style={styles.discoveredBadgeDot} />
+                    )}
                   </View>
                 </NativeMarker>
               );
             })}
+
+            {/* Tracé de l'itinéraire piéton sur carte native */}
+            {NativePolyline && activeRoute?.routeCoordinates && activeRoute.routeCoordinates.length > 0 && (
+              <>
+                <NativePolyline
+                  coordinates={activeRoute.routeCoordinates}
+                  strokeColor="#1E293B"
+                  strokeWidth={7}
+                />
+                <NativePolyline
+                  coordinates={activeRoute.routeCoordinates}
+                  strokeColor="#C52824"
+                  strokeWidth={4.5}
+                />
+              </>
+            )}
           </NativeMapView>
         )
       )}
 
-      {/* Floating Header Label as a Pressable Button */}
-      <Pressable
-        style={({ pressed }) => [
-          styles.floatingHeader,
-          pressed && styles.floatingHeaderPressed,
-        ]}
-        onPress={handleResetToToulouse}
-      >
-        <Text style={styles.headerTitle}>Carte du Petit Tou</Text>
-        <Text style={styles.headerSubtitle}>Toulouse à portée de main (Vue globale) 🔍</Text>
-      </Pressable>
+      {/* Real Neo-Brutalist Search Bar with Live TextInput */}
+      <View style={styles.searchBarContainer}>
+        <View style={styles.searchIconBadge}>
+          <Search size={16} color="#FFFFFF" strokeWidth={2.6} />
+        </View>
 
-      {/* Animated Bottom Spot Details Card */}
-      {selectedSpot && (
-        <Animated.View
-          style={[
-            styles.animatedCardContainer,
-            { transform: [{ translateY: slideAnim }] }
-          ]}
-        >
+        <TextInput
+          style={styles.searchInput}
+          placeholder={
+            filteredSpots && filteredSpots.length > 0
+              ? `Rechercher (${filteredSpots.length} adresses)...`
+              : "Rechercher une adresse..."
+          }
+          placeholderTextColor="#94A3B8"
+          value={searchQuery}
+          onChangeText={(text) => {
+            setSearchQuery(text);
+            setIsSearchFocused(true);
+          }}
+          onFocus={() => setIsSearchFocused(true)}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+        />
+
+        {searchQuery.trim().length > 0 && (
           <Pressable
-            style={[
-              styles.detailsCard,
-              {
-                borderColor: getMarkerColor(selectedSpot.cat || selectedSpot.category),
-                shadowColor: getMarkerColor(selectedSpot.cat || selectedSpot.category),
-              }
-            ]}
-            onPress={() => setShowFullAddressModal(true)}
+            style={styles.searchClearBtn}
+            onPress={() => {
+              setSearchQuery('');
+              setIsSearchFocused(false);
+            }}
+            accessibilityLabel="Effacer la recherche"
           >
-            <View style={styles.cardLeft}>
-              {/* Row of Category & Visit tags */}
-              <View style={styles.tagsContainer}>
-                {/* Category Tag */}
+            <X size={15} color="#64748B" strokeWidth={2.5} />
+          </Pressable>
+        )}
+
+        <View style={styles.searchDivider} />
+
+        {/* Bouton Filtres distinct */}
+        <Pressable
+          style={({ pressed }) => [
+            styles.searchFilterBtn,
+            pressed && styles.searchFilterBtnPressed,
+            filterSheetVisible && styles.searchFilterBtnActive,
+          ]}
+          onPress={handleOpenFilters}
+          accessibilityLabel="Ouvrir les filtres avancés"
+        >
+          <SlidersHorizontal
+            size={17}
+            color={filterSheetVisible ? '#C52824' : '#1E293B'}
+            strokeWidth={2.4}
+          />
+        </Pressable>
+      </View>
+
+      {/* Instant Autocomplete Suggestions Card (when typing) */}
+      {isSearchFocused && searchQuery.trim().length > 0 && (
+        <View style={styles.searchSuggestionsCard}>
+          <ScrollView
+            style={styles.searchSuggestionsScroll}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled={true}
+          >
+            {filteredSpots.slice(0, 5).map((spot) => (
+              <Pressable
+                key={spot.id}
+                style={({ pressed }) => [
+                  styles.suggestionRow,
+                  pressed && styles.suggestionRowPressed,
+                ]}
+                onPress={() => {
+                  setIsSearchFocused(false);
+                  handleSelectSpot(spot);
+                }}
+              >
                 <View
                   style={[
-                    styles.catTag,
-                    {
-                      backgroundColor: getMarkerColor(selectedSpot.cat || selectedSpot.category),
-                      borderColor: '#1E293B',
-                      borderWidth: 1.5,
-                    }
+                    styles.suggestionCatDot,
+                    { backgroundColor: getMarkerColor(spot.cat || spot.category) },
                   ]}
-                >
-                  {renderCategoryIcon(selectedSpot.cat || selectedSpot.category)}
-                  <Text style={[styles.catTagText, { color: '#FFFFFF', marginLeft: 4 }]}>
-                    {getCategoryLabel(selectedSpot.cat || selectedSpot.category)}
+                />
+                <View style={styles.suggestionTexts}>
+                  <Text style={styles.suggestionTitle} numberOfLines={1}>
+                    {spot.name || spot.title}
+                  </Text>
+                  <Text style={styles.suggestionSubtitle} numberOfLines={1}>
+                    {spot.address || spot.location || 'Toulouse'}
                   </Text>
                 </View>
+                <View style={styles.suggestionRating}>
+                  <Text style={styles.suggestionRatingText}>⭐ {spot.rating || '4.8'}</Text>
+                </View>
+              </Pressable>
+            ))}
 
-                {/* Visit Tag */}
-                {visitedSpotIds.includes(selectedSpot.id) && (
-                  <View style={styles.visitTag}>
-                    <Text style={styles.visitTagText}>Visité 📍</Text>
-                  </View>
-                )}
+            {filteredSpots.length === 0 && (
+              <View style={styles.suggestionEmpty}>
+                <Text style={styles.suggestionEmptyText}>
+                  Aucune adresse trouvée pour "{searchQuery}"
+                </Text>
               </View>
+            )}
 
-              <Text style={styles.detailsTitle}>{selectedSpot.name}</Text>
-              <Text style={styles.detailsDesc}>{selectedSpot.description || selectedSpot.desc}</Text>
-            </View>
-
-            {/* Action Buttons Column */}
-            <View style={styles.cardActions}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.likeBtn,
-                  likedSpotIds.includes(selectedSpot.id) ? styles.likeBtnActive : styles.likeBtnInactive,
-                  pressed && styles.likeBtnPressed,
-                ]}
-                onPress={() => handleToggleLike(selectedSpot.id)}
-              >
-                <Heart
-                  size={18}
-                  color={likedSpotIds.includes(selectedSpot.id) ? '#FFFFFF' : '#1E293B'}
-                  fill={likedSpotIds.includes(selectedSpot.id) ? '#FFFFFF' : 'none'}
-                />
-              </Pressable>
-
-              <Pressable
-                style={({ pressed }) => [
-                  styles.itineraryBtn,
-                  {
-                    backgroundColor: getMarkerColor(selectedSpot.cat || selectedSpot.category),
-                  },
-                  pressed && styles.itineraryBtnPressed,
-                ]}
-                onPress={() => handleOpenItinerary(selectedSpot)}
-              >
-                <ArrowUpRight size={20} color="#FFFFFF" strokeWidth={2.8} />
-              </Pressable>
-            </View>
-          </Pressable>
-        </Animated.View>
+            {filteredSpots.length > 5 && (
+              <View style={styles.suggestionFooter}>
+                <Text style={styles.suggestionFooterText}>
+                  + {filteredSpots.length - 5} autre{filteredSpots.length - 5 > 1 ? 's' : ''} résultat{filteredSpots.length - 5 > 1 ? 's' : ''} sur la carte
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        </View>
       )}
 
-      {/* Login Requirement Modal on Map */}
-      {showLoginModal && (
-        <View style={styles.modalBackdrop}>
-          <View style={styles.loginCardModal}>
-            <View style={styles.loginModalHeader}>
-              <Text style={styles.loginModalHeaderTitle}>CONNEXION REQUISE</Text>
+      {/* Floating In-Map Itinerary Banner */}
+      {activeRoute && (
+        <View style={styles.itineraryBanner}>
+          <View style={styles.itineraryBannerLeft}>
+            <View
+              style={[
+                styles.itineraryBadge,
+                activeRoute.isFromUserLocation && styles.itineraryBadgeGps,
+              ]}
+            >
+              <Navigation size={16} color="#FFFFFF" strokeWidth={2.5} />
             </View>
-            <View style={styles.loginModalBody}>
-              <Heart size={36} color="#C52824" style={{ marginBottom: 12 }} />
-              <Text style={styles.loginModalTitle}>Ajouter aux favoris</Text>
-              <Text style={styles.loginModalSub}>
-                Connectez-vous pour sauvegarder vos adresses préférées et y accéder depuis votre profil à tout moment.
-              </Text>
-              <View style={styles.loginModalBtnRow}>
-                <Pressable
-                  style={styles.loginModalBtnCancel}
-                  onPress={() => setShowLoginModal(false)}
+            <View style={styles.itineraryTexts}>
+              <View style={styles.itineraryHeaderLine}>
+                <Text style={styles.itineraryDuration}>{activeRoute.durationMin}</Text>
+                <Text style={styles.itineraryDot}>•</Text>
+                <Text style={styles.itineraryDistance}>{activeRoute.distanceKm}</Text>
+                <View
+                  style={[
+                    styles.itineraryOriginBadge,
+                    activeRoute.isFromUserLocation
+                      ? styles.itineraryOriginBadgeGps
+                      : styles.itineraryOriginBadgeManual,
+                  ]}
                 >
-                  <Text style={styles.loginModalBtnCancelText}>Annuler</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.loginModalBtnConfirm}
-                  onPress={() => {
-                    setShowLoginModal(false);
-                    if (onChangeTab) onChangeTab('profile');
-                  }}
-                >
-                  <Text style={styles.loginModalBtnConfirmText}>Se connecter 👤</Text>
-                </Pressable>
+                  <Text style={styles.itineraryOriginBadgeText}>
+                    {activeRoute.isFromUserLocation ? '📍 GPS' : '🏛️ Capitole'}
+                  </Text>
+                </View>
               </View>
+              <Text style={styles.itineraryDestination} numberOfLines={1}>
+                {activeRoute.isFromUserLocation ? 'Depuis votre position vers ' : 'Vers '}
+                <Text style={{ color: '#FAF5EF', fontWeight: '800' }}>
+                  {activeRoute.spotName}
+                </Text>
+              </Text>
             </View>
+          </View>
+          <View style={styles.itineraryActions}>
+            <Pressable
+              style={styles.itineraryExternalBtn}
+              onPress={() => {
+                if (selectedSpot) {
+                  handleOpenItinerary(selectedSpot);
+                } else {
+                  const target = spots.find((s) => s.id === activeRoute.spotId);
+                  if (target) handleOpenItinerary(target);
+                }
+              }}
+            >
+              <Text style={styles.itineraryExternalBtnText}>GPS ↗</Text>
+            </Pressable>
+            <Pressable
+              style={styles.itineraryCloseBtn}
+              onPress={handleClearRoute}
+              accessibilityLabel="Fermer l'itinéraire"
+            >
+              <X size={16} color="#FFFFFF" strokeWidth={2.5} />
+            </Pressable>
           </View>
         </View>
       )}
+
+      {/* Floating Category Filter Pills Row (Instant 1-tap filtering directly on the map!) */}
+      <View
+        style={[
+          styles.floatingCategoryBar,
+          activeRoute && { top: Platform.OS === 'ios' ? 180 : 160 },
+        ]}
+      >
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryScrollContent}
+        >
+          {[
+            { label: 'Tous (790)', value: null, icon: Compass, color: '#1E293B' },
+            { label: 'Restos (286)', value: 'food', icon: Utensils, color: '#C52824' },
+            { label: 'Shopping (231)', value: 'shopping', icon: ShoppingBag, color: '#3B82F6' },
+            { label: 'Bars & Cafés (141)', value: 'drinks', icon: Wine, color: '#E5A93B' },
+            { label: 'Beauté (71)', value: 'beauty', icon: Scissors, color: '#EC4899' },
+            { label: 'Culture (43)', value: 'culture', icon: Landmark, color: '#10B981' },
+            { label: 'Sport (17)', value: 'sport', icon: Dumbbell, color: '#6366F1' },
+          ].map((catItem) => {
+            const isSelected = category === catItem.value;
+            const IconComp = catItem.icon;
+            return (
+              <Pressable
+                key={catItem.label}
+                style={[
+                  styles.categoryPill,
+                  isSelected && {
+                    backgroundColor: catItem.color,
+                    borderColor: '#1E293B',
+                  },
+                ]}
+                onPress={() => {
+                  triggerHaptic();
+                  setCategory(isSelected ? null : catItem.value);
+                }}
+              >
+                <IconComp size={14} color={isSelected ? '#FFFFFF' : catItem.color} strokeWidth={2.4} style={{ marginRight: 6 }} />
+                <Text
+                  style={[
+                    styles.categoryPillText,
+                    isSelected && styles.categoryPillTextSelected,
+                  ]}
+                >
+                  {catItem.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Apple Maps-like Continuous Tactile Place Detail Sheet */}
+      <PlaceDetailSheet
+        spot={selectedSpot}
+        visible={!!selectedSpot}
+        onClose={() => {
+          setSelectedSpot(null);
+        }}
+        onOpenItinerary={(spot) => {
+          handleCalculateRoute(spot);
+        }}
+        isFavorite={selectedSpot ? likedSpotIds.includes(selectedSpot.id) : false}
+        likesCount={selectedSpot ? (likesMap[selectedSpot.id] ?? (Number(selectedSpot.likes_count) || 0)) : 0}
+        onToggleFavorite={(id) => handleToggleLike(id)}
+        routeLoading={routeLoading}
+      />
 
       {/* Address Detail Modal from Map */}
       {showFullAddressModal && selectedSpot && (
@@ -1117,6 +1444,8 @@ export default function MapView({
             category: getCategoryLabel(selectedSpot.cat || selectedSpot.category),
             location: selectedSpot.location || 'Toulouse',
             address: selectedSpot.address || `${selectedSpot.name}, Toulouse`,
+            lat: selectedSpot.lat,
+            lng: selectedSpot.lng,
             rating: selectedSpot.rating || 4.8,
             price_level: selectedSpot.price_max ? `Jusqu'à ${selectedSpot.price_max}€` : '€€',
             image_url: selectedSpot.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80',
@@ -1124,7 +1453,11 @@ export default function MapView({
             phone: selectedSpot.telephone || selectedSpot.phone || '',
             website: selectedSpot.site_web || selectedSpot.website || '',
             hours: selectedSpot.horaires || selectedSpot.hours || '',
+            is_recommended: !!selectedSpot.is_recommended,
           }}
+          isFavorite={likedSpotIds.includes(selectedSpot.id)}
+          likesCount={likesMap[selectedSpot.id] ?? (Number(selectedSpot.likes_count) || 0)}
+          onToggleFavorite={handleToggleLike}
           onClose={() => setShowFullAddressModal(false)}
           onGoToMap={() => {
             setShowFullAddressModal(false);
@@ -1132,29 +1465,52 @@ export default function MapView({
         />
       )}
 
-      {/* Floating Action Buttons Column (GPS + Filter) */}
-      <View style={styles.actionsColumn}>
-        {/* Sliders Filter Button */}
+      {/* Floating Action Buttons Row (Perspective 3D, Toulouse Macro, GPS in round buttons) */}
+      <View
+        style={[
+          styles.actionsRow,
+          selectedSpot ? { bottom: 185 } : { bottom: 125 },
+        ]}
+      >
+        {/* Bouton Toggle Vue 3D / 2D Perspective */}
         <Pressable
           style={({ pressed }) => [
-            styles.floatingBtn,
-            pressed && styles.floatingBtnPressed,
-            filterSheetVisible && styles.filterBtnActive,
+            styles.floatingRoundBtn,
+            styles.perspective3dBtn,
+            is3dMode && styles.perspective3dBtnActive,
+            pressed && styles.floatingRoundBtnPressed,
           ]}
-          onPress={handleOpenFilters}
+          onPress={handleToggle3D}
+          accessibilityLabel="Basculer perspective 3D"
         >
-          <SlidersHorizontal size={22} color={filterSheetVisible ? '#FFFFFF' : '#1E293B'} strokeWidth={2.5} />
+          <Text style={[styles.perspective3dText, is3dMode && styles.perspective3dTextActive]}>
+            {is3dMode ? '2D' : '3D'}
+          </Text>
+        </Pressable>
+
+        {/* Bouton Reset Vue Macro Toulouse */}
+        <Pressable
+          style={({ pressed }) => [
+            styles.floatingRoundBtn,
+            styles.macroViewBtn,
+            pressed && styles.floatingRoundBtnPressed,
+          ]}
+          onPress={handleResetToulouseView}
+          accessibilityLabel="Vue d'ensemble Toulouse"
+        >
+          <Compass size={22} color="#FFFFFF" strokeWidth={2.6} />
         </Pressable>
 
         {/* Center on Me Button */}
         <Pressable
           style={({ pressed }) => [
-            styles.floatingBtn,
-            pressed && styles.floatingBtnPressed,
+            styles.floatingRoundBtn,
+            pressed && styles.floatingRoundBtnPressed,
           ]}
           onPress={handleCenterOnMe}
+          accessibilityLabel="Ma position"
         >
-          <Navigation size={22} color="#1E293B" strokeWidth={2.5} />
+          <Navigation size={20} color="#1E293B" strokeWidth={2.4} />
         </Pressable>
       </View>
 
@@ -1176,7 +1532,7 @@ export default function MapView({
           <ScrollView contentContainerStyle={styles.drawerScrollContent} keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
             {/* Search Input Bar */}
             <View style={styles.searchBarRow}>
-              <View style={styles.searchBarContainer}>
+              <View style={styles.drawerSearchBarContainer}>
                 <Search size={18} color="#64748B" style={styles.searchIcon} />
                 <TextInput
                   placeholder="Brunch"
@@ -1216,17 +1572,84 @@ export default function MapView({
               </Pressable>
             </View>
 
-            {/* Budget Step Slider Section */}
-            <Text style={styles.filterLabel}>Budget</Text>
-            <View style={styles.sliderContainer}>
-              <View style={styles.sliderTrack}>
-                <View style={[styles.sliderTrackActive, { width: `${((budget - 10) / 40) * 100}%` }]} />
-                <View style={[styles.sliderHandle, { left: `${((budget - 10) / 40) * 100}%` }]} />
+            {/* Budget Draggable Range Slider Section */}
+            <View style={styles.budgetHeaderRow}>
+              <View>
+                <Text style={styles.filterLabel}>Budget maximal</Text>
+                <Text style={styles.budgetHelperText}>
+                  {budget >= 50
+                    ? 'Tous les budgets (sans limite)'
+                    : `Jusqu'à ${budget}€ par personne`}
+                </Text>
               </View>
+              <View style={styles.budgetValueBadge}>
+                <Text style={styles.budgetValueBadgeText}>
+                  {budget >= 50 ? '50€+' : `${budget}€`}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.sliderContainer}>
+              {/* Stylized Visual Track & Handle */}
+              <View style={styles.sliderTrack}>
+                <View
+                  style={[
+                    styles.sliderTrackActive,
+                    { width: `${Math.max(0, Math.min(100, ((budget - 10) / 40) * 100))}%` },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.sliderHandle,
+                    { left: `${Math.max(0, Math.min(100, ((budget - 10) / 40) * 100))}%` },
+                  ]}
+                />
+              </View>
+
+              {/* Native Web Range Input for 60fps Smooth Dragging */}
+              {Platform.OS === 'web' && (
+                <input
+                  type="range"
+                  min="10"
+                  max="50"
+                  step="1"
+                  value={budget}
+                  onChange={(e: any) => {
+                    setBudget(Number(e.target.value));
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: 36,
+                    opacity: 0,
+                    cursor: 'pointer',
+                    zIndex: 20,
+                  } as any}
+                />
+              )}
+
+              {/* Quick Preset Buttons Below */}
               <View style={styles.sliderLabels}>
                 {[10, 20, 30, 40, 50].map((val) => (
-                  <Pressable key={val} onPress={() => setBudget(val)} style={styles.sliderLabelBtn}>
-                    <Text style={[styles.sliderLabelText, budget === val && styles.sliderLabelTextActive]}>
+                  <Pressable
+                    key={val}
+                    onPress={() => {
+                      triggerHaptic();
+                      setBudget(val);
+                    }}
+                    style={[
+                      styles.sliderLabelBtn,
+                      budget === val && styles.sliderLabelBtnActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.sliderLabelText,
+                        budget === val && styles.sliderLabelTextActive,
+                      ]}
+                    >
                       {val === 50 ? '€ 50+' : `€ ${val}`}
                     </Text>
                   </Pressable>
@@ -1238,37 +1661,48 @@ export default function MapView({
             <Text style={styles.filterLabel}>Catégories</Text>
             <View style={styles.chipsRow}>
               {[
-                { label: '🍴 Restauration', value: 'food' },
-                { label: '🍹 Bars & Cafés', value: 'drinks' },
-                { label: '🛍️ Shopping & Mode', value: 'shopping' },
-                { label: '💅 Beauté & Bien-être', value: 'beauty' },
-                { label: '🎭 Loisirs & Culture', value: 'culture' },
-                { label: '🏆 Sport & Activités', value: 'sport' },
-              ].map((c) => (
-                <Pressable
-                  key={c.value}
-                  onPress={() => setCategory(category === c.value ? null : c.value)}
-                  style={[styles.chip, category === c.value && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, category === c.value && styles.chipTextActive]}>
-                    {c.label}
-                  </Text>
-                </Pressable>
-              ))}
+                { label: 'Restauration', value: 'food', icon: Utensils },
+                { label: 'Bars & Cafés', value: 'drinks', icon: Wine },
+                { label: 'Shopping & Mode', value: 'shopping', icon: ShoppingBag },
+                { label: 'Beauté & Bien-être', value: 'beauty', icon: Scissors },
+                { label: 'Loisirs & Culture', value: 'culture', icon: Landmark },
+                { label: 'Sport & Activités', value: 'sport', icon: Dumbbell },
+              ].map((c) => {
+                const IconComp = c.icon;
+                const isSelected = category === c.value;
+                return (
+                  <Pressable
+                    key={c.value}
+                    onPress={() => {
+                      triggerHaptic();
+                      setCategory(isSelected ? null : c.value);
+                    }}
+                    style={[styles.chip, isSelected && styles.chipActive]}
+                  >
+                    <IconComp size={14} color={isSelected ? '#FFFFFF' : '#64748B'} strokeWidth={2.2} style={{ marginRight: 6 }} />
+                    <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
+                      {c.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
 
             {/* Ambiance Chips */}
-            <Text style={styles.filterLabel}>Ambiance</Text>
+            <Text style={styles.filterLabel}>Ambiance & Cadre</Text>
             <View style={styles.chipsRow}>
               {[
-                { label: 'Cosy', value: 'cosy' },
-                { label: 'Rooftop', value: 'rooftop' },
-                { label: 'Tendance', value: 'trendy' },
-                { label: 'Calme', value: 'calm' },
+                { label: 'Cosy & Intimiste', value: 'cosy' },
+                { label: 'Rooftop & Terrasse', value: 'rooftop' },
+                { label: 'Tendance & Branché', value: 'trendy' },
+                { label: 'Calme & Détente', value: 'calm' },
               ].map((a) => (
                 <Pressable
                   key={a.value}
-                  onPress={() => setAmbiance(ambiance === a.value ? null : a.value)}
+                  onPress={() => {
+                    triggerHaptic();
+                    setAmbiance(ambiance === a.value ? null : a.value);
+                  }}
                   style={[styles.chip, ambiance === a.value && styles.chipActive]}
                 >
                   <Text style={[styles.chipText, ambiance === a.value && styles.chipTextActive]}>
@@ -1315,6 +1749,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF5EF',
   },
   webMap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     width: '100%',
     height: '100%',
     borderWidth: 0,
@@ -1406,51 +1845,344 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textDecorationLine: 'underline',
   },
-  floatingHeader: {
+  // Dynamic Island Search Pill
+  searchBarContainer: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 35,
-    left: 20,
-    right: 20,
+    top: Platform.OS === 'ios' ? 52 : 36,
+    alignSelf: 'center',
+    width: '90%',
+    maxWidth: 440,
+    height: 52,
+    borderRadius: 18,
     backgroundColor: '#FAF5EF',
-    borderRadius: 10,
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: '#1E293B',
-    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
     shadowColor: '#1E293B',
-    shadowOffset: { width: 4, height: 4 },
+    shadowOffset: { width: 3, height: 3 },
     shadowOpacity: 1,
     shadowRadius: 0,
-    zIndex: 89,
+    elevation: 6,
+    zIndex: 99,
   },
-  floatingHeaderPressed: {
-    transform: [{ translateX: 2 }, { translateY: 2 }],
-    shadowOffset: { width: 2, height: 2 },
+  searchIconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#C52824',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
   },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '900',
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+    paddingVertical: 0,
+  },
+  searchClearBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  searchDivider: {
+    width: 1.5,
+    height: 24,
+    backgroundColor: '#CBD5E1',
+    marginRight: 6,
+  },
+  searchFilterBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchFilterBtnPressed: {
+    transform: [{ scale: 0.92 }],
+  },
+  searchFilterBtnActive: {
+    backgroundColor: '#FEE2E2',
+  },
+
+  // Autocomplete Suggestions Dropdown Card
+  searchSuggestionsCard: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 110 : 94,
+    alignSelf: 'center',
+    width: '90%',
+    maxWidth: 440,
+    maxHeight: 280,
+    backgroundColor: '#FAF5EF',
+    borderRadius: 16,
+    borderWidth: 2.5,
+    borderColor: '#1E293B',
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 8,
+    zIndex: 98,
+    overflow: 'hidden',
+  },
+  searchSuggestionsScroll: {
+    paddingVertical: 6,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  suggestionRowPressed: {
+    backgroundColor: '#F1E9DE',
+  },
+  suggestionCatDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  suggestionTexts: {
+    flex: 1,
+    marginRight: 10,
+  },
+  suggestionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
     color: '#1E293B',
   },
-  headerSubtitle: {
+  suggestionSubtitle: {
     fontSize: 11,
+    fontWeight: '500',
     color: '#64748B',
-    fontWeight: '700',
     marginTop: 2,
   },
-  
-  // Floating Actions Column
-  actionsColumn: {
+  suggestionRating: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  suggestionRatingText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  suggestionEmpty: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  suggestionEmptyText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  suggestionFooter: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: '#F8F5EE',
+    alignItems: 'center',
+  },
+  suggestionFooterText: {
+    fontSize: 11,
+    color: '#C52824',
+    fontWeight: '700',
+  },
+
+  // In-Map Route Banner
+  itineraryBanner: {
     position: 'absolute',
-    bottom: 130, // Positioned beautifully above bottom dock
-    right: 20,
-    gap: 12,
+    top: Platform.OS === 'ios' ? 114 : 94,
+    left: 16,
+    right: 16,
+    backgroundColor: '#1E293B',
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#C52824',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+    zIndex: 95,
+  },
+  itineraryBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  itineraryBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#C52824',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  itineraryBadgeGps: {
+    backgroundColor: '#10B981',
+  },
+  itineraryBadgeIcon: {
+    fontSize: 15,
+  },
+  itineraryOriginBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginLeft: 6,
+    alignSelf: 'center',
+  },
+  itineraryOriginBadgeGps: {
+    backgroundColor: 'rgba(16, 185, 129, 0.25)',
+    borderWidth: 1,
+    borderColor: '#10B981',
+  },
+  itineraryOriginBadgeManual: {
+    backgroundColor: 'rgba(229, 169, 59, 0.25)',
+    borderWidth: 1,
+    borderColor: '#E5A93B',
+  },
+  itineraryOriginBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FAF5EF',
+  },
+  itineraryTexts: {
+    flex: 1,
+  },
+  itineraryHeaderLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  itineraryDuration: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#FAF5EF',
+  },
+  itineraryDot: {
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  itineraryDistance: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#E5A93B',
+  },
+  itineraryDestination: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  itineraryActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  itineraryExternalBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  itineraryExternalBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FAF5EF',
+  },
+  itineraryCloseBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Floating Category Pills Bar — centré et fixé sous la barre de recherche
+  floatingCategoryBar: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 114 : 98,
+    left: 0,
+    right: 0,
+    zIndex: 89,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  categoryScrollContent: {
+    paddingHorizontal: 20,
+    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  categoryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAF5EF',
+    borderWidth: 2,
+    borderColor: '#1E293B',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+  },
+  categoryPillIcon: {
+    fontSize: 13,
+    marginRight: 5,
+  },
+  categoryPillText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  categoryPillTextSelected: {
+    color: '#FFFFFF',
+  },
+  
+  // Floating Action Buttons — colonne verticale à droite
+  actionsRow: {
+    position: 'absolute',
+    right: 16,
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 10,
     zIndex: 90,
   },
-  floatingBtn: {
+  floatingRoundBtn: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: '#1E293B',
     backgroundColor: '#FAF5EF',
     justifyContent: 'center',
@@ -1461,16 +2193,31 @@ const styles = StyleSheet.create({
     shadowRadius: 0,
     elevation: 4,
   },
-  floatingBtnPressed: {
+  floatingRoundBtnPressed: {
     transform: [{ translateX: 2 }, { translateY: 2 }],
-    shadowOffset: { width: 0, height: 0 },
+    shadowOffset: { width: 1, height: 1 },
+  },
+  macroViewBtn: {
+    backgroundColor: '#C52824',
+  },
+  perspective3dBtn: {
+    backgroundColor: '#FAF5EF',
+  },
+  perspective3dBtnActive: {
+    backgroundColor: '#E5A93B',
+    borderColor: '#1E293B',
+  },
+  perspective3dText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#1E293B',
+    letterSpacing: 0.5,
+  },
+  perspective3dTextActive: {
+    color: '#FFFFFF',
   },
   filterBtnActive: {
     backgroundColor: '#C52824',
-  },
-  gpsBtnPressed: {
-    transform: [{ translateX: 2 }, { translateY: 2 }],
-    shadowOffset: { width: 0, height: 0 },
   },
   nativeMarker: {
     width: 32,
@@ -1489,6 +2236,23 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.35 }, { translateY: -4 }],
     shadowOffset: { width: 4, height: 4 },
     borderWidth: 3,
+  },
+  nativeMarkerDiscovered: {
+    borderColor: '#10B981',
+    borderWidth: 2.8,
+    shadowColor: '#10B981',
+    shadowOpacity: 0.6,
+  },
+  discoveredBadgeDot: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#10B981',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
   markerRed: {
     backgroundColor: '#C52824',
@@ -1515,24 +2279,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FAF5EF',
-    borderRadius: 12,
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 0,
     padding: 16,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 6, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
     elevation: 5,
     position: 'relative',
   },
   cardAccentRed: {
-    borderTopWidth: 6,
+    borderTopWidth: 4,
     borderTopColor: '#C52824',
   },
   cardAccentGold: {
-    borderTopWidth: 6,
+    borderTopWidth: 4,
     borderTopColor: '#E5A93B',
   },
   cardLeft: {
@@ -1550,10 +2313,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 0,
   },
   tagRed: {
     backgroundColor: '#C52824',
@@ -1569,17 +2331,40 @@ const styles = StyleSheet.create({
   },
   visitTag: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingVertical: 4,
+    borderRadius: 8,
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderWidth: 1.5,
-    borderColor: '#10B981',
+    borderWidth: 0,
   },
   visitTagText: {
     fontSize: 9,
     fontWeight: '800',
     color: '#065F46',
     textTransform: 'uppercase',
+  },
+  budgetTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 0,
+  },
+  budgetTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  budgetHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  budgetHelperText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#C52824',
   },
   detailsTitle: {
     fontSize: 16,
@@ -1599,17 +2384,20 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   likeBtn: {
-    width: 42,
+    minWidth: 42,
     height: 42,
+    paddingHorizontal: 8,
     borderRadius: 21,
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
+    borderWidth: 0,
+    flexDirection: 'row',
+    gap: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   likeBtnInactive: {
     backgroundColor: '#FAF5EF',
@@ -1619,21 +2407,20 @@ const styles = StyleSheet.create({
     borderColor: '#1E293B',
   },
   likeBtnPressed: {
-    transform: [{ translateX: 2 }, { translateY: 2 }],
-    shadowOffset: { width: 0, height: 0 },
+    transform: [{ scale: 0.96 }],
   },
   itineraryBtn: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
+    borderWidth: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 2,
   },
   itineraryBtnRed: {
     backgroundColor: '#C52824',
@@ -1642,8 +2429,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5A93B',
   },
   itineraryBtnPressed: {
-    transform: [{ translateX: 2 }, { translateY: 2 }],
-    shadowOffset: { width: 0, height: 0 },
+    transform: [{ scale: 0.96 }],
   },
 
   // --- Filter Drawer (Slide-up Sheet) Styling ---
@@ -1689,7 +2475,7 @@ const styles = StyleSheet.create({
   },
   drawerScrollContent: {
     padding: 20,
-    paddingBottom: 60,
+    paddingBottom: 160,
   },
   searchBarRow: {
     flexDirection: 'row',
@@ -1697,7 +2483,7 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 20,
   },
-  searchBarContainer: {
+  drawerSearchBarContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1776,37 +2562,59 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   
-  // Step Slider Styles
+  budgetValueBadge: {
+    backgroundColor: '#C52824',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+  },
+  budgetValueBadgeText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 13,
+  },
+  
+  // Draggable Slider Styles
   sliderContainer: {
     marginBottom: 20,
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
+    position: 'relative',
   },
   sliderTrack: {
-    height: 6,
-    borderRadius: 3,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: '#E2E8F0',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
     position: 'relative',
     marginVertical: 14,
   },
   sliderTrackActive: {
     height: '100%',
     backgroundColor: '#C52824',
-    borderRadius: 3,
+    borderRadius: 4,
   },
   sliderHandle: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#C52824',
-    borderWidth: 2,
-    borderColor: '#FAF5EF',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FAF5EF',
+    borderWidth: 3,
+    borderColor: '#C52824',
     position: 'absolute',
-    top: -5,
-    marginLeft: -8,
+    top: -8,
+    marginLeft: -11,
     shadowColor: '#1E293B',
-    shadowOffset: { width: 1, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
   },
   sliderLabels: {
     flexDirection: 'row',
@@ -1815,6 +2623,16 @@ const styles = StyleSheet.create({
   },
   sliderLabelBtn: {
     alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+  },
+  sliderLabelBtnActive: {
+    backgroundColor: 'rgba(197, 40, 36, 0.12)',
+    borderColor: '#C52824',
   },
   sliderLabelText: {
     fontSize: 11,
@@ -1959,72 +2777,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 0,
     elevation: 8,
-  },
-  loginModalHeader: {
-    backgroundColor: '#1E293B',
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  loginModalHeaderTitle: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  loginModalBody: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  loginModalTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#1E293B',
-    marginBottom: 8,
-  },
-  loginModalSub: {
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  loginModalBtnRow: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  loginModalBtnCancel: {
-    flex: 1,
-    height: 46,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loginModalBtnCancelText: {
-    color: '#1E293B',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  loginModalBtnConfirm: {
-    flex: 1.2,
-    height: 46,
-    borderRadius: 12,
-    backgroundColor: '#C52824',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-  },
-  loginModalBtnConfirmText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 14,
   },
 });

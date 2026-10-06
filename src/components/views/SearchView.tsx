@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,23 +6,27 @@ import {
   TextInput,
   ScrollView,
   Pressable,
-  Image,
   Platform,
 } from 'react-native';
-import { Search, Sparkles, TrendingUp, MapPin, Star, Utensils, Coffee, ShoppingBag, Dumbbell, Tag } from 'lucide-react-native';
+import { Image } from 'expo-image';
+import { Search, TrendingUp, MapPin, Star, Utensils, Wine, CakeSlice, ShoppingBag, Scissors, Landmark, Dumbbell, Sun, Leaf } from 'lucide-react-native';
 import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
 
 import dataset from '../../constants/dataset.json';
+import { supabase } from '../../lib/supabase';
+import { searchIndex } from '../../lib/searchIndex';
+import { getOptimizedImageUrl } from '../../lib/imageOptimizer';
 
 const QUICK_TAGS = [
-  { id: '1', name: 'Restaurants 🍴', tag: 'Restaurants', icon: Utensils },
-  { id: '2', name: 'Bars & Cafés ☕', tag: 'Bars & Cafés', icon: Coffee },
-  { id: '3', name: 'Brunch & Douceurs 🥐', tag: 'Brunch & Douceurs', icon: Coffee },
-  { id: '4', name: 'Shopping & Déco 🛍️', tag: 'Shopping & Déco', icon: ShoppingBag },
-  { id: '5', name: 'Beauté 💆', tag: 'Beauté & Bien-être', icon: Sparkles },
-  { id: '6', name: 'Culture & Loisirs 🎨', tag: 'Culture & Loisirs', icon: Dumbbell },
-  { id: '7', name: 'Terrasse ☀️', tag: 'Terrasse ☀️', icon: Tag },
-  { id: '8', name: 'Bio & Local 🌿', tag: 'Bio & Local 🌿', icon: Tag },
+  { id: '1', name: 'Restaurants', tag: 'Restaurants', icon: Utensils },
+  { id: '2', name: 'Bars & Cocktails', tag: 'Bars', icon: Wine },
+  { id: '3', name: 'Brunch & Douceurs', tag: 'Brunch', icon: CakeSlice },
+  { id: '4', name: 'Shopping & Mode', tag: 'Shopping', icon: ShoppingBag },
+  { id: '5', name: 'Beauté & Spa', tag: 'Beauté', icon: Scissors },
+  { id: '6', name: 'Culture & Musées', tag: 'Culture', icon: Landmark },
+  { id: '7', name: 'Sport & Fitness', tag: 'Sport', icon: Dumbbell },
+  { id: '8', name: 'Terrasse & Rooftop', tag: 'Terrasse', icon: Sun },
+  { id: '9', name: 'Bio & Terroir', tag: 'Bio', icon: Leaf },
 ];
 
 const POPULAR_SEARCHES = [
@@ -33,31 +37,67 @@ const POPULAR_SEARCHES = [
   "Tapas toulousains ambiance chaleureuse",
 ];
 
-const ALL_SPOTS = dataset.addresses || [];
-
 export default function SearchView({
   onSelectSpot,
 }: {
   onSelectSpot?: (spotId: string) => void;
 }) {
+  const [allSpots, setAllSpots] = useState<any[]>(dataset.addresses || []);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [searchLimit, setSearchLimit] = useState(24);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedSpotDetail, setSelectedSpotDetail] = useState<SpotDetail | null>(null);
+  const searchInputRef = useRef<TextInput>(null);
 
-  // Dynamic search filtering across 790 spots
-  const filteredSpots = ALL_SPOTS.filter(s => {
-    if (selectedTag) {
-      if (!s.tags || !s.tags.includes(selectedTag)) return false;
+  // Sync latest addresses dynamically from Supabase & Listen to changes
+  useEffect(() => {
+    const fetchLatestSpots = async () => {
+      try {
+        const { data, error } = await supabase.from('addresses').select('*').order('created_at', { ascending: false });
+        if (!error && data && data.length > 0) {
+          setAllSpots(data);
+          searchIndex.updateSpots(data);
+        }
+      } catch (e) {
+        console.warn('SearchView fetch spots warning:', e);
+      }
+    };
+
+    fetchLatestSpots();
+
+    const onAddressesChanged = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setAllSpots(e.detail);
+        searchIndex.updateSpots(e.detail);
+      } else {
+        fetchLatestSpots();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pt_addresses_changed', onAddressesChanged);
     }
-    if (!query.trim()) return selectedTag ? true : false;
-    const q = query.toLowerCase();
-    return (
-      s.title.toLowerCase().includes(q) ||
-      s.description.toLowerCase().includes(q) ||
-      s.location.toLowerCase().includes(q) ||
-      (s.tags && s.tags.some(t => t.toLowerCase().includes(q)))
-    );
-  });
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('pt_addresses_changed', onAddressesChanged);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(query);
+      setSearchLimit(24);
+    }, 120);
+    return () => clearTimeout(handler);
+  }, [query]);
+
+  // Sub-millisecond pre-indexed search across all venues
+  const filteredSpots = React.useMemo(() => {
+    if (!debouncedQuery.trim() && !selectedTag) return [];
+    return searchIndex.search(debouncedQuery, selectedTag, searchLimit);
+  }, [debouncedQuery, selectedTag, searchLimit, allSpots]);
 
   return (
     <View style={styles.container}>
@@ -65,15 +105,19 @@ export default function SearchView({
         
         {/* Title Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Recherche 🔍</Text>
+          <Text style={styles.title}>Recherche</Text>
           <Text style={styles.subtitle}>Trouvez les meilleures adresses de Toulouse</Text>
         </View>
 
-        {/* Neo-Brutalist Search Bar */}
+        {/* Clean Modern Search Bar */}
         <View style={styles.searchBarWrapper}>
-          <View style={styles.searchBarContainer}>
-            <Search size={20} color="#1E293B" strokeWidth={2.5} style={{ marginRight: 10 }} />
+          <Pressable 
+            style={styles.searchBarContainer}
+            onPress={() => searchInputRef.current?.focus()}
+          >
+            <Search size={20} color="#64748B" strokeWidth={2.4} style={{ marginRight: 10 }} />
             <TextInput
+              ref={searchInputRef}
               placeholder="Ex: Brunch, Tapas, Rooftop..."
               placeholderTextColor="#94A3B8"
               value={query}
@@ -85,7 +129,7 @@ export default function SearchView({
                 <Text style={styles.clearBtnText}>✕</Text>
               </Pressable>
             )}
-          </View>
+          </Pressable>
         </View>
 
         {/* Quick Filter Tags Carousel */}
@@ -118,45 +162,74 @@ export default function SearchView({
 
             {filteredSpots.length === 0 ? (
               <View style={styles.emptyResultsBox}>
-                <Sparkles size={32} color="#CBD5E1" style={{ marginBottom: 8 }} />
+                <Search size={32} color="#CBD5E1" style={{ marginBottom: 8 }} />
                 <Text style={styles.emptyResultsTitle}>Aucune adresse trouvée</Text>
                 <Text style={styles.emptyResultsSub}>Essayez un autre mot-clé comme "Brunch", "Café" ou "Carmes".</Text>
               </View>
             ) : (
-              filteredSpots.map(spot => (
-                <Pressable
-                  key={spot.id}
-                  style={styles.resultCard}
-                  onPress={() => setSelectedSpotDetail({
-                    ...spot,
-                    description: (spot as any).full_description || spot.description,
-                    full_description: (spot as any).full_description || spot.description,
-                    breadcrumbs: (spot as any).breadcrumbs || [],
-                    tags: spot.tags || [],
-                    photos: spot.image_url ? [spot.image_url, ...((spot as any).gallery_urls || [])] : ((spot as any).gallery_urls || []),
-                    phone: (spot as any).telephone || (spot as any).phone || '',
-                    website: (spot as any).site_web || (spot as any).website || '',
-                    hours: (spot as any).horaires || (spot as any).hours || '',
-                  })}
-                >
-                  <Image source={{ uri: spot.image_url }} style={styles.resultImage} />
-                  <View style={styles.resultInfo}>
-                    <View style={styles.resultBadgeRow}>
-                      <Text style={styles.resultCategory}>{spot.tags ? spot.tags[0] : 'Adresse'}</Text>
-                      <View style={styles.ratingBadge}>
-                        <Star size={12} color="#E5A93B" fill="#E5A93B" />
-                        <Text style={styles.ratingText}>{spot.rating}</Text>
+              <>
+                {filteredSpots.slice(0, searchLimit).map(spot => (
+                  <Pressable
+                    key={spot.id}
+                    style={styles.resultCard}
+                    onPress={() => setSelectedSpotDetail({
+                      ...spot,
+                      description: (spot as any).full_description || spot.description,
+                      full_description: (spot as any).full_description || spot.description,
+                      breadcrumbs: (spot as any).breadcrumbs || [],
+                      tags: spot.tags || [],
+                      photos: spot.image_url ? [spot.image_url, ...((spot as any).gallery_urls || [])] : ((spot as any).gallery_urls || []),
+                      phone: (spot as any).telephone || (spot as any).phone || '',
+                      website: (spot as any).site_web || (spot as any).website || '',
+                      hours: (spot as any).horaires || (spot as any).hours || '',
+                    })}
+                  >
+                    <Image source={{ uri: getOptimizedImageUrl(spot.image_url, 350) }} style={styles.resultImage} contentFit="cover" transition={150} cachePolicy="memory-disk" />
+                    <View style={styles.resultInfo}>
+                      <View style={styles.resultBadgeRow}>
+                        <Text style={styles.resultCategory}>{spot.tags ? spot.tags[0] : 'Adresse'}</Text>
+                        <View style={styles.ratingBadge}>
+                          <Star size={12} color="#E5A93B" fill="#E5A93B" />
+                          <Text style={styles.ratingText}>{spot.rating}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.resultTitle}>{spot.title}</Text>
+                      <Text style={styles.resultDesc} numberOfLines={1}>{spot.description}</Text>
+                      <View style={styles.resultMetaRow}>
+                        <MapPin size={12} color="#64748B" />
+                        <Text style={styles.resultMetaText}>{spot.location} • {spot.price_level}</Text>
                       </View>
                     </View>
-                    <Text style={styles.resultTitle}>{spot.title}</Text>
-                    <Text style={styles.resultDesc} numberOfLines={1}>{spot.description}</Text>
-                    <View style={styles.resultMetaRow}>
-                      <MapPin size={12} color="#64748B" />
-                      <Text style={styles.resultMetaText}>{spot.location} • {spot.price_level}</Text>
-                    </View>
-                  </View>
-                </Pressable>
-              ))
+                  </Pressable>
+                ))}
+
+                {filteredSpots.length > searchLimit && (
+                  <Pressable
+                    style={({ pressed }) => [
+                      {
+                        width: '100%',
+                        paddingVertical: 14,
+                        backgroundColor: '#1E293B',
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginTop: 10,
+                        shadowColor: '#0F172A',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 8,
+                        elevation: 2,
+                      },
+                      pressed && { opacity: 0.85 }
+                    ]}
+                    onPress={() => setSearchLimit(prev => prev + 20)}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>
+                      Afficher plus de résultats ({Math.min(searchLimit, filteredSpots.length)} / {filteredSpots.length}) ↓
+                    </Text>
+                  </Pressable>
+                )}
+              </>
             )}
           </View>
         ) : (
@@ -236,15 +309,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
+    borderWidth: 0,
     paddingHorizontal: 16,
     height: 54,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 3,
   },
   searchInput: {
     flex: 1,
@@ -254,8 +326,10 @@ const styles = StyleSheet.create({
     ...Platform.select({
       web: {
         outlineStyle: 'none',
+        outlineWidth: 0,
         outlineColor: 'transparent',
         boxShadow: 'none',
+        borderWidth: 0,
       } as any
     }),
   },
@@ -289,19 +363,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 12,
-    paddingHorizontal: 14,
+    borderWidth: 0,
+    borderRadius: 20,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   tagPillSelected: {
     backgroundColor: '#C52824',
-    borderColor: '#1E293B',
+    borderWidth: 0,
   },
   tagPillText: {
     fontSize: 13,
@@ -318,13 +392,13 @@ const styles = StyleSheet.create({
   popularList: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
+    borderWidth: 0,
     paddingVertical: 8,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 3,
   },
   popularItem: {
     flexDirection: 'row',
@@ -343,15 +417,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
+    borderWidth: 0,
     padding: 12,
     marginBottom: 12,
     gap: 12,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 3,
   },
   resultImage: {
     width: 84,
@@ -379,6 +453,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
+    backgroundColor: '#FAF5EF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   ratingText: {
     fontSize: 12,
@@ -411,9 +489,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#CBD5E1',
-    borderStyle: 'dashed',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   emptyResultsTitle: {
     fontSize: 15,

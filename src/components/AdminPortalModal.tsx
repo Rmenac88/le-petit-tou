@@ -26,7 +26,6 @@ import {
   MapPin,
   Check,
   X,
-  QrCode,
   Sparkles,
   Utensils,
   Coffee,
@@ -44,10 +43,60 @@ import {
   Tag,
   Archive,
   Link as LinkIcon,
+  Star,
+  Image as ImageIcon,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import dataset from '../constants/dataset.json';
+import { getStoredPartners, saveStoredPartners } from '../lib/partnersStore';
+import { dataStore } from '../lib/dataStore';
+import {
+  isAddressInCategory,
+  getCategorySpotCount,
+  classifyAddress,
+} from '../lib/categoryResolver';
+
+const generateUUID = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
+const normalizeDate = (input: string): string | null => {
+  const trimmed = (input || '').trim();
+  if (!trimmed) return null;
+
+  // Format YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) return trimmed;
+  }
+
+  // Format DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+  const frMatch = trimmed.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/);
+  if (frMatch) {
+    const day = frMatch[1].padStart(2, '0');
+    const month = frMatch[2].padStart(2, '0');
+    const year = frMatch[3];
+    const iso = `${year}-${month}-${day}`;
+    const d = new Date(iso);
+    if (!isNaN(d.getTime())) return iso;
+  }
+
+  // Generic date parsing
+  const parsed = Date.parse(trimmed);
+  if (!isNaN(parsed)) {
+    return new Date(parsed).toISOString().split('T')[0];
+  }
+
+  return null;
+};
 
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web') {
@@ -85,11 +134,11 @@ const uploadMediaToSupabase = async (
 interface AdminPortalModalProps {
   visible: boolean;
   onClose: () => void;
-  onLogout: () => void;
+  onLogout?: () => void;
 }
 
 export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPortalModalProps) {
-  const [activeTab, setActiveTab] = useState<'spots' | 'editSpot' | 'categories' | 'events' | 'scanner'>('spots');
+  const [activeTab, setActiveTab] = useState<'spots' | 'editSpot' | 'categories' | 'events' | 'partners'>('spots');
 
   // Spots Data & Filters State
   const [spots, setSpots] = useState<any[]>(dataset.addresses || []);
@@ -102,7 +151,9 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formFullDescription, setFormFullDescription] = useState('');
-  const [formCategory, setFormCategory] = useState('cat_gourmand');
+  const [formCategory, setFormCategory] = useState<string>(
+    dataset.categories?.[0]?.id || 'e6134429-8d6e-5d84-bf4e-884e016df958'
+  );
   const [formAddress, setFormAddress] = useState('');
   const [formLocation, setFormLocation] = useState('');
   const [formPhone, setFormPhone] = useState('');
@@ -131,7 +182,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
   const [events, setEvents] = useState<any[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [eventSearchQuery, setEventSearchQuery] = useState('');
-  const [eventTabFilter, setEventTabFilter] = useState<'upcoming' | 'archived'>('upcoming');
+  const [eventTabFilter, setEventTabFilter] = useState<'all' | 'upcoming' | 'archived'>('all');
 
   // Edit / Create Event Form State
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -143,25 +194,40 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
   const [eventFormPrice, setEventFormPrice] = useState('0');
   const [eventFormImageUrl, setEventFormImageUrl] = useState('');
   const [eventFormSpotId, setEventFormSpotId] = useState<string | null>(null);
+  const [eventFormBookingUrl, setEventFormBookingUrl] = useState('');
+  const [eventFormMaxPlaces, setEventFormMaxPlaces] = useState('');
   const [showSpotSelectorModal, setShowSpotSelectorModal] = useState(false);
+
+  // Sponsored Partners (Top Sponsoring Netflix) State
+  const [partners, setPartners] = useState<any[]>([]);
+  const [loadingPartners, setLoadingPartners] = useState(false);
+  const [partnerFormTitle, setPartnerFormTitle] = useState('');
+  const [partnerFormSubtitle, setPartnerFormSubtitle] = useState('');
+  const [partnerFormImage, setPartnerFormImage] = useState('');
+  const [partnerFormRank, setPartnerFormRank] = useState('1');
+  const [partnerFormPrice, setPartnerFormPrice] = useState('150');
+  const [partnerFormDays, setPartnerFormDays] = useState('30');
+  const [partnerFormNotifyHours, setPartnerFormNotifyHours] = useState('24');
+  const [partnerFormSpotId, setPartnerFormSpotId] = useState<string | null>(null);
+  const [partnerFormSpotName, setPartnerFormSpotName] = useState('');
+  const [partnerAddressSearch, setPartnerAddressSearch] = useState('');
+  const [showPartnerAddressDropdown, setShowPartnerAddressDropdown] = useState(false);
+  const [isSubmittingPartner, setIsSubmittingPartner] = useState(false);
 
   // Deletion Confirmation Modal State
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
     visible: boolean;
-    type: 'spot' | 'event' | 'category';
+    type: 'spot' | 'event' | 'category' | 'partner';
     id: string;
     name: string;
   }>({ visible: false, type: 'spot', id: '', name: '' });
-
-  // Ticket Scanner State
-  const [scannerTicketNum, setScannerTicketNum] = useState('');
-  const [scanResult, setScanResult] = useState<{ status: 'success' | 'scanned_already' | 'invalid'; message: string } | null>(null);
 
   useEffect(() => {
     if (visible) {
       fetchSpots();
       fetchEvents();
       fetchCategories();
+      fetchPartners();
     }
   }, [visible]);
 
@@ -171,6 +237,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
       const { data, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
       if (!error && data && data.length > 0) {
         setCategories(data);
+        dataStore.notifyCategoriesChanged(data);
       } else {
         setCategories(dataset.categories || []);
       }
@@ -189,6 +256,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
       const { data, error } = await supabase.from('addresses').select('*').order('created_at', { ascending: false });
       if (!error && data && data.length > 0) {
         setSpots(data);
+        dataStore.notifyAddressesChanged(data);
       } else {
         setSpots(dataset.addresses || []);
       }
@@ -207,6 +275,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
       const { data, error } = await supabase.from('events').select('*').order('event_date', { ascending: true });
       if (!error && data) {
         setEvents(data);
+        dataStore.notifyEventsChanged(data);
       }
     } catch (e) {
       console.warn('Fetch events error:', e);
@@ -234,9 +303,9 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
         if (foundAddr && (!formAddress || formAddress === 'Toulouse')) {
           setFormAddress(foundAddr);
         }
-        showAlert('Géocodage réussi 🎯', `Coordonnées BAN trouvées : (${coords[1].toFixed(5)}, ${coords[0].toFixed(5)})`);
+        showAlert('Géocodage réussi', `Coordonnées BAN trouvées : (${coords[1].toFixed(5)}, ${coords[0].toFixed(5)})`);
       } else {
-        showAlert('Géocodage introuvable ⚠️', 'Aucune coordonnée BAN trouvée. Veuillez vérifier l\'adresse.');
+        showAlert('Géocodage introuvable', 'Aucune coordonnée BAN trouvée. Veuillez vérifier l\'adresse.');
       }
     } catch (e: any) {
       showAlert('Erreur de géocodage', e.message);
@@ -247,12 +316,13 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
 
   // ── Open Spot Form (New or Edit) ──
   const handleOpenEditSpot = (spot?: any) => {
+    const defaultCatId = categories[0]?.id || dataset.categories?.[0]?.id || 'e6134429-8d6e-5d84-bf4e-884e016df958';
     if (spot) {
       setEditingSpotId(spot.id);
       setFormTitle(spot.title || '');
       setFormDescription(spot.description || '');
       setFormFullDescription(spot.full_description || spot.description || '');
-      setFormCategory(spot.category_id || 'cat_gourmand');
+      setFormCategory(spot.category_id || classifyAddress(spot) || defaultCatId);
       setFormAddress(spot.address || '');
       setFormLocation(spot.location || '');
       setFormPhone(spot.telephone || '');
@@ -270,7 +340,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
       setFormTitle('');
       setFormDescription('');
       setFormFullDescription('');
-      setFormCategory('cat_gourmand');
+      setFormCategory(defaultCatId);
       setFormAddress('');
       setFormLocation('');
       setFormPhone('');
@@ -300,11 +370,27 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
       const lngVal = formLng ? parseFloat(formLng) : 1.4442;
       const ratingVal = formRating ? parseFloat(formRating) : 4.8;
 
+      // Ensure category_id is a valid UUID
+      let validCatId = formCategory;
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(validCatId);
+      if (!isUUID) {
+        const found = categories.find(c => 
+          c.id === validCatId || 
+          c.slug === validCatId || 
+          (c.name && c.name.toLowerCase().includes(validCatId.toLowerCase()))
+        );
+        if (found && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(found.id)) {
+          validCatId = found.id;
+        } else {
+          validCatId = categories[0]?.id || dataset.categories?.[0]?.id || 'e6134429-8d6e-5d84-bf4e-884e016df958';
+        }
+      }
+
       const record: any = {
         title: formTitle.trim(),
         description: formDescription.trim(),
         full_description: formFullDescription.trim() || formDescription.trim(),
-        category_id: formCategory,
+        category_id: validCatId,
         address: formAddress.trim(),
         location: formLocation.trim() || 'Toulouse Centre',
         telephone: formPhone.trim(),
@@ -321,19 +407,39 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
 
       if (editingSpotId) {
         // Update existing record
-        const { error } = await supabase.from('addresses').update(record).eq('id', editingSpotId);
+        let { error } = await supabase.from('addresses').update(record).eq('id', editingSpotId);
+        if (error && error.message?.includes('full_description')) {
+          delete record.full_description;
+          const retry = await supabase.from('addresses').update(record).eq('id', editingSpotId);
+          error = retry.error;
+        }
+        if (error && (error.message?.includes('category_id') || error.message?.includes('uuid'))) {
+          record.category_id = categories[0]?.id || 'e6134429-8d6e-5d84-bf4e-884e016df958';
+          const retry = await supabase.from('addresses').update(record).eq('id', editingSpotId);
+          error = retry.error;
+        }
         if (error) throw error;
-        showAlert('Succès 🟢', `L'adresse "${formTitle}" a été mise à jour avec succès.`);
+        showAlert('Succès', `L'adresse "${formTitle}" a été mise à jour avec succès.`);
       } else {
-        // Insert new record
+        // Insert new record (generate valid UUID compliant with Postgres type)
         const cleanSlug = formTitle.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 40);
-        record.id = `spot-${cleanSlug}-${Date.now().toString(36)}`;
+        record.id = generateUUID();
         record.slug = cleanSlug;
         record.is_recommended = true;
         record.is_new = true;
-        const { error } = await supabase.from('addresses').insert(record);
+        let { error } = await supabase.from('addresses').insert(record);
+        if (error && error.message?.includes('full_description')) {
+          delete record.full_description;
+          const retry = await supabase.from('addresses').insert(record);
+          error = retry.error;
+        }
+        if (error && (error.message?.includes('category_id') || error.message?.includes('uuid'))) {
+          record.category_id = categories[0]?.id || 'e6134429-8d6e-5d84-bf4e-884e016df958';
+          const retry = await supabase.from('addresses').insert(record);
+          error = retry.error;
+        }
         if (error) throw error;
-        showAlert('Succès 🟢', `L'adresse "${formTitle}" a été créée et publiée.`);
+        showAlert('Succès', `L'adresse "${formTitle}" a été créée et publiée.`);
       }
 
       await fetchSpots();
@@ -362,7 +468,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const publicUrl = await uploadMediaToSupabase(result.assets[0].uri, 'etablissements', 'covers', 'image/jpeg');
         setFormCoverUrl(publicUrl);
-        showAlert('Image mise à jour 📸', 'La photo de couverture a été téléversée sur Supabase Storage.');
+        showAlert('Image mise à jour', 'La photo de couverture a été téléversée sur Supabase Storage.');
       }
     } catch (e: any) {
       showAlert('Erreur téléversement', e.message);
@@ -387,7 +493,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const publicUrl = await uploadMediaToSupabase(result.assets[0].uri, 'etablissements', 'gallery', 'image/jpeg');
         setFormGalleryUrls(prev => [...prev, publicUrl]);
-        showAlert('Photo ajoutée 📸', 'Une nouvelle photo a été ajoutée à la galerie.');
+        showAlert('Photo ajoutée', 'Une nouvelle photo a été ajoutée à la galerie.');
       }
     } catch (e: any) {
       showAlert('Erreur téléversement', e.message);
@@ -435,12 +541,12 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
       if (editingCatId) {
         const { error } = await supabase.from('categories').update(catObj).eq('id', editingCatId);
         if (error) throw error;
-        showAlert('Catégorie mise à jour 🏷️', `La catégorie "${catFormName}" a été modifiée.`);
+        showAlert('Catégorie mise à jour', `La catégorie "${catFormName}" a été modifiée.`);
       } else {
-        const newId = `cat_${Date.now()}`;
-        const { error } = await supabase.from('categories').insert({ id: newId, ...catObj });
+        (catObj as any).id = generateUUID();
+        const { error } = await supabase.from('categories').insert(catObj);
         if (error) throw error;
-        showAlert('Catégorie créée 🏷️', `La catégorie "${catFormName}" a été ajoutée avec succès.`);
+        showAlert('Catégorie créée', `La catégorie "${catFormName}" a été ajoutée avec succès.`);
       }
 
       await fetchCategories();
@@ -460,56 +566,59 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
     setDeleteConfirmModal({ visible: false, type: 'spot', id: '', name: '' });
     try {
       if (type === 'spot') {
-        const { error } = await supabase.from('addresses').delete().eq('id', id);
+        // Optimistic UI update: remove from local state immediately
+        setSpots(prev => prev.filter(s => s.id !== id));
+        const { data, error } = await supabase.from('addresses').delete().eq('id', id).select();
         if (error) throw error;
-        showAlert('Suppression réussie 🗑️', `L'adresse "${name}" a été supprimée.`);
-        fetchSpots();
+        if (!data || data.length === 0) {
+          showAlert(
+            'Suppression locale',
+            `L'adresse "${name}" a été retirée de la liste locale.\n\nNote : Supabase n'a pas pu la supprimer dans le cloud car les règles RLS restreignent la suppression directe. Exécutez le script SQL fourni dans le SQL Editor Supabase pour autoriser la suppression distante.`
+          );
+        } else {
+          showAlert('Suppression réussie', `L'adresse "${name}" a été définitivement supprimée.`);
+        }
+        await fetchSpots();
       } else if (type === 'event') {
-        const { error } = await supabase.from('events').delete().eq('id', id);
+        setEvents(prev => prev.filter(e => e.id !== id));
+        const { error } = await supabase.from('events').delete().eq('id', id).select();
         if (error) throw error;
-        showAlert('Suppression réussie 🗑️', `L'événement "${name}" a été supprimé.`);
-        fetchEvents();
+        showAlert('Suppression réussie', `L'événement "${name}" a été supprimé.`);
+        await fetchEvents();
       } else if (type === 'category') {
-        const { error } = await supabase.from('categories').delete().eq('id', id);
+        setCategories(prev => prev.filter(c => c.id !== id));
+        const { error } = await supabase.from('categories').delete().eq('id', id).select();
         if (error) throw error;
-        showAlert('Suppression réussie 🗑️', `La catégorie "${name}" a été supprimée.`);
-        fetchCategories();
+        showAlert('Suppression réussie', `La catégorie "${name}" a été supprimée.`);
+        await fetchCategories();
+      } else if (type === 'partner') {
+        const updated = partners.filter(p => p.id !== id);
+        setPartners(updated);
+        saveStoredPartners(updated);
+        await supabase.from('sponsored_partners').delete().eq('id', id);
+        showAlert('Suppression réussie', `Le partenaire a été supprimé.`);
+        await fetchPartners();
       }
     } catch (e: any) {
       showAlert('Erreur lors de la suppression', e.message);
     }
   };
 
-  // ── Save / Update Event ──
-  const handleSaveEvent = async () => {
-    if (!eventFormTitle.trim() || !eventFormDate.trim()) {
-      showAlert('Champs requis', 'Veuillez saisir au moins le Titre et la Date de l\'événement.');
-      return;
-    }
-    try {
-      setIsUploading(true);
-      const record: any = {
-        title: eventFormTitle.trim(),
-        description: eventFormDesc.trim(),
-        event_date: eventFormDate.trim(),
-        event_time: eventFormTime.trim() || '19:00',
-        location: eventFormLocation.trim() || 'Toulouse',
-        price: parseFloat(eventFormPrice || '0'),
-        image_url: eventFormImageUrl.trim(),
-        address_id: eventFormSpotId || null,
-      };
-
-      if (editingEventId) {
-        const { error } = await supabase.from('events').update(record).eq('id', editingEventId);
-        if (error) throw error;
-        showAlert('Succès 🎫', `L'événement "${eventFormTitle}" a été mis à jour.`);
-      } else {
-        const { error } = await supabase.from('events').insert(record);
-        if (error) throw error;
-        showAlert('Succès 🎫', `L'événement "${eventFormTitle}" a été créé.`);
-      }
-
-      await fetchEvents();
+  // ── Event Handlers ──
+  const handleOpenEditEvent = (evt?: any) => {
+    if (evt) {
+      setEditingEventId(evt.id);
+      setEventFormTitle(evt.title || '');
+      setEventFormDesc(evt.description || '');
+      setEventFormDate(evt.event_date || '');
+      setEventFormTime(evt.event_time || '19:00');
+      setEventFormLocation(evt.location || '');
+      setEventFormPrice(evt.price !== undefined && evt.price !== null ? String(evt.price) : '0');
+      setEventFormImageUrl(evt.image_url || '');
+      setEventFormSpotId(evt.address_id || null);
+      setEventFormBookingUrl(evt.booking_url || '');
+      setEventFormMaxPlaces(evt.max_places !== undefined && evt.max_places !== null ? String(evt.max_places) : '');
+    } else {
       setEditingEventId(null);
       setEventFormTitle('');
       setEventFormDesc('');
@@ -519,10 +628,195 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
       setEventFormPrice('0');
       setEventFormImageUrl('');
       setEventFormSpotId(null);
+      setEventFormBookingUrl('');
+      setEventFormMaxPlaces('');
+    }
+  };
+
+  const setQuickDate = (offsetDays: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    const iso = d.toISOString().split('T')[0];
+    setEventFormDate(iso);
+  };
+
+  // ── Save / Update Event ──
+  const handleSaveEvent = async () => {
+    if (!eventFormTitle.trim()) {
+      showAlert('Titre requis', 'Veuillez saisir au moins le Titre de l\'événement.');
+      return;
+    }
+    const cleanDate = normalizeDate(eventFormDate);
+    if (!cleanDate) {
+      showAlert(
+        'Format de date requis',
+        'Veuillez saisir une date valide au format AAAA-MM-JJ (ex: 2026-10-15) ou JJ/MM/AAAA (ex: 15/10/2026). Vous pouvez aussi utiliser les raccourcis sous le champ.'
+      );
+      return;
+    }
+    try {
+      setIsUploading(true);
+      const parsedPrice = parseFloat((eventFormPrice || '0').toString().replace(',', '.').replace(/[^0-9.]/g, ''));
+      const validPrice = isNaN(parsedPrice) ? 0 : parsedPrice;
+      const parsedMaxPlaces = eventFormMaxPlaces.trim() ? parseInt(eventFormMaxPlaces.trim(), 10) : null;
+
+      const record: any = {
+        title: eventFormTitle.trim(),
+        description: eventFormDesc.trim() || 'Événement Le Petit Tou',
+        event_date: cleanDate,
+        event_time: eventFormTime.trim() || '19:00',
+        location: eventFormLocation.trim() || 'Toulouse',
+        price: validPrice,
+        image_url: eventFormImageUrl.trim() || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800',
+        booking_url: eventFormBookingUrl.trim() || 'https://www.phoenix-egalite-des-chances.com',
+        max_places: !isNaN(parsedMaxPlaces as number) && parsedMaxPlaces !== null ? parsedMaxPlaces : null,
+      };
+      if (eventFormSpotId) {
+        record.address_id = eventFormSpotId;
+      }
+
+      if (editingEventId) {
+        let { error } = await supabase.from('events').update(record).eq('id', editingEventId);
+        if (error && error.message?.includes('address_id')) {
+          delete record.address_id;
+          const retry = await supabase.from('events').update(record).eq('id', editingEventId);
+          error = retry.error;
+        }
+        if (error) throw error;
+        showAlert('Succès', `L'événement "${eventFormTitle}" a été mis à jour.`);
+      } else {
+        record.id = generateUUID();
+        let { error } = await supabase.from('events').insert(record);
+        if (error && error.message?.includes('address_id')) {
+          delete record.address_id;
+          const retry = await supabase.from('events').insert(record);
+          error = retry.error;
+        }
+        if (error) throw error;
+        showAlert('Succès', `L'événement "${eventFormTitle}" a été créé avec succès.`);
+      }
+
+      await fetchEvents();
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('eventsChanged'));
+      }
+      setEditingEventId(null);
+      setEventFormTitle('');
+      setEventFormDesc('');
+      setEventFormDate('');
+      setEventFormTime('19:00');
+      setEventFormLocation('');
+      setEventFormPrice('0');
+      setEventFormImageUrl('');
+      setEventFormSpotId(null);
+      setEventFormBookingUrl('');
+      setEventFormMaxPlaces('');
     } catch (e: any) {
-      showAlert('Erreur enregistrement événement', e.message);
+      if (e.message?.includes('user_push_tokens')) {
+        showAlert(
+          'Mise à jour SQL requise',
+          'Un ancien trigger de notifications cherche la table "user_push_tokens".\n\nVeuillez exécuter le script SQL "fix_user_push_tokens.sql" dans votre éditeur Supabase pour nettoyer les triggers et recréer la table.'
+        );
+      } else {
+        showAlert('Erreur enregistrement événement', e.message);
+      }
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  // ── Sponsoring Partners Management (Top Netflix) ──
+  const fetchPartners = async () => {
+    try {
+      setLoadingPartners(true);
+      const { data, error } = await supabase
+        .from('sponsored_partners')
+        .select('*')
+        .order('rank_position', { ascending: true });
+      if (!error && data && data.length > 0) {
+        setPartners(data);
+        saveStoredPartners(data);
+      } else {
+        const stored = getStoredPartners();
+        setPartners(stored);
+      }
+    } catch (e) {
+      console.warn('Fetch partners error:', e);
+      setPartners(getStoredPartners());
+    } finally {
+      setLoadingPartners(false);
+    }
+  };
+
+  const handleSavePartner = async () => {
+    if (!partnerFormTitle.trim()) {
+      showAlert('Titre requis', 'Veuillez saisir le nom du partenaire.');
+      return;
+    }
+    try {
+      setIsSubmittingPartner(true);
+      const rank = parseInt(partnerFormRank || '1', 10);
+      const price = parseFloat(partnerFormPrice || '150');
+      const days = parseInt(partnerFormDays || '30', 10);
+      const notifyHours = parseInt(partnerFormNotifyHours || '24', 10);
+
+      const startsAt = new Date();
+      const endsAt = new Date(Date.now() + days * 86400000);
+
+      const record: any = {
+        title: partnerFormTitle.trim(),
+        subtitle: partnerFormSubtitle.trim() || `Offre exclusive membre - ${price}€ de privilèges`,
+        image_url: partnerFormImage.trim() || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
+        badge_text: rank <= 3 ? `TOP #${rank} PARTENAIRE` : 'PARTENAIRE OFFICIEL',
+        sponsorship_tier: rank === 1 ? 'platinum' : (rank <= 3 ? 'gold' : 'silver'),
+        price_paid: price,
+        rank_position: rank,
+        starts_at: startsAt.toISOString(),
+        ends_at: endsAt.toISOString(),
+        notify_interval_hours: notifyHours,
+        is_active: true,
+        spot_id: partnerFormSpotId || null,
+      };
+      record.id = generateUUID();
+
+      const { data: inserted, error } = await supabase.from('sponsored_partners').insert(record).select();
+      if (error) {
+        // Local fallback if offline or restricted by RLS
+        const updated = [...partners, record].sort((a, b) => (a.rank_position || 1) - (b.rank_position || 1));
+        setPartners(updated);
+        saveStoredPartners(updated);
+        showAlert('Partenaire enregistré', `Le partenaire "${partnerFormTitle}" a été enregistré localement (exécutez le script SQL fourni pour activer l'écriture directe dans Supabase).`);
+      } else if (inserted && inserted.length > 0) {
+        const updated = [...partners, inserted[0]].sort((a, b) => (a.rank_position || 1) - (b.rank_position || 1));
+        setPartners(updated);
+        saveStoredPartners(updated);
+        showAlert('Partenaire sponsorisé ajouté', `Le partenaire "${partnerFormTitle}" a été classé Top ${rank} (${price}€ pour ${days} jours).`);
+      }
+
+      await fetchPartners();
+      setPartnerFormTitle('');
+      setPartnerFormSubtitle('');
+      setPartnerFormImage('');
+      setPartnerFormSpotId(null);
+      setPartnerFormSpotName('');
+      setPartnerAddressSearch('');
+    } catch (err: any) {
+      showAlert('Enregistrement local', 'Le partenaire a été enregistré et synchronisé localement.');
+      fetchPartners();
+    } finally {
+      setIsSubmittingPartner(false);
+    }
+  };
+
+  const handleTogglePartnerActive = async (partner: any) => {
+    try {
+      const nextVal = !partner.is_active;
+      const updated = partners.map(p => p.id === partner.id ? { ...p, is_active: nextVal } : p);
+      setPartners(updated);
+      saveStoredPartners(updated);
+      await supabase.from('sponsored_partners').update({ is_active: nextVal }).eq('id', partner.id);
+    } catch (e) {
+      console.warn(e);
     }
   };
 
@@ -534,13 +828,15 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
       const addrMatch = (s.address || '').toLowerCase().includes(q);
       if (!nameMatch && !addrMatch) return false;
     }
-    if (selectedCategoryFilter !== 'all' && s.category_id !== selectedCategoryFilter) {
+    if (selectedCategoryFilter !== 'all' && !isAddressInCategory(s, selectedCategoryFilter)) {
       return false;
     }
     return true;
   });
 
   const todayStr = new Date().toISOString().split('T')[0];
+  const upcomingCount = events.filter(e => e.event_date >= todayStr).length;
+  const archivedCount = events.filter(e => e.event_date < todayStr).length;
   const filteredEvents = events.filter(e => {
     if (eventSearchQuery) {
       const q = eventSearchQuery.toLowerCase();
@@ -574,25 +870,36 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
           </View>
         </SafeAreaView>
 
-        {/* Tab Selector Bar */}
+        {/* Tab Selector Bar (Horizontally scrollable on mobile) */}
         <View style={styles.tabBar}>
-          <Pressable style={[styles.tabBtn, activeTab === 'spots' && styles.tabBtnActive]} onPress={() => setActiveTab('spots')}>
-            <Text style={[styles.tabBtnText, activeTab === 'spots' && styles.tabBtnTextActive]}>🏠 Adresses ({spots.length})</Text>
-          </Pressable>
-          <Pressable style={[styles.tabBtn, activeTab === 'editSpot' && styles.tabBtnActive]} onPress={() => handleOpenEditSpot()}>
-            <Text style={[styles.tabBtnText, activeTab === 'editSpot' && styles.tabBtnTextActive]}>
-              {editingSpotId ? '✏️ Édition' : '➕ Créer'}
-            </Text>
-          </Pressable>
-          <Pressable style={[styles.tabBtn, activeTab === 'categories' && styles.tabBtnActive]} onPress={() => setActiveTab('categories')}>
-            <Text style={[styles.tabBtnText, activeTab === 'categories' && styles.tabBtnTextActive]}>🏷️ Catégories ({categories.length})</Text>
-          </Pressable>
-          <Pressable style={[styles.tabBtn, activeTab === 'events' && styles.tabBtnActive]} onPress={() => setActiveTab('events')}>
-            <Text style={[styles.tabBtnText, activeTab === 'events' && styles.tabBtnTextActive]}>🎫 Événements</Text>
-          </Pressable>
-          <Pressable style={[styles.tabBtn, activeTab === 'scanner' && styles.tabBtnActive]} onPress={() => setActiveTab('scanner')}>
-            <Text style={[styles.tabBtnText, activeTab === 'scanner' && styles.tabBtnTextActive]}>📷 Scanner</Text>
-          </Pressable>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBarScroll}>
+            <Pressable style={[styles.tabBtn, activeTab === 'spots' && styles.tabBtnActive]} onPress={() => setActiveTab('spots')}>
+              <MapPin size={14} color={activeTab === 'spots' ? '#C52824' : '#64748B'} strokeWidth={2.2} style={{ marginRight: 6 }} />
+              <Text style={[styles.tabBtnText, activeTab === 'spots' && styles.tabBtnTextActive]}>Adresses ({spots.length})</Text>
+            </Pressable>
+            <Pressable style={[styles.tabBtn, activeTab === 'editSpot' && styles.tabBtnActive]} onPress={() => handleOpenEditSpot()}>
+              {editingSpotId ? (
+                <Edit3 size={14} color={activeTab === 'editSpot' ? '#C52824' : '#64748B'} strokeWidth={2.2} style={{ marginRight: 6 }} />
+              ) : (
+                <Plus size={14} color={activeTab === 'editSpot' ? '#C52824' : '#64748B'} strokeWidth={2.2} style={{ marginRight: 6 }} />
+              )}
+              <Text style={[styles.tabBtnText, activeTab === 'editSpot' && styles.tabBtnTextActive]}>
+                {editingSpotId ? 'Édition' : 'Créer'}
+              </Text>
+            </Pressable>
+            <Pressable style={[styles.tabBtn, activeTab === 'categories' && styles.tabBtnActive]} onPress={() => setActiveTab('categories')}>
+              <Tag size={14} color={activeTab === 'categories' ? '#C52824' : '#64748B'} strokeWidth={2.2} style={{ marginRight: 6 }} />
+              <Text style={[styles.tabBtnText, activeTab === 'categories' && styles.tabBtnTextActive]}>Catégories</Text>
+            </Pressable>
+            <Pressable style={[styles.tabBtn, activeTab === 'events' && styles.tabBtnActive]} onPress={() => setActiveTab('events')}>
+              <Calendar size={14} color={activeTab === 'events' ? '#C52824' : '#64748B'} strokeWidth={2.2} style={{ marginRight: 6 }} />
+              <Text style={[styles.tabBtnText, activeTab === 'events' && styles.tabBtnTextActive]}>Événements</Text>
+            </Pressable>
+            <Pressable style={[styles.tabBtn, activeTab === 'partners' && styles.tabBtnActive]} onPress={() => setActiveTab('partners')}>
+              <Sparkles size={14} color={activeTab === 'partners' ? '#C52824' : '#64748B'} strokeWidth={2.2} style={{ marginRight: 6 }} />
+              <Text style={[styles.tabBtnText, activeTab === 'partners' && styles.tabBtnTextActive]}>Top Partenaires ({partners.length})</Text>
+            </Pressable>
+          </ScrollView>
         </View>
 
         {/* Main Content Area */}
@@ -621,20 +928,23 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
 
                 {/* Category Pills */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryPillsRow}>
-                  {[
-                    { id: 'all', name: 'Toutes' },
-                    { id: 'cat_gourmand', name: 'Gourmand 🍴' },
-                    { id: 'cat_trinquer', name: 'Trinquer 🍷' },
-                    { id: 'cat_shopping', name: 'Shopping 🛍️' },
-                    { id: 'cat_culture', name: 'Culture 🎨' },
-                    { id: 'cat_viepratique', name: 'Vie Pratique 🏠' },
-                  ].map(cat => (
+                  <Pressable
+                    style={[styles.catPill, selectedCategoryFilter === 'all' && styles.catPillActive]}
+                    onPress={() => setSelectedCategoryFilter('all')}
+                  >
+                    <Text style={[styles.catPillText, selectedCategoryFilter === 'all' && styles.catPillTextActive]}>
+                      Toutes ({spots.length})
+                    </Text>
+                  </Pressable>
+                  {categories.map(cat => (
                     <Pressable
                       key={cat.id}
                       style={[styles.catPill, selectedCategoryFilter === cat.id && styles.catPillActive]}
                       onPress={() => setSelectedCategoryFilter(cat.id)}
                     >
-                      <Text style={[styles.catPillText, selectedCategoryFilter === cat.id && styles.catPillTextActive]}>{cat.name}</Text>
+                      <Text style={[styles.catPillText, selectedCategoryFilter === cat.id && styles.catPillTextActive]}>
+                        {cat.name}
+                      </Text>
                     </Pressable>
                   ))}
                 </ScrollView>
@@ -662,14 +972,20 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                       />
                       <View style={styles.spotCardBody}>
                         <Text style={styles.spotCardTitle} numberOfLines={1}>{spot.title || spot.name}</Text>
-                        <Text style={styles.spotCardAddress} numberOfLines={1}>📍 {spot.address || spot.location || 'Toulouse'}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <MapPin size={11} color="#64748B" />
+                          <Text style={styles.spotCardAddress} numberOfLines={1}>{spot.address || spot.location || 'Toulouse'}</Text>
+                        </View>
                         <View style={styles.spotCardBadgeRow}>
                           <View style={styles.miniBadge}>
                             <Text style={styles.miniBadgeText}>
-                              {spot.category_id === 'cat_gourmand' ? 'Gourmand' : spot.category_id === 'cat_trinquer' ? 'Trinquer' : 'Shopping'}
+                              {categories.find(c => c.id === spot.category_id)?.name || categories.find(c => c.id === classifyAddress(spot))?.name || 'Adresse'}
                             </Text>
                           </View>
-                          <Text style={styles.spotCardRating}>★ {spot.rating || '4.8'}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                            <Star size={11} color="#E5A93B" fill="#E5A93B" />
+                            <Text style={styles.spotCardRating}>{spot.rating || '4.8'}</Text>
+                          </View>
                         </View>
                       </View>
 
@@ -697,7 +1013,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
             <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
               <View style={styles.formContainer}>
                 <Text style={styles.formSectionTitle}>
-                  {editingSpotId ? '✏️ Modifier l\'adresse' : '➕ Créer une nouvelle adresse'}
+                  {editingSpotId ? 'Modifier l\'adresse' : 'Créer une nouvelle adresse'}
                 </Text>
 
                 {/* Cover Image Manager */}
@@ -707,7 +1023,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                     <Image source={{ uri: formCoverUrl }} style={styles.coverPreview} />
                   ) : (
                     <View style={styles.coverPlaceholder}>
-                      <Text style={{ fontSize: 24 }}>🖼️</Text>
+                      <ImageIcon size={24} color="#94A3B8" />
                       <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '700' }}>Aucune image</Text>
                     </View>
                   )}
@@ -723,13 +1039,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
 
                 <Text style={styles.inputLabel}>Catégorie *</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 12 }}>
-                  {[
-                    { id: 'cat_gourmand', name: 'Gourmand 🍴' },
-                    { id: 'cat_trinquer', name: 'Trinquer 🍷' },
-                    { id: 'cat_shopping', name: 'Shopping 🛍️' },
-                    { id: 'cat_culture', name: 'Culture 🎨' },
-                    { id: 'cat_viepratique', name: 'Vie Pratique 🏠' },
-                  ].map(c => (
+                  {categories.map(c => (
                     <Pressable
                       key={c.id}
                       style={[styles.catPill, formCategory === c.id && styles.catPillActive]}
@@ -750,7 +1060,14 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                     placeholderTextColor="#94A3B8"
                   />
                   <Pressable style={styles.geocodeBtn} onPress={handleGeocodeFormAddress} disabled={isGeocoding}>
-                    {isGeocoding ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.geocodeBtnText}>🎯 BAN</Text>}
+                    {isGeocoding ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Compass size={14} color="#FFFFFF" />
+                        <Text style={styles.geocodeBtnText}>BAN</Text>
+                      </View>
+                    )}
                   </Pressable>
                 </View>
 
@@ -827,7 +1144,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
             <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
               {/* Category Form */}
               <View style={styles.formContainer}>
-                <Text style={styles.formSectionTitle}>{editingCatId ? '✏️ Modifier la catégorie' : '➕ Ajouter une nouvelle catégorie'}</Text>
+                <Text style={styles.formSectionTitle}>{editingCatId ? 'Modifier la catégorie' : 'Ajouter une nouvelle catégorie'}</Text>
                 
                 <Text style={styles.inputLabel}>Nom de la catégorie *</Text>
                 <TextInput
@@ -865,7 +1182,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                     </Pressable>
                   )}
                   <Pressable style={[styles.saveSubmitBtn, { flex: 1 }]} onPress={handleSaveCategory} disabled={isUploading}>
-                    <Text style={styles.saveSubmitBtnText}>{editingCatId ? 'Enregistrer 🏷️' : 'Créer la catégorie 🏷️'}</Text>
+                    <Text style={styles.saveSubmitBtnText}>{editingCatId ? 'Enregistrer les modifications' : 'Créer la catégorie'}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -875,7 +1192,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
               
               <View style={{ gap: 10 }}>
                 {categories.map((cat: any) => {
-                  const spotCount = spots.filter(s => s.category_id === cat.id || s.category_id === cat.slug).length;
+                  const spotCount = getCategorySpotCount(spots, cat.id);
                   return (
                     <View key={cat.id} style={styles.catAdminCard}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
@@ -908,56 +1225,152 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
           {/* ── TAB 4: EVENTS MANAGEMENT (Upcoming / Archived / Create) ── */}
           {activeTab === 'events' && (
             <View style={{ flex: 1, paddingHorizontal: 16 }}>
-              {/* Filter Row: Upcoming vs Archived */}
+              {/* Filter Row: All vs Upcoming vs Archived */}
               <View style={styles.eventTabRow}>
+                <Pressable
+                  style={[styles.eventTabPill, eventTabFilter === 'all' && styles.eventTabPillActive]}
+                  onPress={() => setEventTabFilter('all')}
+                >
+                  <Calendar size={13} color={eventTabFilter === 'all' ? '#1E293B' : '#64748B'} style={{ marginRight: 6 }} />
+                  <Text style={[styles.eventTabPillText, eventTabFilter === 'all' && styles.eventTabPillTextActive]}>
+                    Tous ({events.length})
+                  </Text>
+                </Pressable>
                 <Pressable
                   style={[styles.eventTabPill, eventTabFilter === 'upcoming' && styles.eventTabPillActive]}
                   onPress={() => setEventTabFilter('upcoming')}
                 >
-                  <Text style={[styles.eventTabPillText, eventTabFilter === 'upcoming' && styles.eventTabPillTextActive]}>📅 À venir</Text>
+                  <Clock size={13} color={eventTabFilter === 'upcoming' ? '#1E293B' : '#64748B'} style={{ marginRight: 6 }} />
+                  <Text style={[styles.eventTabPillText, eventTabFilter === 'upcoming' && styles.eventTabPillTextActive]}>
+                    À venir ({upcomingCount})
+                  </Text>
                 </Pressable>
                 <Pressable
                   style={[styles.eventTabPill, eventTabFilter === 'archived' && styles.eventTabPillActive]}
                   onPress={() => setEventTabFilter('archived')}
                 >
-                  <Text style={[styles.eventTabPillText, eventTabFilter === 'archived' && styles.eventTabPillTextActive]}>🗄️ Archivés (Passés)</Text>
+                  <Archive size={13} color={eventTabFilter === 'archived' ? '#1E293B' : '#64748B'} style={{ marginRight: 6 }} />
+                  <Text style={[styles.eventTabPillText, eventTabFilter === 'archived' && styles.eventTabPillTextActive]}>
+                    Archivés ({archivedCount})
+                  </Text>
                 </Pressable>
               </View>
 
               <ScrollView contentContainerStyle={{ paddingBottom: 60, gap: 12 }} showsVerticalScrollIndicator={false}>
                 {/* Event Form Box */}
                 <View style={styles.formContainer}>
-                  <Text style={styles.formSectionTitle}>{editingEventId ? '✏️ Modifier l\'événement' : '➕ Créer un événement'}</Text>
+                  <Text style={styles.formSectionTitle}>{editingEventId ? 'Modifier l\'événement' : 'Créer un événement'}</Text>
                   
                   <TextInput style={styles.input} value={eventFormTitle} onChangeText={setEventFormTitle} placeholder="Titre de l'événement *" placeholderTextColor="#94A3B8" />
                   <TextInput style={styles.input} value={eventFormDesc} onChangeText={setEventFormDesc} placeholder="Description *" placeholderTextColor="#94A3B8" multiline />
                   
                   <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormDate} onChangeText={setEventFormDate} placeholder="Date (AAAA-MM-JJ) *" placeholderTextColor="#94A3B8" />
+                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormDate} onChangeText={setEventFormDate} placeholder="Date (AAAA-MM-JJ ou JJ/MM/AAAA) *" placeholderTextColor="#94A3B8" />
                     <TextInput style={[styles.input, { flex: 1 }]} value={eventFormTime} onChangeText={setEventFormTime} placeholder="Heure (ex: 19:00)" placeholderTextColor="#94A3B8" />
                   </View>
 
-                  <TextInput style={styles.input} value={eventFormLocation} onChangeText={setEventFormLocation} placeholder="Lieu *" placeholderTextColor="#94A3B8" />
-                  <TextInput style={styles.input} value={eventFormPrice} onChangeText={setEventFormPrice} keyboardType="numeric" placeholder="Tarif (€)" placeholderTextColor="#94A3B8" />
+                  {/* Raccourcis date rapide */}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 11, color: '#64748B', marginRight: 2 }}>Raccourcis :</Text>
+                    <Pressable
+                      style={{ backgroundColor: '#F1F5F9', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}
+                      onPress={() => setQuickDate(0)}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#334155' }}>Aujourd'hui</Text>
+                    </Pressable>
+                    <Pressable
+                      style={{ backgroundColor: '#F1F5F9', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}
+                      onPress={() => setQuickDate(1)}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#334155' }}>Demain</Text>
+                    </Pressable>
+                    <Pressable
+                      style={{ backgroundColor: '#F1F5F9', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}
+                      onPress={() => setQuickDate(7)}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#334155' }}>Dans 7 j</Text>
+                    </Pressable>
+                    <Pressable
+                      style={{ backgroundColor: '#F1F5F9', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}
+                      onPress={() => setQuickDate(30)}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#334155' }}>Dans 1 mois</Text>
+                    </Pressable>
+                  </View>
 
-                  <Pressable style={styles.saveSubmitBtn} onPress={handleSaveEvent} disabled={isUploading}>
-                    <Text style={styles.saveSubmitBtnText}>{editingEventId ? 'Mettre à jour l\'événement →' : 'Publier l\'événement →'}</Text>
-                  </Pressable>
+                  <TextInput style={styles.input} value={eventFormLocation} onChangeText={setEventFormLocation} placeholder="Lieu *" placeholderTextColor="#94A3B8" />
+
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormPrice} onChangeText={setEventFormPrice} keyboardType="numeric" placeholder="Tarif (€)" placeholderTextColor="#94A3B8" />
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      value={eventFormMaxPlaces}
+                      onChangeText={setEventFormMaxPlaces}
+                      keyboardType="numeric"
+                      placeholder="Places max (ex: 50)"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+
+                  <TextInput
+                    style={styles.input}
+                    value={eventFormBookingUrl}
+                    onChangeText={setEventFormBookingUrl}
+                    placeholder="Lien de réservation (https://...)"
+                    placeholderTextColor="#94A3B8"
+                    autoCapitalize="none"
+                    keyboardType="url"
+                  />
+
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <Pressable style={[styles.saveSubmitBtn, { flex: 1 }]} onPress={handleSaveEvent} disabled={isUploading}>
+                      <Text style={styles.saveSubmitBtnText}>{editingEventId ? 'Mettre à jour l\'événement →' : 'Publier l\'événement →'}</Text>
+                    </Pressable>
+                    {editingEventId && (
+                      <Pressable
+                        style={[styles.saveSubmitBtn, { backgroundColor: '#94A3B8', paddingHorizontal: 16 }]}
+                        onPress={() => handleOpenEditEvent(null)}
+                      >
+                        <Text style={styles.saveSubmitBtnText}>Annuler</Text>
+                      </Pressable>
+                    )}
+                  </View>
                 </View>
 
                 {/* Events List */}
                 <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E293B', marginTop: 12 }}>
-                  {filteredEvents.length} événements {eventTabFilter === 'upcoming' ? 'à venir' : 'passés (archivés)'}
+                  {filteredEvents.length} événements {eventTabFilter === 'all' ? 'au total' : eventTabFilter === 'upcoming' ? 'à venir' : 'passés (archivés)'}
                 </Text>
 
                 {filteredEvents.map(evt => (
                   <View key={evt.id} style={styles.spotCard}>
                     <View style={styles.spotCardBody}>
                       <Text style={styles.spotCardTitle}>{evt.title}</Text>
-                      <Text style={styles.spotCardAddress}>📅 {evt.event_date} à {evt.event_time} - {evt.location}</Text>
-                      <Text style={styles.spotCardRating}>{evt.price ? `${evt.price} €` : 'Gratuit'}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Calendar size={11} color="#64748B" />
+                        <Text style={styles.spotCardAddress}>{evt.event_date} à {evt.event_time} - {evt.location}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+                        <Text style={styles.spotCardRating}>{evt.price ? `${evt.price} €` : 'Gratuit'}</Text>
+                        {evt.max_places ? (
+                          <Text style={{ fontSize: 11, color: '#8B5CF6', fontWeight: '700', backgroundColor: '#EDE9FE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                            {evt.max_places} places
+                          </Text>
+                        ) : null}
+                        {evt.booking_url ? (
+                          <Text style={{ fontSize: 11, color: '#0891B2', fontWeight: '700', backgroundColor: '#ECFEFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                            Lien réservation
+                          </Text>
+                        ) : null}
+                      </View>
                     </View>
                     <View style={styles.spotCardActions}>
+                      <Pressable
+                        style={styles.actionBtnEdit}
+                        onPress={() => handleOpenEditEvent(evt)}
+                      >
+                        <Edit3 size={16} color="#4F46E5" strokeWidth={2.5} />
+                      </Pressable>
                       <Pressable
                         style={styles.actionBtnDelete}
                         onPress={() => setDeleteConfirmModal({ visible: true, type: 'event', id: evt.id, name: evt.title })}
@@ -971,34 +1384,388 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
             </View>
           )}
 
-          {/* ── TAB 4: SCANNER ── */}
-          {activeTab === 'scanner' && (
-            <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-              <View style={styles.scannerCard}>
-                <QrCode size={48} color="#C52824" />
-                <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E293B' }}>Validation de billet QR Code</Text>
-                <TextInput
-                  placeholder="#PT2026-XXXXXXXX"
-                  placeholderTextColor="#94A3B8"
-                  value={scannerTicketNum}
-                  onChangeText={setScannerTicketNum}
-                  style={styles.input}
-                  autoCapitalize="characters"
-                />
+          {/* ── TAB 5: TOP PARTENAIRES (STYLE NETFLIX) ── */}
+          {activeTab === 'partners' && (
+            <ScrollView style={{ flex: 1, padding: 16 }} contentContainerStyle={{ paddingBottom: 60 }}>
+              <View style={styles.formCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <Sparkles size={22} color="#E5A93B" />
+                  <Text style={styles.sectionHeaderTitle}>Nouveau Partenaire Sponsorisé (Top Netflix)</Text>
+                </View>
+                <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 16 }}>
+                  Les partenaires apparaîtront dans le carrousel Top 1..10 de la page d'accueil classés par rang et prix payé.
+                </Text>
+
+                {/* ── Sélecteur d'adresse existante avec moteur de recherche ── */}
+                <Text style={styles.inputLabel}>
+                  Lier à une adresse existante du Petit Tou
+                </Text>
                 <Pressable
-                  style={styles.saveSubmitBtn}
-                  onPress={() => {
-                    if (scannerTicketNum.trim()) {
-                      showAlert('Billet validé 🟢', `Le billet ${scannerTicketNum.trim().toUpperCase()} a été scanné avec succès.`);
-                      setScannerTicketNum('');
-                    }
-                  }}
+                  style={[
+                    styles.input,
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 0,
+                      height: 46,
+                    },
+                  ]}
+                  onPress={() => setShowPartnerAddressDropdown((v) => !v)}
                 >
-                  <Text style={styles.saveSubmitBtnText}>Valider le billet ✓</Text>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontSize: 14,
+                      color: partnerFormSpotId ? '#1E293B' : '#94A3B8',
+                      fontWeight: partnerFormSpotId ? '700' : '400',
+                    }}
+                    numberOfLines={1}
+                  >
+                    {partnerFormSpotId
+                      ? partnerFormSpotName
+                      : 'Sélectionner une adresse…'}
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {partnerFormSpotId && (
+                      <Pressable
+                        hitSlop={10}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          setPartnerFormSpotId(null);
+                          setPartnerFormSpotName('');
+                          setPartnerAddressSearch('');
+                        }}
+                      >
+                        <X size={14} color="#94A3B8" />
+                      </Pressable>
+                    )}
+                    <MapPin size={16} color="#C52824" />
+                  </View>
+                </Pressable>
+
+                {showPartnerAddressDropdown && (
+                  <View
+                    style={{
+                      borderWidth: 2,
+                      borderColor: '#1E293B',
+                      borderRadius: 12,
+                      backgroundColor: '#FAF5EF',
+                      marginTop: 4,
+                      overflow: 'hidden',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.18,
+                      shadowRadius: 8,
+                      elevation: 8,
+                      zIndex: 999,
+                    }}
+                  >
+                    {/* Barre de recherche interne */}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        borderBottomWidth: 2,
+                        borderBottomColor: '#1E293B',
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        backgroundColor: '#FFFFFF',
+                        gap: 8,
+                      }}
+                    >
+                      <Search size={16} color="#C52824" />
+                      <TextInput
+                        autoFocus
+                        placeholder={`Rechercher parmi ${spots.length} adresses…`}
+                        placeholderTextColor="#94A3B8"
+                        value={partnerAddressSearch}
+                        onChangeText={setPartnerAddressSearch}
+                        style={{
+                          flex: 1,
+                          fontSize: 14,
+                          color: '#1E293B',
+                          fontWeight: '600',
+                          height: 36,
+                        }}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      {partnerAddressSearch.length > 0 && (
+                        <Pressable hitSlop={8} onPress={() => setPartnerAddressSearch('')}>
+                          <X size={13} color="#94A3B8" />
+                        </Pressable>
+                      )}
+                    </View>
+
+                    {/* Liste filtrée */}
+                    <ScrollView
+                      style={{ maxHeight: 260 }}
+                      keyboardShouldPersistTaps="handled"
+                      nestedScrollEnabled
+                    >
+                      {spots
+                        .filter((s) => {
+                          const q = partnerAddressSearch.toLowerCase();
+                          if (!q) return true;
+                          return (
+                            (s.title || s.name || '').toLowerCase().includes(q) ||
+                            (s.address || '').toLowerCase().includes(q) ||
+                            (s.location || '').toLowerCase().includes(q)
+                          );
+                        })
+                        .slice(0, 60)
+                        .map((s, idx) => {
+                          const spotName = s.title || s.name || '—';
+                          const isSelected = partnerFormSpotId === s.id;
+                          return (
+                            <Pressable
+                              key={s.id || idx}
+                              onPress={() => {
+                                setPartnerFormSpotId(s.id);
+                                setPartnerFormSpotName(spotName);
+                                if (!partnerFormTitle.trim()) {
+                                  setPartnerFormTitle(spotName);
+                                }
+                                if (!partnerFormImage.trim() && s.image_url) {
+                                  setPartnerFormImage(s.image_url);
+                                }
+                                setShowPartnerAddressDropdown(false);
+                                setPartnerAddressSearch('');
+                              }}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                paddingVertical: 10,
+                                paddingHorizontal: 14,
+                                backgroundColor: isSelected ? '#FFF0F0' : 'transparent',
+                                borderBottomWidth: 1,
+                                borderBottomColor: '#F1F5F9',
+                                gap: 10,
+                              }}
+                            >
+                              {/* Miniature */}
+                              {s.image_url ? (
+                                <Image
+                                  source={{ uri: s.image_url }}
+                                  style={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 8,
+                                    borderWidth: 1.5,
+                                    borderColor: isSelected ? '#C52824' : '#E2E8F0',
+                                  }}
+                                />
+                              ) : (
+                                <View
+                                  style={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 8,
+                                    backgroundColor: '#F1F5F9',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                >
+                                  <MapPin size={14} color="#94A3B8" />
+                                </View>
+                              )}
+                              <View style={{ flex: 1 }}>
+                                <Text
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: '800',
+                                    color: isSelected ? '#C52824' : '#1E293B',
+                                  }}
+                                  numberOfLines={1}
+                                >
+                                  {spotName}
+                                </Text>
+                                {(s.address || s.location) && (
+                                  <Text
+                                    style={{
+                                      fontSize: 11,
+                                      color: '#64748B',
+                                      fontWeight: '500',
+                                      marginTop: 1,
+                                    }}
+                                    numberOfLines={1}
+                                  >
+                                    {s.address || s.location}
+                                  </Text>
+                                )}
+                              </View>
+                              {isSelected && (
+                                <CheckCircle size={18} color="#C52824" />
+                              )}
+                            </Pressable>
+                          );
+                        })}
+                      {spots.filter((s) => {
+                        const q = partnerAddressSearch.toLowerCase();
+                        if (!q) return true;
+                        return (
+                          (s.title || s.name || '').toLowerCase().includes(q) ||
+                          (s.address || '').toLowerCase().includes(q)
+                        );
+                      }).length === 0 && (
+                        <View style={{ padding: 20, alignItems: 'center' }}>
+                          <Text style={{ color: '#94A3B8', fontSize: 13, fontWeight: '600' }}>
+                            Aucune adresse trouvée pour "{partnerAddressSearch}"
+                          </Text>
+                        </View>
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {partnerFormSpotId && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      marginTop: 6,
+                      marginBottom: 2,
+                      backgroundColor: '#F0FDF4',
+                      borderWidth: 1.5,
+                      borderColor: '#10B981',
+                      borderRadius: 8,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                    }}
+                  >
+                    <CheckCircle size={14} color="#10B981" />
+                    <Text style={{ fontSize: 12, color: '#065F46', fontWeight: '700', flex: 1 }} numberOfLines={1}>
+                      Lié à : {partnerFormSpotName}
+                    </Text>
+                  </View>
+                )}
+
+                <Text style={[styles.inputLabel, { marginTop: 14 }]}>Nom du partenaire / commerce *</Text>
+                <TextInput
+                  placeholder="Ex: Le Bibent, Brasserie Flo…"
+                  placeholderTextColor="#94A3B8"
+                  value={partnerFormTitle}
+                  onChangeText={setPartnerFormTitle}
+                  style={styles.input}
+                />
+
+                <Text style={styles.inputLabel}>Sous-titre / Offre exclusive</Text>
+                <TextInput
+                  placeholder="Ex: 1 Coupe de champagne offerte pour tout repas..."
+                  placeholderTextColor="#94A3B8"
+                  value={partnerFormSubtitle}
+                  onChangeText={setPartnerFormSubtitle}
+                  style={styles.input}
+                />
+
+                <Text style={styles.inputLabel}>URL de l'image de couverture (HD)</Text>
+                <TextInput
+                  placeholder="https://..."
+                  placeholderTextColor="#94A3B8"
+                  value={partnerFormImage}
+                  onChangeText={setPartnerFormImage}
+                  style={styles.input}
+                />
+
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Rang Top (1..10)</Text>
+                    <TextInput
+                      placeholder="1"
+                      keyboardType="numeric"
+                      placeholderTextColor="#94A3B8"
+                      value={partnerFormRank}
+                      onChangeText={setPartnerFormRank}
+                      style={styles.input}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Montant payé (€)</Text>
+                    <TextInput
+                      placeholder="150"
+                      keyboardType="numeric"
+                      placeholderTextColor="#94A3B8"
+                      value={partnerFormPrice}
+                      onChangeText={setPartnerFormPrice}
+                      style={styles.input}
+                    />
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Durée (jours)</Text>
+                    <TextInput
+                      placeholder="30"
+                      keyboardType="numeric"
+                      placeholderTextColor="#94A3B8"
+                      value={partnerFormDays}
+                      onChangeText={setPartnerFormDays}
+                      style={styles.input}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Fréquence notifs (heures)</Text>
+                    <TextInput
+                      placeholder="24"
+                      keyboardType="numeric"
+                      placeholderTextColor="#94A3B8"
+                      value={partnerFormNotifyHours}
+                      onChangeText={setPartnerFormNotifyHours}
+                      style={styles.input}
+                    />
+                  </View>
+                </View>
+
+                <Pressable
+                  disabled={isSubmittingPartner}
+                  style={({ pressed }) => [
+                    styles.saveSubmitBtn,
+                    { opacity: isSubmittingPartner ? 0.7 : 1, marginTop: 8 },
+                    pressed && styles.btnPressed,
+                  ]}
+                  onPress={handleSavePartner}
+                >
+                  <Text style={styles.saveSubmitBtnText}>
+                    {isSubmittingPartner ? 'Enregistrement...' : 'Classer et mettre en avant'}
+                  </Text>
                 </Pressable>
               </View>
-            </View>
+
+              {/* Partners List */}
+              <View style={{ marginTop: 20 }}>
+                <Text style={[styles.sectionHeaderTitle, { marginBottom: 12 }]}>
+                  Classement Actif des Partenaires ({partners.length})
+                </Text>
+
+                {partners.map((p, idx) => (
+                  <View key={p.id || idx} style={styles.partnerAdminCard}>
+                    <View style={styles.partnerRankBadge}>
+                      <Text style={styles.partnerRankText}>#{p.rank_position || idx + 1}</Text>
+                    </View>
+                    <Image source={{ uri: p.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800' }} style={styles.partnerThumb} />
+                    <View style={{ flex: 1, paddingHorizontal: 10 }}>
+                      <Text style={styles.partnerTitle}>{p.title}</Text>
+                      <Text style={styles.partnerSub} numberOfLines={1}>{p.subtitle}</Text>
+                      <Text style={styles.partnerMeta}>{p.price_paid || 0} € • Push: {p.notify_interval_hours || 24}h</Text>
+                    </View>
+                    <Pressable
+                      style={[styles.partnerStatusPill, p.is_active ? styles.partnerActivePill : styles.partnerInactivePill]}
+                      onPress={() => handleTogglePartnerActive(p)}
+                    >
+                      <Text style={[styles.partnerStatusText, { color: p.is_active ? '#065F46' : '#EF4444' }]}>
+                        {p.is_active ? 'Actif' : 'Inactif'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
           )}
+
+
         </View>
 
         {/* ── DELETION CONFIRMATION MODAL ── */}
@@ -1020,7 +1787,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                     <Text style={styles.cancelBtnText}>Annuler</Text>
                   </Pressable>
                   <Pressable style={styles.deleteBtn} onPress={handleConfirmDelete}>
-                    <Text style={styles.deleteBtnText}>Supprimer 🗑️</Text>
+                    <Text style={styles.deleteBtnText}>Supprimer</Text>
                   </Pressable>
                 </View>
               </View>
@@ -1042,103 +1809,124 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 2.5,
-    borderBottomColor: '#1E293B',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.06)',
     backgroundColor: '#FAF5EF',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '900',
     color: '#1E293B',
+    letterSpacing: -0.3,
   },
   iconBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    borderWidth: 2,
-    borderColor: '#1E293B',
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    boxShadow: '2px 2px 0px #1E293B',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   btnPressed: {
-    transform: [{ translateY: 1 }],
-    boxShadow: '1px 1px 0px #1E293B',
+    opacity: 0.75,
   },
   tabBar: {
-    flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 2.5,
-    borderBottomColor: '#1E293B',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.06)',
+    maxHeight: 56,
+  },
+  tabBarScroll: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    alignItems: 'center',
   },
   tabBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
   },
   tabBtnActive: {
-    backgroundColor: '#FAF5EF',
-    borderColor: '#1E293B',
-    boxShadow: '2px 2px 0px #1E293B',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   tabBtnText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#64748B',
   },
   tabBtnTextActive: {
-    color: '#1E293B',
+    color: '#C52824',
+    fontWeight: '800',
   },
   searchSection: {
     paddingVertical: 12,
-    gap: 8,
+    gap: 10,
   },
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 44,
-    boxShadow: '2px 2px 0px #1E293B',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 46,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   searchInput: {
     flex: 1,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#1E293B',
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      } as any,
+    }),
   },
   categoryPillsRow: {
     gap: 8,
     paddingVertical: 4,
   },
   catPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#1E293B',
     backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
   },
   catPillActive: {
     backgroundColor: '#C52824',
-    borderColor: '#1E293B',
+    shadowColor: '#C52824',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
   },
   catPillText: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: '#64748B',
   },
   catPillTextActive: {
     color: '#FFFFFF',
@@ -1159,73 +1947,74 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     backgroundColor: '#10B981',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    boxShadow: '2px 2px 0px #1E293B',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 2,
   },
   addInlineBtnText: {
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   spotCard: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 12,
-    padding: 10,
+    borderRadius: 16,
+    padding: 12,
     gap: 12,
     alignItems: 'center',
-    boxShadow: '3px 3px 0px #1E293B',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
   },
   spotCardImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
   },
   spotCardBody: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
   spotCardTitle: {
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
     color: '#1E293B',
   },
   spotCardAddress: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#64748B',
   },
   spotCardBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 2,
+    gap: 8,
+    marginTop: 3,
   },
   miniBadge: {
-    backgroundColor: '#FAF5EF',
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
   miniBadgeText: {
     fontSize: 10,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: '#475569',
   },
   spotCardRating: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#E5A93B',
+    color: '#D97706',
   },
   spotCardActions: {
     flexDirection: 'row',
@@ -1235,9 +2024,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
-    backgroundColor: '#FAF5EF',
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1245,43 +2032,48 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
     backgroundColor: '#FEE2E2',
     justifyContent: 'center',
     alignItems: 'center',
   },
   formContainer: {
     backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
-    borderRadius: 14,
-    padding: 16,
-    gap: 10,
-    boxShadow: '4px 4px 0px #1E293B',
+    borderRadius: 16,
+    padding: 18,
+    gap: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 3,
   },
   formSectionTitle: {
     fontSize: 16,
     fontWeight: '900',
     color: '#1E293B',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   inputLabel: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: '#475569',
     marginTop: 4,
   },
   input: {
-    backgroundColor: '#FAF5EF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#1E293B',
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      } as any,
+    }),
   },
   coverImageRow: {
     flexDirection: 'row',
@@ -1289,75 +2081,77 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   coverPreview: {
-    width: 70,
-    height: 70,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#1E293B',
+    width: 72,
+    height: 72,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
   },
   coverPlaceholder: {
-    width: 70,
-    height: 70,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    backgroundColor: '#FAF5EF',
+    width: 72,
+    height: 72,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 4,
   },
   uploadBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     backgroundColor: '#C52824',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    boxShadow: '2px 2px 0px #1E293B',
+    shadowColor: '#C52824',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 2,
   },
   uploadBtnText: {
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   geocodeBtn: {
     backgroundColor: '#3B82F6',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    boxShadow: '2px 2px 0px #1E293B',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   geocodeBtnText: {
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   galleryManagerSection: {
-    backgroundColor: '#FAF5EF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 10,
-    padding: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
     marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   addPhotoSmallBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     backgroundColor: '#10B981',
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   addPhotoSmallBtnText: {
-    fontSize: 10,
-    fontWeight: '900',
+    fontSize: 11,
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   galleryThumbWrapper: {
@@ -1368,36 +2162,37 @@ const styles = StyleSheet.create({
   galleryThumb: {
     width: 60,
     height: 60,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
   },
   deleteThumbBtn: {
     position: 'absolute',
     top: -4,
     right: -4,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: '#C52824',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#FFFFFF',
   },
   saveSubmitBtn: {
     backgroundColor: '#C52824',
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
-    borderRadius: 10,
-    paddingVertical: 12,
+    borderRadius: 12,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 8,
-    boxShadow: '3px 3px 0px #1E293B',
+    marginTop: 10,
+    shadowColor: '#C52824',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
   saveSubmitBtnText: {
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   eventTabRow: {
@@ -1407,54 +2202,55 @@ const styles = StyleSheet.create({
   },
   eventTabPill: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    backgroundColor: '#FFFFFF',
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   eventTabPillActive: {
-    backgroundColor: '#E5A93B',
-    boxShadow: '2px 2px 0px #1E293B',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   eventTabPillText: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: '#64748B',
   },
   eventTabPillTextActive: {
     color: '#1E293B',
-  },
-  scannerCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    gap: 14,
-    width: '100%',
-    maxWidth: 320,
-    boxShadow: '4px 4px 0px #1E293B',
+    fontWeight: '800',
   },
   confirmBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(30,41,59,0.7)',
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    ...Platform.select({
+      web: {
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+      } as any,
+    }),
   },
   confirmBox: {
-    backgroundColor: '#FAF5EF',
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
-    borderRadius: 16,
-    padding: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
     width: '100%',
-    maxWidth: 340,
+    maxWidth: 360,
     gap: 14,
-    boxShadow: '6px 6px 0px #1E293B',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    elevation: 10,
   },
   confirmHeader: {
     flexDirection: 'row',
@@ -1469,42 +2265,42 @@ const styles = StyleSheet.create({
   },
   confirmMessage: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#1E293B',
-    lineHeight: 18,
+    fontWeight: '600',
+    color: '#475569',
+    lineHeight: 20,
   },
   confirmActions: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 4,
+    marginTop: 6,
   },
   cancelBtn: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 8,
-    paddingVertical: 10,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   cancelBtnText: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: '#475569',
   },
   deleteBtn: {
     flex: 1,
     backgroundColor: '#C52824',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 8,
-    paddingVertical: 10,
+    borderRadius: 10,
+    paddingVertical: 12,
     alignItems: 'center',
-    boxShadow: '2px 2px 0px #1E293B',
+    shadowColor: '#C52824',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 2,
   },
   deleteBtnText: {
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   catAdminCard: {
@@ -1512,24 +2308,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 12,
-    padding: 12,
-    boxShadow: '3px 3px 0px #1E293B',
+    borderRadius: 14,
+    padding: 14,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   catIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
   },
   catAdminTitle: {
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
     color: '#1E293B',
   },
   catAdminSub: {
@@ -1539,9 +2335,9 @@ const styles = StyleSheet.create({
   },
   toggleSwitchBtn: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 8,
@@ -1550,11 +2346,11 @@ const styles = StyleSheet.create({
   },
   toggleSwitchBtnActive: {
     backgroundColor: '#E5A93B',
-    borderColor: '#1E293B',
+    borderColor: '#E5A93B',
   },
   toggleSwitchBtnActiveNew: {
     backgroundColor: '#C52824',
-    borderColor: '#1E293B',
+    borderColor: '#C52824',
   },
   toggleSwitchText: {
     fontSize: 11,
@@ -1566,23 +2362,100 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   editActionBtn: {
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
     borderRadius: 8,
-    backgroundColor: '#FAF5EF',
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
   deleteActionBtn: {
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
     borderRadius: 8,
     backgroundColor: '#FEE2E2',
-    borderWidth: 1.5,
-    borderColor: '#C52824',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 18,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 3,
+    gap: 12,
+  },
+  sectionHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#1E293B',
+  },
+
+  // ── PARTNERS STYLES ──
+  partnerAdminCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  partnerRankBadge: {
+    backgroundColor: '#C52824',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 6,
+  },
+  partnerRankText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 12,
+  },
+  partnerThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+  },
+  partnerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  partnerSub: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  partnerMeta: {
+    fontSize: 11,
+    color: '#D97706',
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  partnerStatusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  partnerActivePill: {
+    backgroundColor: '#D1FAE5',
+  },
+  partnerInactivePill: {
+    backgroundColor: '#FEE2E2',
+  },
+  partnerStatusText: {
+    fontSize: 11,
+    fontWeight: '800',
   },
 });

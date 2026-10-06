@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import {
   StyleSheet,
   Text,
   View,
   ScrollView,
-  Image,
   Pressable,
   Dimensions,
   Platform,
@@ -12,18 +12,42 @@ import {
   FlatList,
   Linking,
 } from 'react-native';
-import * as Icons from 'lucide-react-native';
+import { Image } from 'expo-image';
+import {
+  ArrowLeft,
+  Heart,
+  Star,
+  MapPin,
+  Navigation,
+  Quote,
+  Clock,
+  Phone,
+  Globe,
+  Sparkles,
+  MessageSquareQuote,
+  CheckCircle,
+} from 'lucide-react-native';
+import { getOptimizedImageUrl } from '../lib/imageOptimizer';
+import { discoveryStore } from '../lib/discoveryStore';
 
 const { width, height } = Dimensions.get('window');
 
 export interface SpotDetail {
   id: string;
   title: string;
+  is_recommended?: boolean;
+  is_new?: boolean;
   category?: string;
   location?: string;
   address?: string;
+  lat?: number;
+  lng?: number;
   rating?: number;
   price_level?: string;
+  budget_label?: string;
+  estimated_budget?: number;
+  price_min?: number;
+  price_max?: number;
   description?: string;
   full_description?: string;
   breadcrumbs?: string[];
@@ -48,12 +72,57 @@ interface AddressDetailModalProps {
   spot: SpotDetail | null;
   onClose: () => void;
   onGoToMap: (spotId: string) => void;
+  isFavorite?: boolean;
+  likesCount?: number;
+  onToggleFavorite?: (spotId: string) => void;
 }
 
-export default function AddressDetailModal({ spot, onClose, onGoToMap }: AddressDetailModalProps) {
+export default function AddressDetailModal({
+  spot,
+  onClose,
+  onGoToMap,
+  isFavorite: isFavoriteProp,
+  likesCount = 0,
+  onToggleFavorite,
+}: AddressDetailModalProps) {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [internalFavorite, setInternalFavorite] = useState(false);
+  const isFavorite = isFavoriteProp !== undefined ? isFavoriteProp : internalFavorite;
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [isDiscovered, setIsDiscovered] = useState(() => (spot?.id ? discoveryStore.isDiscovered(spot.id) : false));
+  const [isDiscovering, setIsDiscovering] = useState(false);
+
+  useEffect(() => {
+    if (!spot?.id) return;
+    setIsDiscovered(discoveryStore.isDiscovered(spot.id));
+    const unsubscribe = discoveryStore.subscribe(() => {
+      setIsDiscovered(discoveryStore.isDiscovered(spot.id));
+    });
+    return () => unsubscribe();
+  }, [spot?.id]);
+
+  const handleDiscover = async () => {
+    if (isDiscovered || isDiscovering || !spot?.id) return;
+    setIsDiscovering(true);
+    try {
+      await discoveryStore.discoverSpot(spot.id, !!spot.is_recommended);
+      setIsDiscovered(true);
+    } finally {
+      setIsDiscovering(false);
+    }
+  };
+
+  // Track view when address detail modal opens (fires once per unique spot)
+  useEffect(() => {
+    if (!spot?.id) return;
+    (async () => {
+      try {
+        await supabase
+          .from('address_views')
+          .insert({ spot_id: spot.id, source: 'app' });
+      } catch (e) {}
+    })();
+  }, [spot?.id]);
 
   if (!spot) return null;
 
@@ -62,7 +131,7 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
     "Une adresse incontournable sélectionnée avec soin par l'équipe du Petit Tou. Venez vivre une expérience authentique au cœur de Toulouse.";
   
   // Clean any trailing truncation dots if present
-  const cleanedReviewText = rawReviewText.replace(/[\.\…\s]+$/, '').trim();
+  const cleanedReviewText = rawReviewText.replace(/[\.…\s]+$/, '').trim();
   const isLongDescription = cleanedReviewText.length > 180;
   const displayText = (!isDescriptionExpanded && isLongDescription)
     ? `${cleanedReviewText.slice(0, 180)}...`
@@ -95,7 +164,14 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
               scrollEventThrottle={16}
             >
               {galleryPhotos.map((photo, index) => (
-                <Image key={index} source={{ uri: photo }} style={styles.carouselImage} resizeMode="cover" />
+                <Image
+                  key={index}
+                  source={{ uri: getOptimizedImageUrl(photo, 800) }}
+                  style={styles.carouselImage}
+                  contentFit="cover"
+                  transition={200}
+                  cachePolicy="memory-disk"
+                />
               ))}
             </ScrollView>
 
@@ -114,18 +190,35 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
               </View>
             )}
 
-            {/* Top Action Buttons (Back & Favorite) */}
+            {/* Top Action Buttons (Back & Favorite / Likes) */}
             <View style={styles.topActionsRow}>
               <Pressable style={styles.iconCircleBtn} onPress={onClose}>
-                <Icons.ArrowLeft size={22} color="#1E293B" strokeWidth={2.5} />
+                <ArrowLeft size={22} color="#1E293B" strokeWidth={2.5} />
               </Pressable>
-              <Pressable style={styles.iconCircleBtn} onPress={() => setIsFavorite(!isFavorite)}>
-                <Icons.Heart
-                  size={22}
+              <Pressable
+                style={[
+                  styles.iconCircleBtn,
+                  likesCount > 0 && styles.iconPillBtn,
+                ]}
+                onPress={() => {
+                  if (onToggleFavorite && spot.id) {
+                    onToggleFavorite(spot.id);
+                  } else {
+                    setInternalFavorite(!internalFavorite);
+                  }
+                }}
+              >
+                <Heart
+                  size={20}
                   color={isFavorite ? '#C52824' : '#1E293B'}
                   fill={isFavorite ? '#C52824' : 'transparent'}
                   strokeWidth={2.5}
                 />
+                {likesCount > 0 && (
+                  <Text style={[styles.likeCountTopText, isFavorite && styles.likeCountTopTextActive]}>
+                    {likesCount}
+                  </Text>
+                )}
               </Pressable>
             </View>
           </View>
@@ -138,9 +231,9 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
               <View style={styles.categoryBadge}>
                 <Text style={styles.categoryBadgeText}>{spot.category || 'Adresse Toulouse'}</Text>
               </View>
-              {spot.price_level && (
-                <Text style={styles.priceText}>{spot.price_level}</Text>
-              )}
+              <View style={styles.budgetBadge}>
+                <Text style={styles.budgetText}>{spot.budget_label || spot.price_level || '~20€'}</Text>
+              </View>
             </View>
 
             {/* Name / Title */}
@@ -149,7 +242,7 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
             {/* Location & Rating */}
             <View style={styles.metaRow}>
               <View style={styles.ratingBox}>
-                <Icons.Star size={16} color="#E5A93B" fill="#E5A93B" />
+                <Star size={16} color="#E5A93B" fill="#E5A93B" />
                 <Text style={styles.ratingText}>{spot.rating ? spot.rating.toFixed(1) : '4.8'}</Text>
                 <Text style={styles.ratingCount}>(124 avis)</Text>
               </View>
@@ -159,7 +252,7 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
 
             {/* Address line */}
             <View style={styles.addressLineRow}>
-              <Icons.MapPin size={18} color="#C52824" style={{ marginRight: 6 }} />
+              <MapPin size={18} color="#C52824" style={{ marginRight: 6 }} />
               <Text style={styles.addressLineText}>
                 {spot.address && spot.address !== 'Toulouse' && spot.address !== 'Toulouse Centre'
                   ? spot.address 
@@ -175,18 +268,23 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
                   const fullAddress = spot.address && spot.address !== 'Toulouse' && spot.address !== 'Toulouse Centre'
                     ? spot.address
                     : 'Toulouse';
-                  const targetQuery = `${spot.title}, ${fullAddress}`;
+                  const spotName = spot.title || 'Établissement';
+                  const hasCoords = typeof spot.lat === 'number' && typeof spot.lng === 'number';
+                  const destParam = hasCoords ? `${spot.lat},${spot.lng}` : encodeURIComponent(`${spotName}, ${fullAddress}`);
+
                   const scheme = Platform.select({
-                    ios: `maps://?q=${encodeURIComponent(targetQuery)}`,
-                    android: `geo:0,0?q=${encodeURIComponent(targetQuery)}`,
-                    default: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(targetQuery)}`
+                    ios: `maps://?saddr=Current%20Location&daddr=${destParam}&dirflg=w`,
+                    android: hasCoords
+                      ? `google.navigation:q=${spot.lat},${spot.lng}&mode=w`
+                      : `google.navigation:q=${encodeURIComponent(`${spotName}, ${fullAddress}`)}&mode=w`,
+                    default: `https://www.google.com/maps/dir/?api=1&destination=${destParam}&travelmode=walking`,
                   });
                   Linking.openURL(scheme).catch(() => {
-                    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(targetQuery)}`);
+                    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destParam}&travelmode=walking`);
                   });
                 }}
               >
-                <Icons.Navigation size={20} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 8 }} />
+                <Navigation size={20} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 8 }} />
                 <Text style={styles.primaryCtaText}>Itinéraire (Maps)</Text>
               </Pressable>
 
@@ -197,10 +295,45 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
                   onGoToMap(spot.id);
                 }}
               >
-                <Icons.MapPin size={20} color="#1E293B" strokeWidth={2.5} style={{ marginRight: 6 }} />
+                <MapPin size={20} color="#1E293B" strokeWidth={2.5} style={{ marginRight: 6 }} />
                 <Text style={styles.secondaryCtaText}>Carte in-app</Text>
               </Pressable>
             </View>
+
+            {/* Discovery / Gamification Check-in Banner */}
+            <Pressable
+              style={[
+                styles.discoveryBanner,
+                isDiscovered && styles.discoveryBannerDiscovered,
+              ]}
+              onPress={handleDiscover}
+              disabled={isDiscovered || isDiscovering}
+            >
+              <View style={styles.discoveryIconCircle}>
+                {isDiscovered ? (
+                  <CheckCircle size={22} color="#10B981" strokeWidth={2.5} />
+                ) : (
+                  <Sparkles size={22} color="#E5A93B" strokeWidth={2.5} />
+                )}
+              </View>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.discoveryTitle}>
+                  {isDiscovered ? 'Adresse déjà découverte !' : 'Découvrir cette adresse'}
+                </Text>
+                <Text style={styles.discoverySubtitle}>
+                  {isDiscovered
+                    ? 'Cette pépite est comptabilisée dans votre collection d\'adresses.'
+                    : spot.is_recommended
+                    ? 'Coup de cœur du Petit Tou • +25 points'
+                    : 'Gagnez +10 points pour votre progression.'}
+                </Text>
+              </View>
+              <View style={[styles.discoveryPtsBadge, isDiscovered && styles.discoveryPtsBadgeDiscovered]}>
+                <Text style={[styles.discoveryPtsText, isDiscovered && styles.discoveryPtsTextDiscovered]}>
+                  {isDiscovered ? '✓ Validé' : spot.is_recommended ? '+25 pts' : '+10 pts'}
+                </Text>
+              </View>
+            </Pressable>
 
             {/* Breadcrumb Category Chips */}
             {spot.breadcrumbs && spot.breadcrumbs.length > 0 && (
@@ -216,7 +349,7 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
             {/* L'avis du Petit Tou Card */}
             <View style={styles.petitTouReviewCard}>
               <View style={styles.petitTouReviewHeader}>
-                <Icons.Quote size={20} color="#E5A93B" style={{ marginRight: 8 }} />
+                <Quote size={20} color="#E5A93B" style={{ marginRight: 8 }} />
                 <Text style={styles.petitTouReviewTitle}>L'avis du Petit Tou</Text>
               </View>
               <Text style={styles.petitTouReviewText}>
@@ -250,11 +383,11 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
             )}
 
             {/* Practical Info (Hours, Phone, Web) */}
-            <View style={styles.sectionBox}>
+            <View style={styles.practicalInfoCard}>
               <Text style={styles.sectionHeaderTitle}>Informations pratiques</Text>
               
               <View style={styles.infoRow}>
-                <Icons.Clock size={18} color="#64748B" style={styles.infoIcon} />
+                <Clock size={18} color="#64748B" style={styles.infoIcon} />
                 <Text style={styles.infoText}>
                   {spot.hours && spot.hours.trim() ? spot.hours : 'Horaires non communiqués'}
                 </Text>
@@ -268,14 +401,14 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
                     if (clean) Linking.openURL(`tel:${clean}`);
                   }}
                 >
-                  <Icons.Phone size={18} color="#C52824" style={styles.infoIcon} />
-                  <Text style={[styles.infoText, { color: '#C52824', textDecorationLine: 'underline' }]}>
+                  <Phone size={18} color="#C52824" style={styles.infoIcon} />
+                  <Text style={[styles.infoText, { color: '#C52824', fontWeight: '700' }]}>
                     {spot.phone}
                   </Text>
                 </Pressable>
               ) : (
                 <View style={styles.infoRow}>
-                  <Icons.Phone size={18} color="#64748B" style={styles.infoIcon} />
+                  <Phone size={18} color="#64748B" style={styles.infoIcon} />
                   <Text style={[styles.infoText, { color: '#94A3B8' }]}>
                     Téléphone non renseigné
                   </Text>
@@ -293,9 +426,9 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
                     Linking.openURL(url).catch(() => {});
                   }}
                 >
-                  <Icons.Globe size={18} color="#C52824" style={styles.infoIcon} />
+                  <Globe size={18} color="#C52824" style={styles.infoIcon} />
                   <Text
-                    style={[styles.infoText, { color: '#C52824', textDecorationLine: 'underline' }]}
+                    style={[styles.infoText, { color: '#C52824', fontWeight: '700' }]}
                     numberOfLines={1}
                     ellipsizeMode="tail"
                   >
@@ -304,7 +437,7 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
                 </Pressable>
               ) : (
                 <View style={styles.infoRow}>
-                  <Icons.Globe size={18} color="#64748B" style={styles.infoIcon} />
+                  <Globe size={18} color="#64748B" style={styles.infoIcon} />
                   <Text style={[styles.infoText, { color: '#94A3B8' }]}>
                     Site web non renseigné
                   </Text>
@@ -312,14 +445,10 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
               )}
             </View>
 
-            {/* Reviews / Avis (Mock / Future Google/TripAdvisor sync) */}
+            {/* Reviews / Avis */}
             <View style={styles.sectionBox}>
               <View style={styles.reviewsHeaderRow}>
-                <Text style={styles.sectionHeaderTitle}>Avis & Notes</Text>
-                <View style={styles.googleBadge}>
-                  <Icons.Sparkles size={14} color="#E5A93B" style={{ marginRight: 4 }} />
-                  <Text style={styles.googleBadgeText}>Synchro GMaps / TripAdvisor</Text>
-                </View>
+                <Text style={styles.sectionHeaderTitle}>Avis & Retours</Text>
               </View>
 
               {spot.reviews && spot.reviews.length > 0 ? (
@@ -328,20 +457,20 @@ export default function AddressDetailModal({ spot, onClose, onGoToMap }: Address
                     <View style={styles.reviewHeader}>
                       <Text style={styles.reviewAuthor}>{rev.author}</Text>
                       <View style={styles.reviewStars}>
-                        <Icons.Star size={14} color="#E5A93B" fill="#E5A93B" />
+                        <Star size={14} color="#E5A93B" fill="#E5A93B" />
                         <Text style={styles.reviewRatingVal}>{rev.rating}</Text>
                       </View>
                     </View>
                     <Text style={styles.reviewComment}>{rev.comment}</Text>
-                    <Text style={styles.reviewDate}>{rev.date} • via {rev.source || 'Google Reviews'}</Text>
+                    <Text style={styles.reviewDate}>{rev.date}{rev.source ? ` • via ${rev.source}` : ''}</Text>
                   </View>
                 ))
               ) : (
                 <View style={styles.emptyReviewsCard}>
-                  <Icons.MessageSquareQuote size={32} color="#CBD5E1" style={{ marginBottom: 8 }} />
+                  <MessageSquareQuote size={32} color="#CBD5E1" style={{ marginBottom: 8 }} />
                   <Text style={styles.emptyReviewsTitle}>Aucun avis pour l'instant</Text>
                   <Text style={styles.emptyReviewsSub}>
-                    Les avis de Google Maps et TripAdvisor seront importés automatiquement sous peu.
+                    Soyez le premier à partager votre expérience dans cet établissement lors de votre visite !
                   </Text>
                 </View>
               )}
@@ -415,16 +544,30 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderWidth: 2,
-    borderColor: '#1E293B',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderWidth: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  iconPillBtn: {
+    width: 'auto',
+    minWidth: 54,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  likeCountTopText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  likeCountTopTextActive: {
+    color: '#C52824',
   },
   bodyContent: {
     padding: 24,
@@ -437,15 +580,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   categoryBadge: {
-    backgroundColor: '#C5282415',
+    backgroundColor: 'rgba(197, 40, 36, 0.08)',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#C52824',
+    borderRadius: 20,
+    borderWidth: 0,
   },
   categoryBadgeText: {
     fontSize: 12,
@@ -453,6 +595,23 @@ const styles = StyleSheet.create({
     color: '#C52824',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  budgetBadge: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 0,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  budgetText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1E293B',
   },
   priceText: {
     fontSize: 16,
@@ -510,7 +669,7 @@ const styles = StyleSheet.create({
   ctaRow: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 28,
+    marginBottom: 24,
   },
   primaryCtaBtn: {
     flex: 1,
@@ -520,12 +679,11 @@ const styles = StyleSheet.create({
     height: 52,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    borderWidth: 0,
+    shadowColor: '#C52824',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
     elevation: 4,
   },
   secondaryCtaBtn: {
@@ -536,13 +694,12 @@ const styles = StyleSheet.create({
     height: 52,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    borderWidth: 0,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
   secondaryCtaText: {
     color: '#1E293B',
@@ -555,13 +712,25 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   sectionBox: {
-    marginBottom: 28,
+    marginBottom: 24,
+  },
+  practicalInfoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 20,
+    borderWidth: 0,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 3,
   },
   sectionHeaderTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     color: '#1E293B',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   descriptionText: {
     fontSize: 15,
@@ -591,12 +760,11 @@ const styles = StyleSheet.create({
   googleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E5A93B15',
-    paddingHorizontal: 8,
+    backgroundColor: 'rgba(229, 169, 59, 0.12)',
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#E5A93B',
+    borderRadius: 12,
+    borderWidth: 0,
   },
   googleBadgeText: {
     fontSize: 11,
@@ -605,11 +773,15 @@ const styles = StyleSheet.create({
   },
   reviewCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: '#1E293B',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 0,
     marginBottom: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 3,
   },
   reviewHeader: {
     flexDirection: 'row',
@@ -648,9 +820,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    borderStyle: 'dashed',
+    borderWidth: 0,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
   },
   emptyReviewsTitle: {
     fontSize: 15,
@@ -668,16 +843,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   crumbChip: {
     backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    boxShadow: '1.5px 1.5px 0px #1E293B',
+    borderWidth: 0,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   crumbChipText: {
     fontSize: 11,
@@ -686,14 +864,17 @@ const styles = StyleSheet.create({
   },
   petitTouReviewCard: {
     backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
-    borderLeftWidth: 6,
+    borderWidth: 0,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 20,
+    borderLeftWidth: 4,
     borderLeftColor: '#E5A93B',
-    boxShadow: '3px 3px 0px #1E293B',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 3,
   },
   petitTouReviewHeader: {
     flexDirection: 'row',
@@ -715,12 +896,11 @@ const styles = StyleSheet.create({
   expandToggleBtn: {
     alignSelf: 'flex-start',
     marginTop: 10,
-    backgroundColor: '#FAF5EF',
-    borderWidth: 1.5,
-    borderColor: '#C52824',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    backgroundColor: 'rgba(197, 40, 36, 0.08)',
+    borderWidth: 0,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
   },
   expandToggleText: {
     fontSize: 12,
@@ -729,11 +909,15 @@ const styles = StyleSheet.create({
   },
   tagsSectionBox: {
     backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
+    borderWidth: 0,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 20,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 3,
   },
   tagsWrapRow: {
     flexDirection: 'row',
@@ -743,15 +927,77 @@ const styles = StyleSheet.create({
   },
   featureTagBadge: {
     backgroundColor: '#FAF5EF',
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
+    borderWidth: 0,
     borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   featureTagText: {
     fontSize: 11,
     fontWeight: '800',
     color: '#1E293B',
+  },
+  discoveryBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAF5EF',
+    borderWidth: 2,
+    borderColor: '#1E293B',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 20,
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+    gap: 10,
+  },
+  discoveryBannerDiscovered: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#10B981',
+    shadowColor: '#059669',
+  },
+  discoveryIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  discoveryTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  discoverySubtitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    lineHeight: 14,
+  },
+  discoveryPtsBadge: {
+    backgroundColor: '#C52824',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+  },
+  discoveryPtsBadgeDiscovered: {
+    backgroundColor: '#10B981',
+    borderColor: '#065F46',
+  },
+  discoveryPtsText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  discoveryPtsTextDiscovered: {
+    color: '#FFFFFF',
   },
 });

@@ -1,17 +1,16 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, View, Pressable, Platform } from 'react-native';
-import { GlassView } from 'expo-glass-effect';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { Home, Search, Map, Heart, User, LucideIcon } from 'lucide-react-native';
+import { Home, Search, Map, CreditCard, LucideIcon } from 'lucide-react-native';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export type TabType = 'home' | 'search' | 'map' | 'favorites' | 'profile';
+export type TabType = 'home' | 'search' | 'map' | 'cards';
 
 interface FloatingDockProps {
   activeTab: TabType;
@@ -24,11 +23,12 @@ interface TabButtonProps {
   isActive: boolean;
   onPress: () => void;
   color: string;
+  accessibilityLabel?: string;
 }
 
 const APPLE_EASE = Easing.bezier(0.25, 0.1, 0.25, 1);
 
-function TabButton({ Icon, isActive, onPress, color }: TabButtonProps) {
+function TabButton({ Icon, isActive, onPress, color, accessibilityLabel }: TabButtonProps) {
   const scale = useSharedValue(1);
   const tileOpacity = useSharedValue(0);
 
@@ -65,17 +65,16 @@ function TabButton({ Icon, isActive, onPress, color }: TabButtonProps) {
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
+      accessibilityLabel={accessibilityLabel}
       style={[styles.tabButton, animatedStyle]}
     >
-      {/* Glass tile behind active icons (matches your screenshot) */}
-      <Animated.View style={[styles.activeGlassTile, tileStyle]}>
-        <View style={styles.tileShine} />
-      </Animated.View>
+      {/* Active background indicator */}
+      <Animated.View style={[styles.activeGlassTile, tileStyle]} />
 
       <Icon
         color={color}
         size={22}
-        strokeWidth={isActive ? 2.6 : 2.0}
+        strokeWidth={isActive ? 2.4 : 1.8}
         style={styles.iconStyle}
       />
       {isActive && <View style={styles.activeDot} />}
@@ -85,16 +84,22 @@ function TabButton({ Icon, isActive, onPress, color }: TabButtonProps) {
 
 export default function FloatingDock({ activeTab, onChangeTab, visible = true }: FloatingDockProps) {
   const translateY = useSharedValue(0);
+  const opacity = useSharedValue(1);
 
   useEffect(() => {
-    translateY.value = withTiming(visible ? 0 : 150, {
-      duration: 300,
+    translateY.value = withTiming(visible ? 0 : 160, {
+      duration: 280,
+      easing: APPLE_EASE,
+    });
+    opacity.value = withTiming(visible ? 1 : 0, {
+      duration: 220,
       easing: APPLE_EASE,
     });
   }, [visible]);
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
   }));
 
   const tabs: {
@@ -104,20 +109,18 @@ export default function FloatingDock({ activeTab, onChangeTab, visible = true }:
     { type: 'home', icon: Home },
     { type: 'search', icon: Search },
     { type: 'map', icon: Map },
-    { type: 'favorites', icon: Heart },
-    { type: 'profile', icon: User },
+    { type: 'cards', icon: CreditCard },
   ];
 
   return (
-    <Animated.View style={[styles.outerContainer, animStyle]}>
-      <GlassView
-        glassEffectStyle="regular"
-        tintColor="#ffffff"
-        style={styles.dockContainer}
-      >
-        {/* Glass reflection shine across the top half of the dock */}
-        <View style={styles.glassShine} />
-
+    <Animated.View
+      style={[
+        styles.outerContainer,
+        animStyle,
+        { pointerEvents: visible ? 'auto' : 'none' } as any,
+      ]}
+    >
+      <View style={styles.dockContainer}>
         {tabs.map((tab) => {
           const isActive = activeTab === tab.type;
 
@@ -128,10 +131,11 @@ export default function FloatingDock({ activeTab, onChangeTab, visible = true }:
               isActive={isActive}
               onPress={() => onChangeTab(tab.type)}
               color={isActive ? '#C52824' : '#64748B'}
+              accessibilityLabel={`tab-${tab.type}`}
             />
           );
         })}
-      </GlassView>
+      </View>
     </Animated.View>
   );
 }
@@ -149,43 +153,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    height: 72,
-    borderRadius: 36,
+    height: 64,
+    borderRadius: 20,
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 380,
     paddingHorizontal: 12,
-    backgroundColor: Platform.OS === 'ios' ? 'rgba(255, 255, 255, 0.72)' : 'rgba(255, 255, 255, 0.92)',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: Platform.OS === 'ios' ? 'rgba(255, 255, 255, 0.88)' : 'rgba(255, 255, 255, 0.96)',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
     position: 'relative',
     overflow: 'hidden',
     ...Platform.select({
       ios: {},
       android: {
-        elevation: 12,
+        elevation: 6,
       },
       web: {
-        boxShadow: '0 12px 36px 0 rgba(30, 41, 59, 0.18)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        boxShadow: '0 8px 24px 0 rgba(15, 23, 42, 0.08)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
       } as any,
     }),
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.10,
     shadowRadius: 16,
-  },
-  glassShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderTopLeftRadius: 36,
-    borderTopRightRadius: 36,
-    pointerEvents: 'none',
-    zIndex: -1,
   },
   tabButton: {
     flex: 1,
@@ -196,44 +188,25 @@ const styles = StyleSheet.create({
   },
   activeGlassTile: {
     position: 'absolute',
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.45)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.55)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 4,
+    backgroundColor: 'rgba(197, 40, 36, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(197, 40, 36, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: -1,
-  },
-  tileShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    borderTopLeftRadius: 11,
-    borderTopRightRadius: 11,
   },
   iconStyle: {
     zIndex: 2,
   },
   activeDot: {
     position: 'absolute',
-    bottom: -2,
+    bottom: 4,
     width: 4,
     height: 4,
     borderRadius: 2,
     backgroundColor: '#C52824',
-    shadowColor: '#C52824',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 4,
   },
 });
