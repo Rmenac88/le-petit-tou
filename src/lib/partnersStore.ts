@@ -60,14 +60,14 @@ const STORAGE_KEY = "pt_sponsored_partners_v1";
  */
 export function getStoredPartners(): SponsoredPartner[] {
   const cached = appCache.get<SponsoredPartner[]>("sponsoredPartners");
-  if (cached && cached.length > 0) return cached;
+  if (cached) return cached;
 
   if (typeof window !== "undefined" && window.localStorage) {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           appCache.set("sponsoredPartners", parsed);
           return parsed;
         }
@@ -107,7 +107,7 @@ export async function syncPartnersWithSupabase(): Promise<SponsoredPartner[]> {
       .eq("is_active", true)
       .order("rank_position", { ascending: true });
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       saveStoredPartners(data);
       return data;
     }

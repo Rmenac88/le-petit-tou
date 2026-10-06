@@ -12,6 +12,7 @@ import { Lock, Eye, EyeOff, X, ShieldAlert, Check } from 'lucide-react-native';
 
 import { supabase } from '../lib/supabase';
 
+import { Brand } from '../constants/brand';
 interface AdminPasswordModalProps {
   visible: boolean;
   onClose: () => void;
@@ -111,18 +112,18 @@ export default function AdminPasswordModal({
         {/* Header Strip */}
         <View style={styles.headerStrip}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Lock size={16} color="#FFFFFF" strokeWidth={2.5} />
+            <Lock size={16} color={Brand.white} strokeWidth={2} />
             <Text style={styles.headerStripText}>SÉCURITÉ ADMINISTRATEUR</Text>
           </View>
           <Pressable onPress={handleClose} hitSlop={10}>
-            <X size={18} color="#FFFFFF" strokeWidth={2.5} />
+            <X size={18} color={Brand.white} strokeWidth={2} />
           </Pressable>
         </View>
 
         {/* Modal Body */}
         <View style={styles.modalBody}>
           <View style={styles.iconCircle}>
-            <Lock size={32} color="#C52824" strokeWidth={2.5} />
+            <Lock size={32} color={Brand.primaryDeep} strokeWidth={2} />
           </View>
 
           <Text style={styles.modalTitle}>Portail Membres</Text>
@@ -135,7 +136,7 @@ export default function AdminPasswordModal({
             <TextInput
               secureTextEntry={!showPassword}
               placeholder="Entrez la clé secrète..."
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={Brand.inkSoft}
               value={password}
               onChangeText={(text) => {
                 setPassword(text);
@@ -154,9 +155,9 @@ export default function AdminPasswordModal({
               hitSlop={8}
             >
               {showPassword ? (
-                <EyeOff size={20} color="#64748B" />
+                <EyeOff size={20} color={Brand.inkSoft} />
               ) : (
-                <Eye size={20} color="#64748B" />
+                <Eye size={20} color={Brand.inkSoft} />
               )}
             </Pressable>
           </View>
@@ -164,7 +165,7 @@ export default function AdminPasswordModal({
           {/* Error Message */}
           {errorMsg ? (
             <View style={styles.errorBox}>
-              <ShieldAlert size={16} color="#C52824" style={{ marginRight: 6 }} />
+              <ShieldAlert size={16} color={Brand.primaryDeep} style={{ marginRight: 6 }} />
               <Text style={styles.errorText}>{errorMsg}</Text>
             </View>
           ) : null}
@@ -193,13 +194,13 @@ export default function AdminPasswordModal({
             >
               {isSuccess ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Check size={18} color="#FFFFFF" strokeWidth={3} />
+                  <Check size={18} color={Brand.white} strokeWidth={2} />
                   <Text style={styles.confirmBtnText}>Accès autorisé</Text>
                 </View>
               ) : isVerifying ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={Brand.white} />
               ) : (
-                <Text style={styles.confirmBtnText}>Déverrouiller →</Text>
+                <Text style={styles.confirmBtnText}>Déverrouiller</Text>
               )}
             </Pressable>
           </View>
@@ -220,7 +221,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    backgroundColor: 'rgba(43, 29, 70, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 99999,
@@ -242,17 +243,17 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.16,
     shadowRadius: 24,
     elevation: 14,
   },
   headerStrip: {
-    backgroundColor: '#1E293B',
+    backgroundColor: Brand.ink,
     paddingHorizontal: 16,
     paddingVertical: 12,
     flexDirection: 'row',
@@ -260,9 +261,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerStripText: {
-    color: '#FFFFFF',
+    color: Brand.white,
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '700',
     letterSpacing: 1,
   },
   modalBody: {
@@ -273,21 +274,21 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'rgba(197, 40, 36, 0.08)',
+    backgroundColor: 'rgba(232, 74, 95, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
   },
   modalTitle: {
     fontSize: 22,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontWeight: '800',
+    color: Brand.ink,
     marginBottom: 6,
     textAlign: 'center',
   },
   modalSubtitle: {
     fontSize: 14,
-    color: '#64748B',
+    color: Brand.inkSoft,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
@@ -296,19 +297,19 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Brand.bg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
+    borderColor: Brand.line,
+    borderRadius: 20,
     paddingHorizontal: 14,
     marginBottom: 12,
   },
   passwordInput: {
     flex: 1,
     height: 48,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
+    color: Brand.ink,
     ...Platform.select({
       web: {
         outlineStyle: 'none',
@@ -321,8 +322,8 @@ const styles = StyleSheet.create({
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEE2E2',
-    borderRadius: 10,
+    backgroundColor: Brand.primarySoft,
+    borderRadius: 12,
     paddingVertical: 8,
     paddingHorizontal: 12,
     width: '100%',
@@ -343,35 +344,35 @@ const styles = StyleSheet.create({
   cancelBtn: {
     flex: 1,
     height: 48,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    borderRadius: 20,
+    backgroundColor: '#F5F0F2',
     justifyContent: 'center',
     alignItems: 'center',
   },
   cancelBtnText: {
-    color: '#475569',
-    fontWeight: '800',
+    color: '#4A4A58',
+    fontWeight: '700',
     fontSize: 14,
   },
   confirmBtn: {
     flex: 1.5,
     height: 48,
-    borderRadius: 12,
-    backgroundColor: '#C52824',
+    borderRadius: 20,
+    backgroundColor: Brand.primaryDeep,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#C52824',
+    shadowColor: Brand.ink,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.14,
     shadowRadius: 8,
     elevation: 4,
   },
   confirmBtnSuccess: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#1FA67A',
   },
   confirmBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
+    color: Brand.white,
+    fontWeight: '700',
     fontSize: 14,
     letterSpacing: 0.5,
   },
@@ -379,8 +380,8 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   securityHint: {
-    fontSize: 11,
-    color: '#94A3B8',
+    fontSize: 12,
+    color: Brand.inkSoft,
     textAlign: 'center',
     marginTop: 18,
     fontWeight: '500',

@@ -3,6 +3,7 @@ import { View, Text, Pressable, Platform } from 'react-native';
 import { Trophy, Sparkles, CreditCard } from 'lucide-react-native';
 import styles from './homeStyles';
 
+import { Brand } from '../../../constants/brand';
 export interface ProgressionBannerProps {
   discoveryStats: {
     discoveredCount: number;
@@ -41,12 +42,12 @@ export const ProgressionBanner: React.FC<ProgressionBannerProps> = ({
       <View style={styles.progressionContent}>
         <View style={styles.progressionTopRow}>
           <View style={styles.levelBadge}>
-            <Trophy size={13} color="#E5A93B" strokeWidth={2.4} style={{ marginRight: 5 }} />
+            <Trophy size={13} color={Brand.chouchou} strokeWidth={2} style={{ marginRight: 5 }} />
             <Text style={styles.levelBadgeText}>{getBadgeTitle()}</Text>
           </View>
 
           <View style={styles.pointsBadge}>
-            <Sparkles size={11} color="#C52824" strokeWidth={2.4} style={{ marginRight: 4 }} />
+            <Sparkles size={11} color={Brand.primaryDeep} strokeWidth={2} style={{ marginRight: 4 }} />
             <Text style={styles.pointsBadgeText}>{discoveryStats.totalPoints} pts</Text>
           </View>
         </View>
@@ -79,7 +80,7 @@ export const ProgressionBanner: React.FC<ProgressionBannerProps> = ({
           }}
           accessibilityLabel="Ouvrir Le Petit Tou Wallet"
         >
-          <CreditCard size={17} color="#C52824" strokeWidth={2.2} />
+          <CreditCard size={17} color={Brand.primaryDeep} strokeWidth={2} />
           <Text style={styles.privilegeShortcutText}>Wallet</Text>
         </Pressable>
       )}

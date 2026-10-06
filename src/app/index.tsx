@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image';
 
 import FloatingDock, { TabType } from '@/components/FloatingDock';
 import HomeView from '@/components/views/HomeView';
@@ -8,6 +7,7 @@ import SearchView from '@/components/views/SearchView';
 import MapView from '@/components/views/MapView';
 import CardsView from '@/components/views/CardsView';
 
+import { Brand } from '../constants/brand';
 export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [focusedSpotId, setFocusedSpotId] = useState<string | null>(null);
@@ -31,18 +31,6 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Soft Ambient Background Glows */}
-      <Image
-        source={require('../../assets/images/logo-glow.png')}
-        style={[styles.glow, styles.glowRed]}
-        tintColor="rgba(197, 40, 36, 0.25)"
-      />
-      <Image
-        source={require('../../assets/images/logo-glow.png')}
-        style={[styles.glow, styles.glowGold]}
-        tintColor="rgba(229, 169, 59, 0.25)"
-      />
-
       {/* Screen Content: Persistent 0ms Tab Views */}
       <View style={styles.contentContainer}>
         {/* Home Tab */}
@@ -53,11 +41,13 @@ export default function HomeScreen() {
             activeTab === 'home' ? styles.tabViewActive : styles.tabViewHidden,
           ]}
         >
-          <HomeView
-            onChangeTab={setActiveTab}
-            onToggleDock={setIsDockVisible}
-            onSelectSpot={handleSelectSpotForMap}
-          />
+          <View style={styles.column}>
+            <HomeView
+              onChangeTab={setActiveTab}
+              onToggleDock={setIsDockVisible}
+              onSelectSpot={handleSelectSpotForMap}
+            />
+          </View>
         </View>
 
         {/* Search Tab (Mounted on first visit, then kept in memory for 0ms switch) */}
@@ -69,7 +59,9 @@ export default function HomeScreen() {
               activeTab === 'search' ? styles.tabViewActive : styles.tabViewHidden,
             ]}
           >
-            <SearchView onSelectSpot={handleSelectSpotForMap} />
+            <View style={styles.column}>
+              <SearchView onSelectSpot={handleSelectSpotForMap} onToggleDock={setIsDockVisible} />
+            </View>
           </View>
         )}
 
@@ -100,7 +92,9 @@ export default function HomeScreen() {
               activeTab === 'cards' ? styles.tabViewActive : styles.tabViewHidden,
             ]}
           >
-            <CardsView />
+            <View style={styles.column}>
+              <CardsView />
+            </View>
           </View>
         )}
       </View>
@@ -114,7 +108,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
     position: 'relative',
     width: '100%',
     overflow: 'hidden',
@@ -140,6 +134,13 @@ const styles = StyleSheet.create({
     right: -140,
     width: 360,
     height: 360,
+  },
+  // Colonne de lecture centrée sur tablette et bureau (la carte reste pleine largeur)
+  column: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
   },
   tabViewWrapper: {
     ...StyleSheet.absoluteFill,

@@ -25,7 +25,7 @@ export const getWebMapHtml = (mapboxToken: string = MAPBOX_ACCESS_TOKEN) => `
       width: 100%; 
       height: 100%; 
       overflow: hidden; 
-      background-color: #0F172A; 
+      background-color: #24242E; 
       -webkit-tap-highlight-color: transparent;
     }
     #map { 
@@ -36,7 +36,7 @@ export const getWebMapHtml = (mapboxToken: string = MAPBOX_ACCESS_TOKEN) => `
       right: 0;
       width: 100%; 
       height: 100%; 
-      background-color: #0F172A; 
+      background-color: #24242E; 
     }
     .mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right {
       display: none !important;
@@ -63,19 +63,19 @@ export const getWebMapHtml = (mapboxToken: string = MAPBOX_ACCESS_TOKEN) => `
     .lpt-cluster-small {
       width: 34px;
       height: 34px;
-      background: #E5A93B;
+      background: #F2B835;
       font-size: 13px;
     }
     .lpt-cluster-medium {
       width: 40px;
       height: 40px;
-      background: #C52824;
+      background: #E84A5F;
       font-size: 14px;
     }
     .lpt-cluster-large {
       width: 48px;
       height: 48px;
-      background: #8B1A17;
+      background: #A82840;
       font-size: 15px;
       box-shadow: 0 6px 18px rgba(139, 26, 23, 0.45);
     }
@@ -184,19 +184,19 @@ export const getWebMapHtml = (mapboxToken: string = MAPBOX_ACCESS_TOKEN) => `
       top: 0;
       left: 0;
     }
-    .custom-marker-pin.cat-food .fallback-icon { background: #C52824; }
-    .custom-marker-pin.cat-drinks .fallback-icon { background: #E5A93B; }
-    .custom-marker-pin.cat-shopping .fallback-icon { background: #3B82F6; }
-    .custom-marker-pin.cat-beauty .fallback-icon { background: #EC4899; }
-    .custom-marker-pin.cat-culture .fallback-icon { background: #10B981; }
-    .custom-marker-pin.cat-sport .fallback-icon { background: #6366F1; }
-    .custom-marker-pin.cat-services .fallback-icon { background: #64748B; }
+    .custom-marker-pin.cat-food .fallback-icon { background: #E84A5F; }
+    .custom-marker-pin.cat-drinks .fallback-icon { background: #F2B835; }
+    .custom-marker-pin.cat-shopping .fallback-icon { background: #6C4AB6; }
+    .custom-marker-pin.cat-beauty .fallback-icon { background: #E84A5F; }
+    .custom-marker-pin.cat-culture .fallback-icon { background: #1FA67A; }
+    .custom-marker-pin.cat-sport .fallback-icon { background: #6C4AB6; }
+    .custom-marker-pin.cat-services .fallback-icon { background: #6A6A78; }
     
     .user-location-marker {
       width: 16px;
       height: 16px;
       border-radius: 50%;
-      background: #3B82F6;
+      background: #6C4AB6;
       border: 2.5px solid #FFFFFF;
       box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.4);
     }
@@ -560,7 +560,7 @@ export const getWebMapHtml = (mapboxToken: string = MAPBOX_ACCESS_TOKEN) => `
                 type: 'fill-extrusion',
                 minzoom: 14,
                 paint: {
-                  'fill-extrusion-color': '#E2E8F0',
+                  'fill-extrusion-color': '#ECE6EA',
                   'fill-extrusion-height': [
                     'interpolate',
                     ['linear'],
@@ -727,7 +727,7 @@ export const getWebMapHtml = (mapboxToken: string = MAPBOX_ACCESS_TOKEN) => `
                 'line-cap': 'round'
               },
               paint: {
-                'line-color': '#1E293B',
+                'line-color': '#1A1A22',
                 'line-width': 8,
                 'line-opacity': 0.85
               }
@@ -741,7 +741,7 @@ export const getWebMapHtml = (mapboxToken: string = MAPBOX_ACCESS_TOKEN) => `
                 'line-cap': 'round'
               },
               paint: {
-                'line-color': '#C52824',
+                'line-color': '#E84A5F',
                 'line-width': 4.5
               }
             });
@@ -803,14 +803,14 @@ export const getWebMapHtml = (mapboxToken: string = MAPBOX_ACCESS_TOKEN) => `
                   type: 'line',
                   source: 'pt-route',
                   layout: { 'line-join': 'round', 'line-cap': 'round' },
-                  paint: { 'line-color': '#1E293B', 'line-width': 8, 'line-opacity': 0.85 }
+                  paint: { 'line-color': '#1A1A22', 'line-width': 8, 'line-opacity': 0.85 }
                 });
                 map.addLayer({
                   id: 'pt-route-line',
                   type: 'line',
                   source: 'pt-route',
                   layout: { 'line-join': 'round', 'line-cap': 'round' },
-                  paint: { 'line-color': '#C52824', 'line-width': 4.5 }
+                  paint: { 'line-color': '#E84A5F', 'line-width': 4.5 }
                 });
               }
               // Ajuster les limites de la carte pour englober l'utilisateur et la destination

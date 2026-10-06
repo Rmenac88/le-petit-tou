@@ -20,6 +20,16 @@ import styles from './home/homeStyles';
 import HomeHeader from './home/HomeHeader';
 import ProgressionBanner from './home/ProgressionBanner';
 
+/**
+ * Texte public d'un partenaire : jamais de montant ni de mention commerciale.
+ * Filtre aussi les anciennes lignes créées avec le texte automatique « Offre exclusive membre - 150€ ».
+ */
+const publicPartnerText = (text?: string | null): string => {
+  const t = (text || '').trim();
+  if (!t || /^offre exclusive membre/i.test(t) || /\d+\s?€\s*(de privil|offert)/i.test(t)) return '';
+  return t;
+};
+
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web') {
     window.alert(`${title}\n\n${message}`);
@@ -85,6 +95,7 @@ import {
 } from 'lucide-react-native';
 
 import { supabase } from '../../lib/supabase';
+import { PLACEHOLDER_PHOTO } from '../../constants/placeholder';
 import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
 import AdminPortalModal from '../AdminPortalModal';
 import AdminPasswordModal from '../AdminPasswordModal';
@@ -100,6 +111,7 @@ import {
   toggleSpotLike,
 } from '../../lib/likesStore';
 import { discoveryStore, DiscoveryStats } from '../../lib/discoveryStore';
+import { formatRating } from '../../lib/formatRating';
 import {
   isAddressInCategory,
   getCategorySpotCount,
@@ -120,19 +132,20 @@ import {
   CAT_SERVICES,
 } from '../../lib/categoryResolver';
 
+import { Brand } from '../../constants/brand';
 const ALL_EXPANDED_CATEGORIES = [
-  { id: 'all', name: 'Toutes les adresses', icon_name: 'Compass', color: '#1E293B' },
-  { id: 'gourmand-gourmet', name: 'Gourmand & Restauration', icon_name: 'Utensils', color: '#C52824' },
-  { id: 'trinquer-danser', name: 'Trinquer & Bars', icon_name: 'Wine', color: '#E5A93B' },
+  { id: 'all', name: 'Toutes les adresses', icon_name: 'Compass', color: Brand.ink },
+  { id: 'gourmand-gourmet', name: 'Gourmand & Restauration', icon_name: 'Utensils', color: Brand.primaryDeep },
+  { id: 'trinquer-danser', name: 'Trinquer & Bars', icon_name: 'Wine', color: Brand.chouchou },
   { id: 'brunch-douceurs', name: 'Brunch & Douceurs', icon_name: 'CakeSlice', color: '#D97706' },
-  { id: 'shopping-beaute', name: 'Shopping & Déco', icon_name: 'ShoppingBag', color: '#8B5CF6' },
-  { id: 'beaute-bien-etre', name: 'Beauté & Bien-être', icon_name: 'Scissors', color: '#EC4899' },
-  { id: 'culture-loisirs', name: 'Culture & Spectacles', icon_name: 'Ticket', color: '#3B82F6' },
-  { id: 'sport-activites', name: 'Sport & Outdoor', icon_name: 'Dumbbell', color: '#10B981' },
+  { id: 'shopping-beaute', name: 'Shopping & Déco', icon_name: 'ShoppingBag', color: Brand.violet },
+  { id: 'beaute-bien-etre', name: 'Beauté & Bien-être', icon_name: 'Scissors', color: Brand.primary },
+  { id: 'culture-loisirs', name: 'Culture & Spectacles', icon_name: 'Ticket', color: Brand.violet },
+  { id: 'sport-activites', name: 'Sport & Outdoor', icon_name: 'Dumbbell', color: '#1FA67A' },
   { id: 'terrasse', name: 'Terrasse & Rooftop', icon_name: 'Sun', color: '#F59E0B' },
   { id: 'bio-local', name: 'Bio & Écoresponsable', icon_name: 'Leaf', color: '#059669' },
   { id: 'fait-maison', name: 'Fait Maison', icon_name: 'ChefHat', color: '#DC2626' },
-  { id: 'vie-pratique', name: 'Vie Pratique & Services', icon_name: 'Home', color: '#64748B' },
+  { id: 'vie-pratique', name: 'Vie Pratique & Services', icon_name: 'Home', color: Brand.inkSoft },
 ];
 
 const FILTER_KEYWORDS_MAP: Record<string, string[]> = {
@@ -159,48 +172,48 @@ const normalizeText = (str: string) => {
 
 const CATEGORY_SUBTAGS_CONFIG: Record<string, { id: string; label: string; keywords: string[] }[]> = {
   restaurants: [
-    { id: 'italien', label: '🍕 Italien & Pizza', keywords: ['italien', 'pizza', 'pates', 'pasta'] },
-    { id: 'asiatique', label: '🥢 Asiatique', keywords: ['asiat', 'japon', 'ramen', 'sushi', 'viet', 'chinois', 'thai', 'coreen', 'dim sum'] },
-    { id: 'street', label: '🍔 Burgers & Street', keywords: ['burger', 'street', 'tacos', 'fast food', 'kebab', 'street food'] },
-    { id: 'bistrot', label: '🍷 Bistrot & Brasserie', keywords: ['bistrot', 'brasserie', 'terroir', 'sud-ouest', 'tradition', 'gastronomie'] },
-    { id: 'viande', label: '🥩 Viandes & Grillades', keywords: ['viande', 'grill', 'steak', 'boeuf', 'cote de boeuf'] },
-    { id: 'vege', label: '🥗 Végé & Healthy', keywords: ['vege', 'vegan', 'salade', 'healthy', 'vegetar'] },
-    { id: 'terrasse', label: '☀️ En Terrasse', keywords: ['terrasse', 'rooftop', 'jardin', 'patio'] },
-    { id: 'fait_maison', label: '👨‍🍳 Fait Maison', keywords: ['fait maison', 'artisan', 'fait-maison'] },
+    { id: 'italien', label: 'Italien & Pizza', keywords: ['italien', 'pizza', 'pates', 'pasta'] },
+    { id: 'asiatique', label: 'Asiatique', keywords: ['asiat', 'japon', 'ramen', 'sushi', 'viet', 'chinois', 'thai', 'coreen', 'dim sum'] },
+    { id: 'street', label: 'Burgers & Street', keywords: ['burger', 'street', 'tacos', 'fast food', 'kebab', 'street food'] },
+    { id: 'bistrot', label: 'Bistrot & Brasserie', keywords: ['bistrot', 'brasserie', 'terroir', 'sud-ouest', 'tradition', 'gastronomie'] },
+    { id: 'viande', label: 'Viandes & Grillades', keywords: ['viande', 'grill', 'steak', 'boeuf', 'cote de boeuf'] },
+    { id: 'vege', label: 'Végé & Healthy', keywords: ['vege', 'vegan', 'salade', 'healthy', 'vegetar'] },
+    { id: 'terrasse', label: 'En Terrasse', keywords: ['terrasse', 'rooftop', 'jardin', 'patio'] },
+    { id: 'fait_maison', label: 'Fait Maison', keywords: ['fait maison', 'artisan', 'fait-maison'] },
   ],
   bars: [
-    { id: 'cocktails', label: '🍸 Cocktails & Mixo', keywords: ['cocktail', 'mixolog'] },
-    { id: 'bieres', label: '🍺 Bières & Pubs', keywords: ['biere', 'beer', 'brasserie', 'pub'] },
-    { id: 'vin_tapas', label: '🍷 Vin & Tapas', keywords: ['vin', 'tapas', 'cave', 'planche'] },
-    { id: 'terrasse_bar', label: '☀️ En Terrasse', keywords: ['terrasse', 'rooftop'] },
-    { id: 'soiree_nuit', label: '🎉 Fête & Soirées', keywords: ['nuit', 'club', 'dj', 'danse', 'nocturne', 'discotheque'] },
-    { id: 'cafe_the', label: '☕ Cafés & Salons de thé', keywords: ['cafe', 'the', 'coffee', 'salon de the'] },
+    { id: 'cocktails', label: 'Cocktails & Mixo', keywords: ['cocktail', 'mixolog'] },
+    { id: 'bieres', label: 'Bières & Pubs', keywords: ['biere', 'beer', 'brasserie', 'pub'] },
+    { id: 'vin_tapas', label: 'Vin & Tapas', keywords: ['vin', 'tapas', 'cave', 'planche'] },
+    { id: 'terrasse_bar', label: 'En Terrasse', keywords: ['terrasse', 'rooftop'] },
+    { id: 'soiree_nuit', label: 'Fête & Soirées', keywords: ['nuit', 'club', 'dj', 'danse', 'nocturne', 'discotheque'] },
+    { id: 'cafe_the', label: 'Cafés & Salons de thé', keywords: ['cafe', 'the', 'coffee', 'salon de the'] },
   ],
   boulangeries: [
-    { id: 'boulangerie_pain', label: '🥐 Pains & Baguettes', keywords: ['boulanger', 'pain', 'croissant', 'viennois'] },
-    { id: 'patisseries', label: '🍰 Pâtisseries & Gâteaux', keywords: ['patiss', 'gateau', 'douceur', 'sucre'] },
-    { id: 'brunch', label: '🍳 Brunchs & Cafés', keywords: ['brunch', 'oeuf', 'pancake', 'petit-dejeuner'] },
-    { id: 'coffee_shop', label: '☕ Coffee Shops', keywords: ['coffee', 'salon de the', 'latte', 'cafe'] },
-    { id: 'glaces', label: '🍦 Glaciers & Desserts', keywords: ['glace', 'crepe', 'gaufre', 'dessert'] },
+    { id: 'boulangerie_pain', label: 'Pains & Baguettes', keywords: ['boulanger', 'pain', 'croissant', 'viennois'] },
+    { id: 'patisseries', label: 'Pâtisseries & Gâteaux', keywords: ['patiss', 'gateau', 'douceur', 'sucre'] },
+    { id: 'brunch', label: 'Brunchs & Cafés', keywords: ['brunch', 'oeuf', 'pancake', 'petit-dejeuner'] },
+    { id: 'coffee_shop', label: 'Coffee Shops', keywords: ['coffee', 'salon de the', 'latte', 'cafe'] },
+    { id: 'glaces', label: 'Glaciers & Desserts', keywords: ['glace', 'crepe', 'gaufre', 'dessert'] },
   ],
   shopping: [
-    { id: 'mode_vetements', label: '👗 Mode & Vêtements', keywords: ['pret-a-porter', 'mode', 'vetement', 'robe'] },
-    { id: 'bijoux_accessoires', label: '💎 Bijoux & Accessoires', keywords: ['bijou', 'accessoire', 'sac', 'chapeau'] },
-    { id: 'deco_maison', label: '🛋️ Déco & Design', keywords: ['deco', 'maison', 'mobilier', 'design'] },
-    { id: 'vintage_fripes', label: '♻️ Fripes & Vintage', keywords: ['fripe', 'vintage', 'seconde main'] },
-    { id: 'cadeaux_artisans', label: '🎁 Cadeaux & Artisans', keywords: ['cadeau', 'createur', 'artisan'] },
+    { id: 'mode_vetements', label: 'Mode & Vêtements', keywords: ['pret-a-porter', 'mode', 'vetement', 'robe'] },
+    { id: 'bijoux_accessoires', label: 'Bijoux & Accessoires', keywords: ['bijou', 'accessoire', 'sac', 'chapeau'] },
+    { id: 'deco_maison', label: 'Déco & Design', keywords: ['deco', 'maison', 'mobilier', 'design'] },
+    { id: 'vintage_fripes', label: 'Fripes & Vintage', keywords: ['fripe', 'vintage', 'seconde main'] },
+    { id: 'cadeaux_artisans', label: 'Cadeaux & Artisans', keywords: ['cadeau', 'createur', 'artisan'] },
   ],
   beaute: [
-    { id: 'coiffeurs', label: '💇 Coiffure & Barbiers', keywords: ['coiff', 'barbier'] },
-    { id: 'spa_massages', label: '🧖 Spa & Massages', keywords: ['spa', 'massage', 'relax', 'hammam'] },
-    { id: 'soins_ongles', label: '💅 Onglerie & Soins', keywords: ['ongl', 'manucure', 'soin', 'institut', 'esthet'] },
-    { id: 'bio_naturel', label: '🌿 Naturel & Bio', keywords: ['bio', 'naturel'] },
+    { id: 'coiffeurs', label: 'Coiffure & Barbiers', keywords: ['coiff', 'barbier'] },
+    { id: 'spa_massages', label: 'Spa & Massages', keywords: ['spa', 'massage', 'relax', 'hammam'] },
+    { id: 'soins_ongles', label: 'Onglerie & Soins', keywords: ['ongl', 'manucure', 'soin', 'institut', 'esthet'] },
+    { id: 'bio_naturel', label: 'Naturel & Bio', keywords: ['bio', 'naturel'] },
   ],
   culture: [
-    { id: 'spectacles_theatre', label: '🎭 Théâtres & Spectacles', keywords: ['theatre', 'spectacle', 'concert'] },
-    { id: 'musees_arts', label: '🏛️ Musées & Expos', keywords: ['musee', 'expo', 'galerie', 'art'] },
-    { id: 'jeux_escape', label: '🎲 Jeux & Escape Games', keywords: ['escape', 'jeu', 'bowling', 'laser', 'arcade'] },
-    { id: 'sport_fitness', label: '🧗 Sport & Outdoor', keywords: ['sport', 'fitness', 'escalade', 'yoga', 'salle de sport'] },
+    { id: 'spectacles_theatre', label: 'Théâtres & Spectacles', keywords: ['theatre', 'spectacle', 'concert'] },
+    { id: 'musees_arts', label: 'Musées & Expos', keywords: ['musee', 'expo', 'galerie', 'art'] },
+    { id: 'jeux_escape', label: 'Jeux & Escape Games', keywords: ['escape', 'jeu', 'bowling', 'laser', 'arcade'] },
+    { id: 'sport_fitness', label: 'Sport & Outdoor', keywords: ['sport', 'fitness', 'escalade', 'yoga', 'salle de sport'] },
   ],
 };
 
@@ -426,7 +439,7 @@ export default function HomeView({
         { rotate: `${rotateVal}deg` },
         { scale: scaleVal }
       ],
-      backgroundColor: searchFocus.value > 0.5 ? '#C52824' : '#000000' // Toulouse Red focus color
+      backgroundColor: searchFocus.value > 0.5 ? Brand.primary : Brand.ink // Toulouse Red focus color
     };
   });
 
@@ -1098,7 +1111,7 @@ export default function HomeView({
                     ]}
                     onPress={() => handleCategoryChange(null)}
                   >
-                    <Compass size={14} color={selectedCategoryFilter === null ? '#FFFFFF' : '#64748B'} strokeWidth={2.4} />
+                    <Compass size={14} color={selectedCategoryFilter === null ? Brand.white : Brand.inkSoft} strokeWidth={2} />
                     <Text
                       style={[
                         styles.editorialCatPillText,
@@ -1123,9 +1136,9 @@ export default function HomeView({
                         <DynamicIcon
                           name={cat.icon_name}
                           title={cat.name}
-                          color={isActive ? '#FFFFFF' : cat.color || '#64748B'}
+                          color={isActive ? Brand.white : cat.color || Brand.inkSoft}
                           size={14}
-                          strokeWidth={2.4}
+                          strokeWidth={2}
                         />
                         <Text
                           style={[
@@ -1150,15 +1163,15 @@ export default function HomeView({
                     <View
                       style={[
                         styles.editorialIconBox,
-                        { backgroundColor: activeCategoryMeta ? `${activeCategoryMeta.color || '#C52824'}15` : '#FEF2F2' },
+                        { backgroundColor: activeCategoryMeta ? `${activeCategoryMeta.color || Brand.primary}15` : Brand.primarySoft },
                       ]}
                     >
                       <DynamicIcon
                         name={activeCategoryMeta?.icon_name || 'Utensils'}
                         title={activeCategoryMeta?.name || 'Catégorie'}
-                        color={activeCategoryMeta?.color || '#C52824'}
+                        color={activeCategoryMeta?.color || Brand.primary}
                         size={24}
-                        strokeWidth={2.4}
+                        strokeWidth={2}
                       />
                     </View>
 
@@ -1182,7 +1195,7 @@ export default function HomeView({
                     hitSlop={12}
                     accessibilityLabel="Fermer le filtre"
                   >
-                    <X size={18} color="#64748B" strokeWidth={2.4} />
+                    <X size={18} color={Brand.inkSoft} strokeWidth={2} />
                   </Pressable>
                 </View>
 
@@ -1200,8 +1213,8 @@ export default function HomeView({
                   >
                     <SlidersHorizontal
                       size={15}
-                      color="#FFFFFF"
-                      strokeWidth={2.5}
+                      color={Brand.white}
+                      strokeWidth={2}
                     />
                     <Text
                       style={[
@@ -1219,7 +1232,7 @@ export default function HomeView({
                   </Pressable>
 
                   <View style={styles.editorialSearchBox}>
-                    <Search size={15} color="#94A3B8" strokeWidth={2.2} style={{ marginRight: 8 }} />
+                    <Search size={15} color={Brand.inkMute} strokeWidth={2} style={{ marginRight: 8 }} />
                     <TextInput
                       style={styles.editorialSearchInput}
                       placeholder={
@@ -1227,13 +1240,13 @@ export default function HomeView({
                           ? `Dans ${activeCategoryMeta.name}...`
                           : 'Recherche rapide...'
                       }
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={Brand.inkSoft}
                       value={inCategorySearch}
                       onChangeText={setInCategorySearch}
                     />
                     {inCategorySearch.length > 0 && (
                       <Pressable onPress={() => setInCategorySearch('')} hitSlop={8}>
-                        <X size={14} color="#64748B" strokeWidth={2.2} />
+                        <X size={14} color={Brand.inkSoft} strokeWidth={2} />
                       </Pressable>
                     )}
                   </View>
@@ -1303,9 +1316,9 @@ export default function HomeView({
                 <View style={styles.editorialStatusBar}>
                   <View style={styles.editorialStatusLeft}>
                     <Text style={styles.editorialStatusText}>
-                      {selectedSort === 'likes' ? '🔥 Plus aimés' :
-                       selectedSort === 'rating' ? '⭐ Mieux notés' :
-                       selectedSort === 'recommended' ? '✨ Coups de cœur' : '🆕 Nouveautés'}
+                      {selectedSort === 'likes' ? 'Plus aimés' :
+                       selectedSort === 'rating' ? 'Mieux notés' :
+                       selectedSort === 'recommended' ? 'Coups de cœur' : '🆕 Nouveautés'}
                       {selectedPrice !== 'all' ? ` • Budget ${selectedPrice}` : ''}
                       {inCategorySearch.trim().length > 0 ? ` • "${inCategorySearch}"` : ''}
                     </Text>
@@ -1313,7 +1326,7 @@ export default function HomeView({
 
                   {hasAnyActiveSubFilter ? (
                     <Pressable style={styles.editorialResetBtn} onPress={resetSubFilters} hitSlop={8}>
-                      <RotateCcw size={12} color="#C52824" style={{ marginRight: 4 }} />
+                      <RotateCcw size={12} color={Brand.primaryDeep} style={{ marginRight: 4 }} />
                       <Text style={styles.editorialResetText}>Réinitialiser</Text>
                     </Pressable>
                   ) : (
@@ -1334,13 +1347,13 @@ export default function HomeView({
               {/* 7. ADDRESS RESULTS LIST OR EMPTY STATE */}
               {categoryFilteredAddresses.length === 0 ? (
                 <View style={styles.emptyFilteredBox}>
-                  <Sparkles size={36} color="#CBD5E1" style={{ marginBottom: 10 }} />
+                  <Sparkles size={36} color="#E3DCE0" style={{ marginBottom: 10 }} />
                   <Text style={styles.emptyFilteredTitle}>Aucune adresse trouvée</Text>
                   <Text style={styles.emptyFilteredSub}>
                     Aucun résultat ne correspond à cette combinaison de filtres.
                   </Text>
                   <Pressable style={styles.emptyResetBtn} onPress={resetSubFilters}>
-                    <RotateCcw size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <RotateCcw size={14} color={Brand.white} style={{ marginRight: 6 }} />
                     <Text style={styles.emptyResetBtnText}>Élargir les filtres</Text>
                   </Pressable>
                 </View>
@@ -1384,9 +1397,9 @@ export default function HomeView({
                           cachePolicy="memory-disk"
                         />
                         <View style={styles.ratingBadgeGrid}>
-                          <Star color="#E5A93B" size={11} fill="#E5A93B" />
+                          <Star color={Brand.chouchou} size={11} fill={Brand.chouchou} />
                           <Text style={styles.ratingTextSmall}>
-                            {typeof addr.rating === 'number' ? addr.rating.toFixed(1) : addr.rating}
+                            {formatRating(addr.rating)}
                           </Text>
                         </View>
                         <View style={styles.gridCardBody}>
@@ -1405,13 +1418,13 @@ export default function HomeView({
                           </Text>
                           <View style={styles.cardFooterRow}>
                             <View style={styles.locationRow}>
-                              <MapPin color="#64748B" size={12} strokeWidth={2} />
+                              <MapPin color={Brand.inkSoft} size={12} strokeWidth={2} />
                               <Text style={styles.locationTextSmall}>{addr.location}</Text>
                             </View>
-                            <Pressable onPress={() => toggleFavorite(addr.id)} style={styles.favoriteButtonSmall}>
+                            <Pressable onPress={() => toggleFavorite(addr.id)} accessibilityLabel={favorites.includes(addr.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'} style={styles.favoriteButtonSmall}>
                               <Heart
-                                color={isFav ? '#C52824' : '#94A3B8'}
-                                fill={isFav ? '#C52824' : 'transparent'}
+                                color={isFav ? Brand.primary : Brand.inkMute}
+                                fill={isFav ? Brand.primary : 'transparent'}
                                 size={15}
                                 strokeWidth={2}
                               />
@@ -1449,10 +1462,10 @@ export default function HomeView({
             <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40 }}>
               <View style={styles.seeAllHeaderRow}>
                 <Pressable style={styles.backBtn} onPress={() => setViewMode('home')}>
-                  <ArrowLeft size={18} color="#1E293B" strokeWidth={2.5} style={{ marginRight: 6 }} />
+                  <ArrowLeft size={18} color={Brand.ink} strokeWidth={2} style={{ marginRight: 6 }} />
                   <Text style={styles.backBtnText}>Retour</Text>
                 </Pressable>
-                <Text style={styles.seeAllTitle}>⭐ Recommandations ({Math.min(50, recommendedAddresses.length)})</Text>
+                <Text style={styles.seeAllTitle}>Recommandations ({Math.min(50, recommendedAddresses.length)})</Text>
               </View>
 
               <View style={styles.verticalGridContainer}>
@@ -1488,8 +1501,8 @@ export default function HomeView({
                     >
                       <Image source={{ uri: getOptimizedImageUrl(addr.image_url, 400) }} style={styles.gridCardImage} contentFit="cover" transition={150} cachePolicy="memory-disk" />
                       <View style={styles.ratingBadgeGrid}>
-                        <Star color="#E5A93B" size={11} fill="#E5A93B" />
-                        <Text style={styles.ratingTextSmall}>{typeof addr.rating === 'number' ? addr.rating.toFixed(1) : addr.rating}</Text>
+                        <Star color={Brand.chouchou} size={11} fill={Brand.chouchou} />
+                        <Text style={styles.ratingTextSmall}>{formatRating(addr.rating)}</Text>
                       </View>
                       <View style={styles.gridCardBody}>
                         <Text style={styles.gridCardCategory}>
@@ -1498,13 +1511,13 @@ export default function HomeView({
                         <Text style={styles.gridCardTitle} numberOfLines={1}>{addr.title}</Text>
                         <View style={styles.cardFooterRow}>
                           <View style={styles.locationRow}>
-                            <MapPin color="#64748B" size={12} strokeWidth={2} />
+                            <MapPin color={Brand.inkSoft} size={12} strokeWidth={2} />
                             <Text style={styles.locationTextSmall}>{addr.location}</Text>
                           </View>
-                          <Pressable onPress={() => toggleFavorite(addr.id)} style={styles.favoriteButtonSmall}>
+                          <Pressable onPress={() => toggleFavorite(addr.id)} accessibilityLabel={favorites.includes(addr.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'} style={styles.favoriteButtonSmall}>
                             <Heart
-                              color={isFav ? '#C52824' : '#94A3B8'}
-                              fill={isFav ? '#C52824' : 'transparent'}
+                              color={isFav ? Brand.primary : Brand.inkMute}
+                              fill={isFav ? Brand.primary : 'transparent'}
                               size={15}
                               strokeWidth={2}
                             />
@@ -1526,7 +1539,7 @@ export default function HomeView({
             <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40 }}>
               <View style={styles.seeAllHeaderRow}>
                 <Pressable style={styles.backBtn} onPress={() => setViewMode('home')}>
-                  <ArrowLeft size={18} color="#1E293B" strokeWidth={2.5} style={{ marginRight: 6 }} />
+                  <ArrowLeft size={18} color={Brand.ink} strokeWidth={2} style={{ marginRight: 6 }} />
                   <Text style={styles.backBtnText}>Retour</Text>
                 </Pressable>
                 <Text style={styles.seeAllTitle}>Nouveautés toulousaines ({Math.min(50, newAddresses.length)})</Text>
@@ -1565,8 +1578,8 @@ export default function HomeView({
                     >
                       <Image source={{ uri: getOptimizedImageUrl(addr.image_url, 400) }} style={styles.gridCardImage} contentFit="cover" transition={150} cachePolicy="memory-disk" />
                       <View style={styles.ratingBadgeGrid}>
-                        <Star color="#E5A93B" size={11} fill="#E5A93B" />
-                        <Text style={styles.ratingTextSmall}>{typeof addr.rating === 'number' ? addr.rating.toFixed(1) : addr.rating}</Text>
+                        <Star color={Brand.chouchou} size={11} fill={Brand.chouchou} />
+                        <Text style={styles.ratingTextSmall}>{formatRating(addr.rating)}</Text>
                       </View>
                       <View style={styles.gridCardBody}>
                         <Text style={styles.gridCardCategory}>
@@ -1575,13 +1588,13 @@ export default function HomeView({
                         <Text style={styles.gridCardTitle} numberOfLines={1}>{addr.title}</Text>
                         <View style={styles.cardFooterRow}>
                           <View style={styles.locationRow}>
-                            <MapPin color="#64748B" size={12} strokeWidth={2} />
+                            <MapPin color={Brand.inkSoft} size={12} strokeWidth={2} />
                             <Text style={styles.locationTextSmall}>{addr.location}</Text>
                           </View>
-                          <Pressable onPress={() => toggleFavorite(addr.id)} style={styles.favoriteButtonSmall}>
+                          <Pressable onPress={() => toggleFavorite(addr.id)} accessibilityLabel={favorites.includes(addr.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'} style={styles.favoriteButtonSmall}>
                             <Heart
-                              color={isFav ? '#C52824' : '#94A3B8'}
-                              fill={isFav ? '#C52824' : 'transparent'}
+                              color={isFav ? Brand.primary : Brand.inkMute}
+                              fill={isFav ? Brand.primary : 'transparent'}
                               size={15}
                               strokeWidth={2}
                             />
@@ -1704,8 +1717,8 @@ export default function HomeView({
                             setSelectedSpotDetail({
                               id: partner.id,
                               title: partner.title,
-                              description: partner.subtitle || 'Partenaire officiel de l\'association Le Petit Tou.',
-                              full_description: partner.subtitle || 'Partenaire officiel de l\'association Le Petit Tou.',
+                              description: publicPartnerText(partner.subtitle),
+                              full_description: publicPartnerText(partner.subtitle),
                               image_url: partner.image_url,
                               photos: partner.image_url ? [partner.image_url] : [],
                               category: 'Partenaire Officiel',
@@ -1720,7 +1733,7 @@ export default function HomeView({
                           {/* Card Body */}
                           <View style={styles.netflixCardBody}>
                             <Image
-                              source={{ uri: partner.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800' }}
+                              source={{ uri: partner.image_url || PLACEHOLDER_PHOTO }}
                               style={styles.netflixImage}
                               contentFit="cover"
                               transition={150}
@@ -1733,9 +1746,11 @@ export default function HomeView({
                               <Text style={styles.netflixPartnerTitle} numberOfLines={1}>
                                 {partner.title}
                               </Text>
-                              <Text style={styles.netflixPartnerSubtitle} numberOfLines={2}>
-                                {partner.subtitle || 'Offre privilège membre'}
-                              </Text>
+                              {!!publicPartnerText(partner.subtitle) && (
+                                <Text style={styles.netflixPartnerSubtitle} numberOfLines={2}>
+                                  {publicPartnerText(partner.subtitle)}
+                                </Text>
+                              )}
                             </View>
                           </View>
                         </Pressable>
@@ -1747,9 +1762,9 @@ export default function HomeView({
 
               {/* Recommendations of the Moment (Large Cards) */}
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Recommandations du moment</Text>
+                <Text style={styles.sectionTitle}>Les chouchous du moment</Text>
                 <Pressable onPress={() => setViewMode('see_all_recommended')}>
-                  <Text style={styles.seeAllText}>Voir tout ({Math.min(50, recommendedAddresses.length)})</Text>
+                  <Text style={styles.seeAllText}>Voir tout</Text>
                 </Pressable>
               </View>
 
@@ -1799,14 +1814,13 @@ export default function HomeView({
                         }}
                       >
                         <Image source={{ uri: getOptimizedImageUrl(addr.image_url, 600) }} style={styles.largeCardImage} contentFit="cover" transition={150} cachePolicy="memory-disk" />
-                        <View style={styles.carouselPaginatorBadge}>
-                          <View style={[styles.paginatorDot, styles.paginatorDotActive]} />
-                          <View style={styles.paginatorDot} />
-                          <View style={styles.paginatorDot} />
+                        <View style={styles.chouchouBadge}>
+                          <Star size={12} color={Brand.ink} fill={Brand.ink} strokeWidth={2} />
+                          <Text style={styles.chouchouBadgeText}>CHOUCHOU</Text>
                         </View>
                         <View style={styles.ratingBadge}>
-                          <Star color="#E5A93B" size={13} fill="#E5A93B" />
-                          <Text style={styles.ratingText}>{typeof addr.rating === 'number' ? addr.rating.toFixed(1) : addr.rating}</Text>
+                          <Star color={Brand.chouchou} size={13} fill={Brand.chouchou} />
+                          <Text style={styles.ratingText}>{formatRating(addr.rating)}</Text>
                         </View>
                         <View style={styles.largeCardInfo}>
                           <View style={styles.cardHeaderRow}>
@@ -1818,13 +1832,13 @@ export default function HomeView({
                           <Text style={styles.cardTitle} numberOfLines={1}>{addr.title}</Text>
                           <View style={styles.cardFooterRow}>
                             <View style={styles.locationRow}>
-                              <MapPin color="#64748B" size={14} strokeWidth={2} />
+                              <MapPin color={Brand.inkSoft} size={14} strokeWidth={2} />
                               <Text style={styles.locationText}>{addr.location}</Text>
                             </View>
-                            <Pressable onPress={() => toggleFavorite(addr.id)} style={styles.favoriteButton}>
+                            <Pressable onPress={() => toggleFavorite(addr.id)} accessibilityLabel={favorites.includes(addr.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'} style={styles.favoriteButton}>
                               <Heart
-                                color={isFav ? '#C52824' : '#94A3B8'}
-                                fill={isFav ? '#C52824' : 'transparent'}
+                                color={isFav ? Brand.primary : Brand.inkMute}
+                                fill={isFav ? Brand.primary : 'transparent'}
                                 size={17}
                                 strokeWidth={2}
                               />
@@ -1844,9 +1858,9 @@ export default function HomeView({
 
               {/* Novelties section (Smaller Cards) */}
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Nouveautés toulousaines</Text>
+                <Text style={styles.sectionTitle}>Fraîchement testées</Text>
                 <Pressable onPress={() => setViewMode('see_all_new')}>
-                  <Text style={styles.seeAllText}>Voir tout ({Math.min(50, newAddresses.length)})</Text>
+                  <Text style={styles.seeAllText}>Voir tout</Text>
                 </Pressable>
               </View>
 
@@ -1902,8 +1916,8 @@ export default function HomeView({
                           <View style={styles.paginatorDotSmall} />
                         </View>
                         <View style={styles.ratingBadge}>
-                          <Star color="#E5A93B" size={11} fill="#E5A93B" />
-                          <Text style={styles.ratingTextSmall}>{typeof addr.rating === 'number' ? addr.rating.toFixed(1) : addr.rating}</Text>
+                          <Star color={Brand.chouchou} size={11} fill={Brand.chouchou} />
+                          <Text style={styles.ratingTextSmall}>{formatRating(addr.rating)}</Text>
                         </View>
                         <View style={styles.smallCardInfo}>
                           <Text style={styles.smallCardCategory}>
@@ -1912,13 +1926,13 @@ export default function HomeView({
                           <Text style={styles.smallCardTitle} numberOfLines={1}>{addr.title}</Text>
                           <View style={styles.cardFooterRow}>
                             <View style={styles.locationRow}>
-                              <MapPin color="#64748B" size={12} strokeWidth={2} />
+                              <MapPin color={Brand.inkSoft} size={12} strokeWidth={2} />
                               <Text style={styles.locationTextSmall}>{addr.location}</Text>
                             </View>
-                            <Pressable onPress={() => toggleFavorite(addr.id)} style={styles.favoriteButtonSmall}>
+                            <Pressable onPress={() => toggleFavorite(addr.id)} accessibilityLabel={favorites.includes(addr.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'} style={styles.favoriteButtonSmall}>
                               <Heart
-                                color={isFav ? '#C52824' : '#94A3B8'}
-                                fill={isFav ? '#C52824' : 'transparent'}
+                                color={isFav ? Brand.primary : Brand.inkMute}
+                                fill={isFav ? Brand.primary : 'transparent'}
                                 size={15}
                                 strokeWidth={2}
                               />
@@ -1942,7 +1956,7 @@ export default function HomeView({
               </View>
 
               {loading ? (
-                <ActivityIndicator size="small" color="#C52824" style={{ marginVertical: 20 }} />
+                <ActivityIndicator size="small" color={Brand.primaryDeep} style={{ marginVertical: 20 }} />
               ) : events.length === 0 ? (
                 <Text style={styles.emptyText}>Aucun événement pour l'instant</Text>
               ) : (
@@ -2017,7 +2031,7 @@ export default function HomeView({
               style={styles.privacyPolicyFooterBtn}
               onPress={() => setShowPrivacyPolicy(true)}
             >
-              <ShieldCheck size={14} color="#64748B" />
+              <ShieldCheck size={14} color={Brand.inkSoft} />
               <Text style={styles.privacyPolicyFooterText}>
                 Politique de Confidentialité & RGPD
               </Text>
@@ -2035,7 +2049,7 @@ export default function HomeView({
           <View style={styles.confirmCard}>
             <View style={styles.confirmBody}>
               <View style={styles.confirmKickerRow}>
-                <Ticket size={15} color="#C52824" strokeWidth={2.4} />
+                <Ticket size={15} color={Brand.primaryDeep} strokeWidth={2} />
                 <Text style={styles.confirmKicker}>BILLETTERIE OFFICIELLE</Text>
               </View>
 
@@ -2103,7 +2117,7 @@ export default function HomeView({
           <View style={styles.successCard}>
             <View style={styles.successBody}>
               <View style={styles.successIconWrapper}>
-                <CheckCircle size={32} color="#C52824" strokeWidth={2.4} />
+                <CheckCircle size={32} color={Brand.primaryDeep} strokeWidth={2} />
               </View>
 
               <Text style={styles.successKicker}>CONFIRMATION</Text>
@@ -2164,12 +2178,12 @@ export default function HomeView({
             <View style={styles.infoBody}>
               <View style={[
                 styles.infoIconWrapper,
-                { backgroundColor: infoAlert.type === 'info' ? '#FEF3C7' : '#FEE2E2' }
+                { backgroundColor: infoAlert.type === 'info' ? '#FFF3D6' : Brand.primarySoft }
               ]}>
                 {infoAlert.type === 'info' ? (
-                  <User size={24} color="#D97706" strokeWidth={2.4} />
+                  <User size={24} color="#D97706" strokeWidth={2} />
                 ) : (
-                  <AlertTriangle size={24} color="#C52824" strokeWidth={2.4} />
+                  <AlertTriangle size={24} color={Brand.primaryDeep} strokeWidth={2} />
                 )}
               </View>
 
@@ -2237,7 +2251,7 @@ export default function HomeView({
                 onPress={() => setShowAllCategories(false)}
                 hitSlop={12}
               >
-                <X color="#1E293B" size={20} strokeWidth={2.5} />
+                <X color={Brand.ink} size={20} strokeWidth={2} />
               </Pressable>
             </View>
 
@@ -2256,7 +2270,7 @@ export default function HomeView({
                 }}
               >
                 <View style={[styles.gridIconBg, { backgroundColor: '#1E293B15' }]}>
-                  <Compass color="#1E293B" size={24} strokeWidth={2.2} />
+                  <Compass color={Brand.ink} size={24} strokeWidth={2} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.gridItemLabel, selectedCategoryFilter === null && styles.gridItemLabelSelected]}>
@@ -2280,8 +2294,8 @@ export default function HomeView({
                       setShowAllCategories(false);
                     }}
                   >
-                    <View style={[styles.gridIconBg, { backgroundColor: `${category.color || '#C52824'}20` }]}>
-                      <DynamicIcon name={category.icon_name} title={category.name} color={category.color || '#C52824'} size={24} />
+                    <View style={[styles.gridIconBg, { backgroundColor: `${category.color || Brand.primary}20` }]}>
+                      <DynamicIcon name={category.icon_name} title={category.name} color={category.color || Brand.primary} size={24} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.gridItemLabel, isSelected && styles.gridItemLabelSelected]} numberOfLines={2}>
@@ -2316,7 +2330,7 @@ export default function HomeView({
             <View style={styles.filterModalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View style={styles.filterModalIconWrap}>
-                  <SlidersHorizontal size={18} color="#C52824" strokeWidth={2.4} />
+                  <SlidersHorizontal size={18} color={Brand.primaryDeep} strokeWidth={2} />
                 </View>
                 <View>
                   <Text style={styles.filterModalTitle}>Filtres précis</Text>
@@ -2330,7 +2344,7 @@ export default function HomeView({
                 onPress={() => setShowFilterModal(false)}
                 hitSlop={10}
               >
-                <X size={20} color="#1E293B" strokeWidth={2.4} />
+                <X size={20} color={Brand.ink} strokeWidth={2} />
               </Pressable>
             </View>
 
@@ -2442,9 +2456,9 @@ export default function HomeView({
                 <Text style={styles.filterModalSectionTitle}>Trier les résultats par</Text>
                 <View style={styles.filterModalSortList}>
                   {[
-                    { id: 'likes', label: '🔥 Plus aimés', desc: 'Classés selon les likes réels de la communauté Le Petit Tou' },
-                    { id: 'rating', label: '⭐ Mieux notés', desc: 'Les meilleures notes Google & Petit Tou en premier' },
-                    { id: 'recommended', label: '✨ Coups de cœur', desc: 'La sélection officielle recommandée par nos rédacteurs' },
+                    { id: 'likes', label: 'Plus aimés', desc: 'Classés selon les likes réels de la communauté Le Petit Tou' },
+                    { id: 'rating', label: 'Mieux notés', desc: 'Les meilleures notes Google & Petit Tou en premier' },
+                    { id: 'recommended', label: 'Coups de cœur', desc: 'La sélection officielle recommandée par nos rédacteurs' },
                     { id: 'new', label: '🆕 Nouveautés', desc: 'Les adresses les plus récentes de notre guide' },
                   ].map(s => {
                     const isSelected = selectedSort === s.id;
@@ -2494,7 +2508,7 @@ export default function HomeView({
                   resetSubFilters();
                 }}
               >
-                <RotateCcw size={14} color="#64748B" style={{ marginRight: 6 }} />
+                <RotateCcw size={14} color={Brand.inkSoft} style={{ marginRight: 6 }} />
                 <Text style={styles.filterModalResetText}>Réinitialiser</Text>
               </Pressable>
 

@@ -14,5 +14,5 @@ Tous les skills sont installés dans `.agents/skills/` :
 
 ## Règles Projet Le Petit Tou
 - Expo SDK 57 / React Native 0.86 / React 19.
-- Respecter scrupuleusement la charte graphique : Crème `#FAF5EF`, Ardoise `#0F172A`, Rouge Capitole `#C52824`, Or `#E5A93B`.
-- Ne jamais casser la navigation, le dock Liquid Glass ni les gestes tactiles Apple Maps.
+- Respecter scrupuleusement la charte graphique décrite dans `DESIGN_SYSTEM.md` (tokens dans `src/constants/brand.ts`) : rose brique `#E84A5F`, rose poudré `#FDECEF`, jaune Chouchou `#F2B835`, anthracite `#1A1A22`, violet sidéral `#2B1D46`. Aucune couleur, taille de texte ou rayon en dur : importer les tokens.
+- Ne jamais casser la navigation, le dock flottant ni les gestes tactiles Apple Maps.

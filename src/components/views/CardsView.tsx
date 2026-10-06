@@ -15,6 +15,7 @@ import {
 } from 'lucide-react-native';
 import AppleWalletCard, { CardSkin } from '../AppleWalletCard';
 
+import { Brand } from '../../constants/brand';
 const triggerHaptic = () => {
   try {
     if (Platform.OS === 'web') {
@@ -26,13 +27,12 @@ const triggerHaptic = () => {
 };
 
 export default function CardsView() {
-  const [activeSkin, setActiveSkin] = useState<CardSkin>('titanium');
+  const [activeSkin, setActiveSkin] = useState<CardSkin>('sidereal');
   const [isFlipped, setIsFlipped] = useState(false);
 
   const skins: { id: CardSkin; label: string; dotColor: string }[] = [
-    { id: 'titanium', label: 'Titane Brossé', dotColor: '#D4AF37' },
-    { id: 'crimson', label: 'Pourpre & Or', dotColor: '#C52824' },
-    { id: 'obsidian', label: 'Obsidienne', dotColor: '#1E293B' },
+    { id: 'sidereal', label: 'Violet sidéral', dotColor: Brand.violet },
+
   ];
 
   return (
@@ -40,13 +40,9 @@ export default function CardsView() {
       <View style={styles.container}>
         {/* Apple Wallet Header */}
         <View style={styles.header}>
-          <View style={styles.headerTag}>
-            <Sparkles size={12} color="#E5A93B" strokeWidth={2.5} style={{ marginRight: 5 }} />
-            <Text style={styles.headerTagText}>APPLE WALLET PASS</Text>
-          </View>
-          <Text style={styles.title}>Le Petit Tou Wallet</Text>
+          <Text style={styles.title}>Ta carte Petit Tou</Text>
           <Text style={styles.subtitle}>
-            Votre pass membre privilégié pour les 790 adresses de Toulouse
+            Ton pass pour les réductions et les bons plans des 790 adresses de Toulouse
           </Text>
         </View>
 
@@ -59,17 +55,19 @@ export default function CardsView() {
 
           {/* Interactive Flip Hint */}
           <View style={styles.hintWrap}>
-            <RotateCcw size={13} color="#94A3B8" style={{ marginRight: 5 }} />
+            <RotateCcw size={13} color={Brand.inkSoft} style={{ marginRight: 5 }} />
             <Text style={styles.hintText}>
               {isFlipped ? 'Toucher pour voir le recto' : 'Toucher pour retourner la carte'}
             </Text>
           </View>
         </View>
 
+        {skins.length > 1 && (
+          <>
         {/* Card Personalization Selector (Skins) */}
         <View style={styles.customizerContainer}>
           <View style={styles.customizerHeader}>
-            <Palette size={13} color="#64748B" strokeWidth={2.2} style={{ marginRight: 6 }} />
+            <Palette size={13} color={Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
             <Text style={styles.customizerTitle}>Finition de la carte</Text>
           </View>
 
@@ -104,11 +102,14 @@ export default function CardsView() {
           </View>
         </View>
 
+          </>
+        )}
+
         {/* Discreet Security Badge */}
         <View style={styles.securitySeal}>
-          <ShieldCheck size={14} color="#10B981" strokeWidth={2.4} style={{ marginRight: 6 }} />
+          <ShieldCheck size={14} color="#1FA67A" strokeWidth={2} style={{ marginRight: 6 }} />
           <Text style={styles.securitySealText}>
-            Pass sécurisé sans contact • Mémorisé sur cet appareil
+            Mémorisé sur cet appareil
           </Text>
         </View>
       </View>
@@ -119,7 +120,7 @@ export default function CardsView() {
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
   },
   container: {
     flex: 1,
@@ -134,30 +135,30 @@ const styles = StyleSheet.create({
   headerTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(229, 169, 59, 0.14)',
+    backgroundColor: 'rgba(242, 184, 53, 0.14)',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 20,
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: 'rgba(229, 169, 59, 0.3)',
+    borderColor: 'rgba(242, 184, 53, 0.3)',
     marginBottom: 8,
   },
   headerTagText: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#B45309',
     letterSpacing: 1,
   },
   title: {
     fontSize: 28,
-    fontWeight: '900',
-    color: '#0F172A',
+    fontWeight: '800',
+    color: '#24242E',
     letterSpacing: -0.6,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: Brand.inkSoft,
     textAlign: 'center',
     marginTop: 4,
     maxWidth: 290,
@@ -172,15 +173,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 18,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 20,
+    borderRadius: 24,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: Brand.line,
     ...Platform.select({
       ios: {
-        shadowColor: '#0F172A',
+        shadowColor: '#24242E',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.04,
         shadowRadius: 6,
@@ -189,14 +190,14 @@ const styles = StyleSheet.create({
         elevation: 1,
       },
       web: {
-        boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)',
+        boxShadow: '0 2px 8px rgba(43, 29, 70, 0.04)',
       } as any,
     }),
   },
   hintText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#64748B',
+    color: Brand.inkSoft,
   },
   customizerContainer: {
     alignItems: 'center',
@@ -208,14 +209,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   customizerTitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
-    color: '#64748B',
+    color: Brand.inkSoft,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   skinRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
@@ -223,19 +225,19 @@ const styles = StyleSheet.create({
   skinPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: Brand.line,
   },
   skinPillSelected: {
-    backgroundColor: '#0F172A',
-    borderColor: '#0F172A',
+    backgroundColor: '#24242E',
+    borderColor: '#24242E',
     ...Platform.select({
       ios: {
-        shadowColor: '#0F172A',
+        shadowColor: '#24242E',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.12,
         shadowRadius: 8,
@@ -244,7 +246,7 @@ const styles = StyleSheet.create({
         elevation: 3,
       },
       web: {
-        boxShadow: '0 4px 12px rgba(15, 23, 42, 0.12)',
+        boxShadow: '0 4px 12px rgba(43, 29, 70, 0.12)',
       } as any,
     }),
   },
@@ -255,12 +257,12 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   skinPillText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#64748B',
+    color: Brand.inkSoft,
   },
   skinPillTextSelected: {
-    color: '#FFFFFF',
+    color: Brand.white,
     fontWeight: '700',
   },
   securitySeal: {
@@ -270,8 +272,8 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   securitySealText: {
-    fontSize: 11,
-    color: '#475569',
+    fontSize: 12,
+    color: '#4A4A58',
     fontWeight: '600',
   },
 });

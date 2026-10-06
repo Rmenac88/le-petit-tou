@@ -9,14 +9,16 @@ import {
   Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Search, TrendingUp, MapPin, Star, Utensils, Wine, CakeSlice, ShoppingBag, Scissors, Landmark, Dumbbell, Sun, Leaf } from 'lucide-react-native';
+import { X, Search, TrendingUp, MapPin, Star, Utensils, Wine, CakeSlice, ShoppingBag, Scissors, Landmark, Dumbbell, Sun, Leaf } from 'lucide-react-native';
 import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
 
+import { formatRating } from '../../lib/formatRating';
 import dataset from '../../constants/dataset.json';
 import { supabase } from '../../lib/supabase';
 import { searchIndex } from '../../lib/searchIndex';
 import { getOptimizedImageUrl } from '../../lib/imageOptimizer';
 
+import { Brand } from '../../constants/brand';
 const QUICK_TAGS = [
   { id: '1', name: 'Restaurants', tag: 'Restaurants', icon: Utensils },
   { id: '2', name: 'Bars & Cocktails', tag: 'Bars', icon: Wine },
@@ -39,8 +41,10 @@ const POPULAR_SEARCHES = [
 
 export default function SearchView({
   onSelectSpot,
+  onToggleDock,
 }: {
   onSelectSpot?: (spotId: string) => void;
+  onToggleDock?: (visible: boolean) => void;
 }) {
   const [allSpots, setAllSpots] = useState<any[]>(dataset.addresses || []);
   const [query, setQuery] = useState('');
@@ -48,6 +52,11 @@ export default function SearchView({
   const [searchLimit, setSearchLimit] = useState(24);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedSpotDetail, setSelectedSpotDetail] = useState<SpotDetail | null>(null);
+
+  // La fiche d'adresse a sa propre barre d'actions : le dock se cache pendant qu'elle est ouverte
+  useEffect(() => {
+    onToggleDock?.(!selectedSpotDetail);
+  }, [selectedSpotDetail, onToggleDock]);
   const searchInputRef = useRef<TextInput>(null);
 
   // Sync latest addresses dynamically from Supabase & Listen to changes
@@ -105,8 +114,10 @@ export default function SearchView({
         
         {/* Title Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Recherche</Text>
-          <Text style={styles.subtitle}>Trouvez les meilleures adresses de Toulouse</Text>
+          <Text style={styles.title} numberOfLines={1}>Cherche, on te trouve la pépite.</Text>
+          {query.length === 0 && (
+            <Text style={styles.subtitle}>790 adresses testées par des étudiants toulousains.</Text>
+          )}
         </View>
 
         {/* Clean Modern Search Bar */}
@@ -115,18 +126,18 @@ export default function SearchView({
             style={styles.searchBarContainer}
             onPress={() => searchInputRef.current?.focus()}
           >
-            <Search size={20} color="#64748B" strokeWidth={2.4} style={{ marginRight: 10 }} />
+            <Search size={20} color={Brand.inkSoft} strokeWidth={2} style={{ marginRight: 10 }} />
             <TextInput
               ref={searchInputRef}
               placeholder="Ex: Brunch, Tapas, Rooftop..."
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={Brand.inkSoft}
               value={query}
               onChangeText={setQuery}
               style={styles.searchInput}
             />
             {query.length > 0 && (
-              <Pressable onPress={() => setQuery('')} style={styles.clearBtn}>
-                <Text style={styles.clearBtnText}>✕</Text>
+              <Pressable onPress={() => setQuery('')} style={styles.clearBtn} accessibilityRole="button" accessibilityLabel="Effacer la recherche">
+                <X size={16} color={Brand.inkSoft} strokeWidth={2} />
               </Pressable>
             )}
           </Pressable>
@@ -145,7 +156,7 @@ export default function SearchView({
                   style={[styles.tagPill, isSelected && styles.tagPillSelected]}
                   onPress={() => setSelectedTag(isSelected ? null : tag.tag)}
                 >
-                  <IconComp size={14} color={isSelected ? '#FFFFFF' : '#1E293B'} strokeWidth={2.2} />
+                  <IconComp size={14} color={isSelected ? Brand.white : Brand.ink} strokeWidth={2} />
                   <Text style={[styles.tagPillText, isSelected && styles.tagPillTextSelected]}>{tag.name}</Text>
                 </Pressable>
               );
@@ -162,9 +173,13 @@ export default function SearchView({
 
             {filteredSpots.length === 0 ? (
               <View style={styles.emptyResultsBox}>
-                <Search size={32} color="#CBD5E1" style={{ marginBottom: 8 }} />
-                <Text style={styles.emptyResultsTitle}>Aucune adresse trouvée</Text>
-                <Text style={styles.emptyResultsSub}>Essayez un autre mot-clé comme "Brunch", "Café" ou "Carmes".</Text>
+                <Image
+                  source={require('../../../assets/images/logo-transparent.png')}
+                  style={{ width: 72, height: 74, marginBottom: 12, opacity: 0.9 }}
+                  contentFit="contain"
+                />
+                <Text style={styles.emptyResultsTitle}>Rien de ce côté-là</Text>
+                <Text style={styles.emptyResultsSub}>Essaie un autre mot-clé : « brunch », « café », « Carmes ».</Text>
               </View>
             ) : (
               <>
@@ -189,14 +204,14 @@ export default function SearchView({
                       <View style={styles.resultBadgeRow}>
                         <Text style={styles.resultCategory}>{spot.tags ? spot.tags[0] : 'Adresse'}</Text>
                         <View style={styles.ratingBadge}>
-                          <Star size={12} color="#E5A93B" fill="#E5A93B" />
-                          <Text style={styles.ratingText}>{spot.rating}</Text>
+                          <Star size={12} color={Brand.chouchou} fill={Brand.chouchou} />
+                          <Text style={styles.ratingText}>{formatRating(spot.rating)}</Text>
                         </View>
                       </View>
                       <Text style={styles.resultTitle}>{spot.title}</Text>
                       <Text style={styles.resultDesc} numberOfLines={1}>{spot.description}</Text>
                       <View style={styles.resultMetaRow}>
-                        <MapPin size={12} color="#64748B" />
+                        <MapPin size={12} color={Brand.inkSoft} />
                         <Text style={styles.resultMetaText}>{spot.location} • {spot.price_level}</Text>
                       </View>
                     </View>
@@ -209,12 +224,12 @@ export default function SearchView({
                       {
                         width: '100%',
                         paddingVertical: 14,
-                        backgroundColor: '#1E293B',
+                        backgroundColor: Brand.ink,
                         borderRadius: 12,
                         alignItems: 'center',
                         justifyContent: 'center',
                         marginTop: 10,
-                        shadowColor: '#0F172A',
+                        shadowColor: '#24242E',
                         shadowOffset: { width: 0, height: 4 },
                         shadowOpacity: 0.1,
                         shadowRadius: 8,
@@ -224,7 +239,7 @@ export default function SearchView({
                     ]}
                     onPress={() => setSearchLimit(prev => prev + 20)}
                   >
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: Brand.white }}>
                       Afficher plus de résultats ({Math.min(searchLimit, filteredSpots.length)} / {filteredSpots.length}) ↓
                     </Text>
                   </Pressable>
@@ -236,7 +251,7 @@ export default function SearchView({
           /* Popular Searches Section when idle */
           <View style={styles.sectionWrapper}>
             <View style={styles.popularHeader}>
-              <TrendingUp size={18} color="#C52824" strokeWidth={2.5} style={{ marginRight: 6 }} />
+              <TrendingUp size={18} color={Brand.primaryDeep} strokeWidth={2} style={{ marginRight: 6 }} />
               <Text style={styles.sectionTitle}>Recherches populaires</Text>
             </View>
 
@@ -247,7 +262,7 @@ export default function SearchView({
                   style={styles.popularItem}
                   onPress={() => setQuery(item.split(' ')[0])}
                 >
-                  <Search size={14} color="#94A3B8" style={{ marginRight: 10 }} />
+                  <Search size={14} color={Brand.inkMute} style={{ marginRight: 10 }} />
                   <Text style={styles.popularItemText}>{item}</Text>
                 </Pressable>
               ))}
@@ -273,9 +288,16 @@ export default function SearchView({
 }
 
 const styles = StyleSheet.create({
+  kicker: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Brand.primaryDeep,
+    letterSpacing: 1.2,
+    marginBottom: 6,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
     width: '100%',
     overflow: 'hidden',
   },
@@ -289,14 +311,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontSize: 22,
+    fontWeight: '800',
+    color: Brand.ink,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 14,
-    color: '#64748B',
+    color: Brand.inkSoft,
     fontWeight: '600',
     marginTop: 4,
   },
@@ -307,12 +329,12 @@ const styles = StyleSheet.create({
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: Brand.white,
+    borderRadius: 20,
     borderWidth: 0,
     paddingHorizontal: 16,
     height: 54,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 14,
@@ -322,7 +344,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '700',
-    color: '#1E293B',
+    color: Brand.ink,
     ...Platform.select({
       web: {
         outlineStyle: 'none',
@@ -334,17 +356,17 @@ const styles = StyleSheet.create({
     }),
   },
   clearBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#E2E8F0',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
   },
   clearBtnText: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#64748B',
+    color: Brand.inkSoft,
   },
   sectionWrapper: {
     marginBottom: 24,
@@ -352,7 +374,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#1E293B',
+    color: Brand.ink,
     marginBottom: 12,
   },
   tagsScroll: {
@@ -362,39 +384,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     borderWidth: 0,
-    borderRadius: 20,
+    borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
+    minHeight: 44,
   },
   tagPillSelected: {
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
     borderWidth: 0,
   },
   tagPillText: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: Brand.ink,
   },
   tagPillTextSelected: {
-    color: '#FFFFFF',
+    color: Brand.white,
   },
   popularHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   popularList: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: Brand.white,
+    borderRadius: 20,
     borderWidth: 0,
     paddingVertical: 8,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
@@ -406,22 +429,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: '#F5F0F2',
   },
   popularItemText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#334155',
+    color: '#3A3A48',
   },
   resultCard: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: Brand.white,
+    borderRadius: 20,
     borderWidth: 0,
     padding: 12,
     marginBottom: 12,
     gap: 12,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
@@ -430,8 +453,8 @@ const styles = StyleSheet.create({
   resultImage: {
     width: 84,
     height: 84,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    borderRadius: 20,
+    backgroundColor: '#F5F0F2',
   },
   resultInfo: {
     flex: 1,
@@ -444,34 +467,33 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   resultCategory: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
-    color: '#C52824',
-    textTransform: 'uppercase',
+    color: Brand.primaryDeep,
   },
   ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
   ratingText: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: Brand.ink,
   },
   resultTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#1E293B',
+    color: Brand.ink,
     marginBottom: 2,
   },
   resultDesc: {
     fontSize: 12,
-    color: '#64748B',
+    color: Brand.inkSoft,
     marginBottom: 6,
   },
   resultMetaRow: {
@@ -480,30 +502,30 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   resultMetaText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#64748B',
+    color: Brand.inkSoft,
   },
   emptyResultsBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: Brand.white,
+    borderRadius: 20,
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
   },
   emptyResultsTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#1E293B',
+    color: Brand.ink,
     marginBottom: 4,
   },
   emptyResultsSub: {
     fontSize: 13,
-    color: '#64748B',
+    color: Brand.inkSoft,
     textAlign: 'center',
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -21,6 +21,8 @@ import {
   Plus,
   Trash2,
   Edit3,
+  ArrowUp,
+  ArrowDown,
   Upload,
   Calendar,
   MapPin,
@@ -57,6 +59,7 @@ import {
   classifyAddress,
 } from '../lib/categoryResolver';
 
+import { Brand } from '../constants/brand';
 const generateUUID = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -175,7 +178,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [catFormName, setCatFormName] = useState('');
   const [catFormSlug, setCatFormSlug] = useState('');
-  const [catFormColor, setCatFormColor] = useState('#C52824');
+  const [catFormColor, setCatFormColor] = useState<string>(Brand.primary);
   const [catFormIcon, setCatFormIcon] = useState('UtensilsCrossed');
 
   // Events Data & Filters State
@@ -213,6 +216,8 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
   const [partnerAddressSearch, setPartnerAddressSearch] = useState('');
   const [showPartnerAddressDropdown, setShowPartnerAddressDropdown] = useState(false);
   const [isSubmittingPartner, setIsSubmittingPartner] = useState(false);
+  const [editingPartnerId, setEditingPartnerId] = useState<string | null>(null);
+  const partnersScrollRef = useRef<ScrollView>(null);
 
   // Deletion Confirmation Modal State
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
@@ -512,13 +517,13 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
       setEditingCatId(cat.id);
       setCatFormName(cat.name || '');
       setCatFormSlug(cat.slug || cat.id || '');
-      setCatFormColor(cat.color || '#C52824');
+      setCatFormColor(cat.color || Brand.primary);
       setCatFormIcon(cat.icon_name || 'UtensilsCrossed');
     } else {
       setEditingCatId(null);
       setCatFormName('');
       setCatFormSlug('');
-      setCatFormColor('#C52824');
+      setCatFormColor(Brand.primary);
       setCatFormIcon('UtensilsCrossed');
     }
   };
@@ -592,12 +597,26 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
         showAlert('Suppression réussie', `La catégorie "${name}" a été supprimée.`);
         await fetchCategories();
       } else if (type === 'partner') {
-        const updated = partners.filter(p => p.id !== id);
-        setPartners(updated);
-        saveStoredPartners(updated);
-        await supabase.from('sponsored_partners').delete().eq('id', id);
-        showAlert('Suppression réussie', `Le partenaire a été supprimé.`);
-        await fetchPartners();
+        const { data, error } = await supabase.from('sponsored_partners').delete().eq('id', id).select();
+        if (error) throw error;
+        let removedRemotely = !!(data && data.length > 0);
+        if (!removedRemotely) {
+          // 0 ligne supprimée : soit il n'existait qu'en local, soit la base a refusé (RLS)
+          const { data: stillThere } = await supabase.from('sponsored_partners').select('id').eq('id', id);
+          if (stillThere && stillThere.length > 0) {
+            showAlert(
+              'Suppression refusée par Supabase',
+              `"${name}" n'a pas pu être retiré : les règles d'accès (RLS) de sponsored_partners n'autorisent pas la suppression avec ce compte. Rien n'a été modifié.`
+            );
+            return;
+          }
+          removedRemotely = true;
+        }
+        const list = sortedPartners();
+        const remaining = list.filter((p) => p.id !== id);
+        reportPartnerSyncFailures(await commitPartnerOrder(remaining, list));
+        if (editingPartnerId === id) resetPartnerForm();
+        showAlert('Partenaire retiré', `"${name}" a été retiré du Top. Le classement a été renuméroté.`);
       }
     } catch (e: any) {
       showAlert('Erreur lors de la suppression', e.message);
@@ -726,26 +745,104 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
   };
 
   // ── Sponsoring Partners Management (Top Netflix) ──
-  const fetchPartners = async () => {
+  const fetchPartners = async (): Promise<any[]> => {
     try {
       setLoadingPartners(true);
       const { data, error } = await supabase
         .from('sponsored_partners')
         .select('*')
         .order('rank_position', { ascending: true });
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         setPartners(data);
         saveStoredPartners(data);
-      } else {
-        const stored = getStoredPartners();
-        setPartners(stored);
+        return data;
       }
+      const stored = getStoredPartners();
+      setPartners(stored);
+      return stored;
     } catch (e) {
       console.warn('Fetch partners error:', e);
-      setPartners(getStoredPartners());
+      const stored = getStoredPartners();
+      setPartners(stored);
+      return stored;
     } finally {
       setLoadingPartners(false);
     }
+  };
+
+  const partnerBadge = (rank: number) => ({
+    badge_text: rank <= 3 ? `TOP #${rank} PARTENAIRE` : 'PARTENAIRE OFFICIEL',
+    sponsorship_tier: rank === 1 ? 'platinum' : rank <= 3 ? 'gold' : 'silver',
+  });
+
+  /**
+   * Renumérote 1..n dans l'ordre donné, met à jour l'affichage local puis Supabase
+   * (uniquement les lignes dont le rang change). Renvoie les titres refusés par la base.
+   */
+  const commitPartnerOrder = async (ordered: any[], before: any[]): Promise<string[]> => {
+    const previousRank = new Map(before.map((p) => [p.id, p.rank_position]));
+    const renumbered = ordered.map((p, i) => ({ ...p, rank_position: i + 1, ...partnerBadge(i + 1) }));
+    setPartners(renumbered);
+    saveStoredPartners(renumbered);
+    const failed: string[] = [];
+    for (const p of renumbered) {
+      if (previousRank.get(p.id) === p.rank_position) continue;
+      const { data, error } = await supabase
+        .from('sponsored_partners')
+        .update({ rank_position: p.rank_position, badge_text: p.badge_text, sponsorship_tier: p.sponsorship_tier })
+        .eq('id', p.id)
+        .select();
+      if (error || !data || data.length === 0) failed.push(p.title);
+    }
+    return failed;
+  };
+
+  const sortedPartners = () => [...partners].sort((a, b) => (a.rank_position || 999) - (b.rank_position || 999));
+
+  const reportPartnerSyncFailures = (failed: string[]) => {
+    if (failed.length === 0) return;
+    showAlert(
+      'Enregistré sur cet appareil seulement',
+      `Supabase a refusé la modification pour : ${failed.join(', ')}.\n\nLes règles d'accès (RLS) de la table sponsored_partners n'autorisent pas l'écriture avec ce compte. Les autres appareils ne verront pas ce changement tant que ces règles ne sont pas corrigées.`
+    );
+  };
+
+  const handleMovePartner = async (partner: any, direction: -1 | 1) => {
+    const list = sortedPartners();
+    const i = list.findIndex((p) => p.id === partner.id);
+    const j = i + direction;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    const next = [...list];
+    [next[i], next[j]] = [next[j], next[i]];
+    reportPartnerSyncFailures(await commitPartnerOrder(next, list));
+  };
+
+  const resetPartnerForm = () => {
+    setEditingPartnerId(null);
+    setPartnerFormTitle('');
+    setPartnerFormSubtitle('');
+    setPartnerFormImage('');
+    setPartnerFormRank('1');
+    setPartnerFormPrice('150');
+    setPartnerFormDays('30');
+    setPartnerFormNotifyHours('24');
+    setPartnerFormSpotId(null);
+    setPartnerFormSpotName('');
+    setPartnerAddressSearch('');
+  };
+
+  const handleOpenEditPartner = (p: any) => {
+    setEditingPartnerId(p.id);
+    setPartnerFormTitle(p.title || '');
+    setPartnerFormSubtitle(p.subtitle || '');
+    setPartnerFormImage(p.image_url || '');
+    setPartnerFormRank(String(p.rank_position || 1));
+    setPartnerFormPrice(String(p.price_paid ?? 150));
+    setPartnerFormNotifyHours(String(p.notify_interval_hours ?? 24));
+    setPartnerFormSpotId(p.spot_id || null);
+    const linked = spots.find((sp) => sp.id === p.spot_id);
+    setPartnerFormSpotName(linked ? linked.title || linked.name || '' : '');
+    setTimeout(() => partnersScrollRef.current?.scrollTo({ y: 0, animated: true }), 50);
   };
 
   const handleSavePartner = async () => {
@@ -755,54 +852,64 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
     }
     try {
       setIsSubmittingPartner(true);
-      const rank = parseInt(partnerFormRank || '1', 10);
+      const rank = Math.max(1, parseInt(partnerFormRank || '1', 10) || 1);
       const price = parseFloat(partnerFormPrice || '150');
       const days = parseInt(partnerFormDays || '30', 10);
       const notifyHours = parseInt(partnerFormNotifyHours || '24', 10);
-
-      const startsAt = new Date();
-      const endsAt = new Date(Date.now() + days * 86400000);
-
-      const record: any = {
+      const base = {
         title: partnerFormTitle.trim(),
-        subtitle: partnerFormSubtitle.trim() || `Offre exclusive membre - ${price}€ de privilèges`,
+        subtitle: partnerFormSubtitle.trim(),
         image_url: partnerFormImage.trim() || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800',
-        badge_text: rank <= 3 ? `TOP #${rank} PARTENAIRE` : 'PARTENAIRE OFFICIEL',
-        sponsorship_tier: rank === 1 ? 'platinum' : (rank <= 3 ? 'gold' : 'silver'),
         price_paid: price,
-        rank_position: rank,
-        starts_at: startsAt.toISOString(),
-        ends_at: endsAt.toISOString(),
         notify_interval_hours: notifyHours,
-        is_active: true,
         spot_id: partnerFormSpotId || null,
       };
-      record.id = generateUUID();
+      const current = sortedPartners();
+      let record: any;
+      let failed: string[] = [];
 
-      const { data: inserted, error } = await supabase.from('sponsored_partners').insert(record).select();
-      if (error) {
-        // Local fallback if offline or restricted by RLS
-        const updated = [...partners, record].sort((a, b) => (a.rank_position || 1) - (b.rank_position || 1));
-        setPartners(updated);
-        saveStoredPartners(updated);
-        showAlert('Partenaire enregistré', `Le partenaire "${partnerFormTitle}" a été enregistré localement (exécutez le script SQL fourni pour activer l'écriture directe dans Supabase).`);
-      } else if (inserted && inserted.length > 0) {
-        const updated = [...partners, inserted[0]].sort((a, b) => (a.rank_position || 1) - (b.rank_position || 1));
-        setPartners(updated);
-        saveStoredPartners(updated);
-        showAlert('Partenaire sponsorisé ajouté', `Le partenaire "${partnerFormTitle}" a été classé Top ${rank} (${price}€ pour ${days} jours).`);
+      if (editingPartnerId) {
+        const existing = current.find((p) => p.id === editingPartnerId);
+        const startsAt = existing?.starts_at ? new Date(existing.starts_at) : new Date();
+        const fields = { ...base, ends_at: new Date(startsAt.getTime() + days * 86400000).toISOString() };
+        record = { ...existing, ...fields };
+        const { data, error } = await supabase
+          .from('sponsored_partners')
+          .update(fields)
+          .eq('id', editingPartnerId)
+          .select();
+        if (error || !data || data.length === 0) failed.push(base.title);
+      } else {
+        const startsAt = new Date();
+        record = {
+          ...base,
+          ...partnerBadge(rank),
+          rank_position: rank,
+          starts_at: startsAt.toISOString(),
+          ends_at: new Date(Date.now() + days * 86400000).toISOString(),
+          is_active: true,
+          id: generateUUID(),
+        };
+        const { data, error } = await supabase.from('sponsored_partners').insert(record).select();
+        if (error || !data || data.length === 0) failed.push(base.title);
       }
 
-      await fetchPartners();
-      setPartnerFormTitle('');
-      setPartnerFormSubtitle('');
-      setPartnerFormImage('');
-      setPartnerFormSpotId(null);
-      setPartnerFormSpotName('');
-      setPartnerAddressSearch('');
+      // Place le partenaire au rang demandé, les autres se décalent
+      const others = current.filter((p) => p.id !== record.id);
+      const ordered = [...others];
+      ordered.splice(Math.min(rank - 1, others.length), 0, record);
+      const before = editingPartnerId ? current : [...current, { ...record, rank_position: null }];
+      failed = failed.concat(await commitPartnerOrder(ordered, before));
+
+      const wasEditing = !!editingPartnerId;
+      resetPartnerForm();
+      if (failed.length > 0) {
+        reportPartnerSyncFailures(Array.from(new Set(failed)));
+      } else {
+        showAlert(wasEditing ? 'Partenaire modifié' : 'Partenaire ajouté', `"${base.title}" est maintenant classé n°${Math.min(rank, ordered.length)}.`);
+      }
     } catch (err: any) {
-      showAlert('Enregistrement local', 'Le partenaire a été enregistré et synchronisé localement.');
-      fetchPartners();
+      showAlert('Erreur', err?.message || "Impossible d'enregistrer le partenaire.");
     } finally {
       setIsSubmittingPartner(false);
     }
@@ -814,7 +921,8 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
       const updated = partners.map(p => p.id === partner.id ? { ...p, is_active: nextVal } : p);
       setPartners(updated);
       saveStoredPartners(updated);
-      await supabase.from('sponsored_partners').update({ is_active: nextVal }).eq('id', partner.id);
+      const { data, error } = await supabase.from('sponsored_partners').update({ is_active: nextVal }).eq('id', partner.id).select();
+      if (error || !data || data.length === 0) reportPartnerSyncFailures([partner.title]);
     } catch (e) {
       console.warn(e);
     }
@@ -856,16 +964,16 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         {/* Header Admin Neo-Brutalist */}
-        <SafeAreaView edges={['top']} style={{ backgroundColor: '#FAF5EF' }}>
+        <SafeAreaView edges={['top']} style={{ backgroundColor: Brand.bg }}>
           <View style={styles.adminHeader}>
             <Pressable style={({ pressed }) => [styles.iconBtn, pressed && styles.btnPressed]} onPress={onClose}>
-              <ChevronLeft size={22} color="#1E293B" strokeWidth={2.5} />
+              <ChevronLeft size={22} color={Brand.ink} strokeWidth={2} />
             </Pressable>
             <Text style={styles.headerTitle}>
-              <Text style={{ color: '#C52824' }}>t </Text>Portail Admin
+              <Text style={{ color: Brand.primaryDeep }}>t </Text>Portail Admin
             </Text>
             <Pressable style={({ pressed }) => [styles.iconBtn, pressed && styles.btnPressed]} onPress={onLogout}>
-              <LogOut size={18} color="#C52824" strokeWidth={2.5} />
+              <LogOut size={18} color={Brand.primaryDeep} strokeWidth={2} />
             </Pressable>
           </View>
         </SafeAreaView>
@@ -874,36 +982,36 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
         <View style={styles.tabBar}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBarScroll}>
             <Pressable style={[styles.tabBtn, activeTab === 'spots' && styles.tabBtnActive]} onPress={() => setActiveTab('spots')}>
-              <MapPin size={14} color={activeTab === 'spots' ? '#C52824' : '#64748B'} strokeWidth={2.2} style={{ marginRight: 6 }} />
+              <MapPin size={14} color={activeTab === 'spots' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
               <Text style={[styles.tabBtnText, activeTab === 'spots' && styles.tabBtnTextActive]}>Adresses ({spots.length})</Text>
             </Pressable>
             <Pressable style={[styles.tabBtn, activeTab === 'editSpot' && styles.tabBtnActive]} onPress={() => handleOpenEditSpot()}>
               {editingSpotId ? (
-                <Edit3 size={14} color={activeTab === 'editSpot' ? '#C52824' : '#64748B'} strokeWidth={2.2} style={{ marginRight: 6 }} />
+                <Edit3 size={14} color={activeTab === 'editSpot' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
               ) : (
-                <Plus size={14} color={activeTab === 'editSpot' ? '#C52824' : '#64748B'} strokeWidth={2.2} style={{ marginRight: 6 }} />
+                <Plus size={14} color={activeTab === 'editSpot' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
               )}
               <Text style={[styles.tabBtnText, activeTab === 'editSpot' && styles.tabBtnTextActive]}>
                 {editingSpotId ? 'Édition' : 'Créer'}
               </Text>
             </Pressable>
             <Pressable style={[styles.tabBtn, activeTab === 'categories' && styles.tabBtnActive]} onPress={() => setActiveTab('categories')}>
-              <Tag size={14} color={activeTab === 'categories' ? '#C52824' : '#64748B'} strokeWidth={2.2} style={{ marginRight: 6 }} />
+              <Tag size={14} color={activeTab === 'categories' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
               <Text style={[styles.tabBtnText, activeTab === 'categories' && styles.tabBtnTextActive]}>Catégories</Text>
             </Pressable>
             <Pressable style={[styles.tabBtn, activeTab === 'events' && styles.tabBtnActive]} onPress={() => setActiveTab('events')}>
-              <Calendar size={14} color={activeTab === 'events' ? '#C52824' : '#64748B'} strokeWidth={2.2} style={{ marginRight: 6 }} />
+              <Calendar size={14} color={activeTab === 'events' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
               <Text style={[styles.tabBtnText, activeTab === 'events' && styles.tabBtnTextActive]}>Événements</Text>
             </Pressable>
             <Pressable style={[styles.tabBtn, activeTab === 'partners' && styles.tabBtnActive]} onPress={() => setActiveTab('partners')}>
-              <Sparkles size={14} color={activeTab === 'partners' ? '#C52824' : '#64748B'} strokeWidth={2.2} style={{ marginRight: 6 }} />
+              <Sparkles size={14} color={activeTab === 'partners' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
               <Text style={[styles.tabBtnText, activeTab === 'partners' && styles.tabBtnTextActive]}>Top Partenaires ({partners.length})</Text>
             </Pressable>
           </ScrollView>
         </View>
 
         {/* Main Content Area */}
-        <View style={{ flex: 1, backgroundColor: '#FAF5EF' }}>
+        <View style={{ flex: 1, backgroundColor: Brand.bg }}>
 
           {/* ── TAB 1: SPOTS MANAGEMENT (List / Search / Filter / Delete) ── */}
           {activeTab === 'spots' && (
@@ -911,17 +1019,17 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
               {/* Search & Category Filter Section */}
               <View style={styles.searchSection}>
                 <View style={styles.searchInputContainer}>
-                  <Search size={18} color="#64748B" style={{ marginRight: 8 }} />
+                  <Search size={18} color={Brand.inkSoft} style={{ marginRight: 8 }} />
                   <TextInput
                     placeholder="Rechercher une adresse par nom ou rue..."
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={Brand.inkSoft}
                     value={spotSearchQuery}
                     onChangeText={setSpotSearchQuery}
                     style={styles.searchInput}
                   />
                   {spotSearchQuery.length > 0 && (
                     <Pressable onPress={() => setSpotSearchQuery('')}>
-                      <X size={16} color="#64748B" />
+                      <X size={16} color={Brand.inkSoft} />
                     </Pressable>
                   )}
                 </View>
@@ -952,14 +1060,14 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
 
               {loadingSpots ? (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                  <ActivityIndicator size="large" color="#C52824" />
+                  <ActivityIndicator size="large" color={Brand.primaryDeep} />
                 </View>
               ) : (
                 <ScrollView contentContainerStyle={{ paddingBottom: 60, gap: 12 }} showsVerticalScrollIndicator={false}>
                   <View style={styles.listHeaderRow}>
                     <Text style={styles.listHeaderCount}>{filteredSpots.length} adresses affichées</Text>
                     <Pressable style={styles.addInlineBtn} onPress={() => handleOpenEditSpot()}>
-                      <Plus size={16} color="#FFFFFF" strokeWidth={2.5} />
+                      <Plus size={16} color={Brand.white} strokeWidth={2} />
                       <Text style={styles.addInlineBtnText}>Ajouter</Text>
                     </Pressable>
                   </View>
@@ -973,7 +1081,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                       <View style={styles.spotCardBody}>
                         <Text style={styles.spotCardTitle} numberOfLines={1}>{spot.title || spot.name}</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <MapPin size={11} color="#64748B" />
+                          <MapPin size={11} color={Brand.inkSoft} />
                           <Text style={styles.spotCardAddress} numberOfLines={1}>{spot.address || spot.location || 'Toulouse'}</Text>
                         </View>
                         <View style={styles.spotCardBadgeRow}>
@@ -983,7 +1091,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                             </Text>
                           </View>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                            <Star size={11} color="#E5A93B" fill="#E5A93B" />
+                            <Star size={11} color={Brand.chouchou} fill={Brand.chouchou} />
                             <Text style={styles.spotCardRating}>{spot.rating || '4.8'}</Text>
                           </View>
                         </View>
@@ -992,13 +1100,13 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                       {/* Card Action Buttons */}
                       <View style={styles.spotCardActions}>
                         <Pressable style={styles.actionBtnEdit} onPress={() => handleOpenEditSpot(spot)}>
-                          <Edit3 size={16} color="#1E293B" strokeWidth={2.5} />
+                          <Edit3 size={16} color={Brand.ink} strokeWidth={2} />
                         </Pressable>
                         <Pressable
                           style={styles.actionBtnDelete}
                           onPress={() => setDeleteConfirmModal({ visible: true, type: 'spot', id: spot.id, name: spot.title || spot.name })}
                         >
-                          <Trash2 size={16} color="#C52824" strokeWidth={2.5} />
+                          <Trash2 size={16} color={Brand.primaryDeep} strokeWidth={2} />
                         </Pressable>
                       </View>
                     </View>
@@ -1023,19 +1131,19 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                     <Image source={{ uri: formCoverUrl }} style={styles.coverPreview} />
                   ) : (
                     <View style={styles.coverPlaceholder}>
-                      <ImageIcon size={24} color="#94A3B8" />
-                      <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '700' }}>Aucune image</Text>
+                      <ImageIcon size={24} color={Brand.inkMute} />
+                      <Text style={{ fontSize: 12, color: Brand.inkSoft, fontWeight: '700' }}>Aucune image</Text>
                     </View>
                   )}
                   <Pressable style={styles.uploadBtn} onPress={handleUploadCoverImage} disabled={isUploading}>
-                    {isUploading ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Upload size={18} color="#FFFFFF" strokeWidth={2.5} />}
+                    {isUploading ? <ActivityIndicator color={Brand.white} size="small" /> : <Upload size={18} color={Brand.white} strokeWidth={2} />}
                     <Text style={styles.uploadBtnText}>Téléverser image</Text>
                   </Pressable>
                 </View>
 
                 {/* Form Fields */}
                 <Text style={styles.inputLabel}>Nom de l'établissement *</Text>
-                <TextInput style={styles.input} value={formTitle} onChangeText={setFormTitle} placeholder="Ex: Mizuki Ramen" placeholderTextColor="#94A3B8" />
+                <TextInput style={styles.input} value={formTitle} onChangeText={setFormTitle} placeholder="Ex: Mizuki Ramen" placeholderTextColor={Brand.inkSoft} />
 
                 <Text style={styles.inputLabel}>Catégorie *</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 12 }}>
@@ -1057,14 +1165,14 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                     value={formAddress}
                     onChangeText={setFormAddress}
                     placeholder="Ex: 54 Rue Peyrolières, 31000 Toulouse"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={Brand.inkSoft}
                   />
                   <Pressable style={styles.geocodeBtn} onPress={handleGeocodeFormAddress} disabled={isGeocoding}>
                     {isGeocoding ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <ActivityIndicator size="small" color={Brand.white} />
                     ) : (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Compass size={14} color="#FFFFFF" />
+                        <Compass size={14} color={Brand.white} />
                         <Text style={styles.geocodeBtnText}>BAN</Text>
                       </View>
                     )}
@@ -1074,40 +1182,40 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.inputLabel}>Latitude (GPS)</Text>
-                    <TextInput style={styles.input} value={formLat} onChangeText={setFormLat} keyboardType="numeric" placeholder="43.6001" placeholderTextColor="#94A3B8" />
+                    <TextInput style={styles.input} value={formLat} onChangeText={setFormLat} keyboardType="numeric" placeholder="43.6001" placeholderTextColor={Brand.inkSoft} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.inputLabel}>Longitude (GPS)</Text>
-                    <TextInput style={styles.input} value={formLng} onChangeText={setFormLng} keyboardType="numeric" placeholder="1.4409" placeholderTextColor="#94A3B8" />
+                    <TextInput style={styles.input} value={formLng} onChangeText={setFormLng} keyboardType="numeric" placeholder="1.4409" placeholderTextColor={Brand.inkSoft} />
                   </View>
                 </View>
 
                 <Text style={styles.inputLabel}>Quartier / Secteur</Text>
-                <TextInput style={styles.input} value={formLocation} onChangeText={setFormLocation} placeholder="Ex: Capitole / Carmes" placeholderTextColor="#94A3B8" />
+                <TextInput style={styles.input} value={formLocation} onChangeText={setFormLocation} placeholder="Ex: Capitole / Carmes" placeholderTextColor={Brand.inkSoft} />
 
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.inputLabel}>Téléphone</Text>
-                    <TextInput style={styles.input} value={formPhone} onChangeText={setFormPhone} placeholder="05 61 23 45 67" placeholderTextColor="#94A3B8" />
+                    <TextInput style={styles.input} value={formPhone} onChangeText={setFormPhone} placeholder="05 61 23 45 67" placeholderTextColor={Brand.inkSoft} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.inputLabel}>Site Web</Text>
-                    <TextInput style={styles.input} value={formWebsite} onChangeText={setFormWebsite} placeholder="https://..." placeholderTextColor="#94A3B8" />
+                    <TextInput style={styles.input} value={formWebsite} onChangeText={setFormWebsite} placeholder="https://..." placeholderTextColor={Brand.inkSoft} />
                   </View>
                 </View>
 
                 <Text style={styles.inputLabel}>Description courte</Text>
-                <TextInput style={styles.input} value={formDescription} onChangeText={setFormDescription} multiline numberOfLines={2} placeholder="Courte accroche..." placeholderTextColor="#94A3B8" />
+                <TextInput style={styles.input} value={formDescription} onChangeText={setFormDescription} multiline numberOfLines={2} placeholder="Courte accroche..." placeholderTextColor={Brand.inkSoft} />
 
                 <Text style={styles.inputLabel}>Description complète (Avis Petit Tou)</Text>
-                <TextInput style={[styles.input, { height: 90, textAlignVertical: 'top' }]} value={formFullDescription} onChangeText={setFormFullDescription} multiline numberOfLines={4} placeholder="L'avis complet du Petit Tou..." placeholderTextColor="#94A3B8" />
+                <TextInput style={[styles.input, { height: 90, textAlignVertical: 'top' }]} value={formFullDescription} onChangeText={setFormFullDescription} multiline numberOfLines={4} placeholder="L'avis complet du Petit Tou..." placeholderTextColor={Brand.inkSoft} />
 
                 {/* Gallery Management Section */}
                 <View style={styles.galleryManagerSection}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text style={styles.inputLabel}>Galerie de photos ({formGalleryUrls.length})</Text>
                     <Pressable style={styles.addPhotoSmallBtn} onPress={handleAddGalleryPhoto} disabled={isUploading}>
-                      <Plus size={14} color="#FFFFFF" strokeWidth={2.5} />
+                      <Plus size={14} color={Brand.white} strokeWidth={2} />
                       <Text style={styles.addPhotoSmallBtnText}>Ajouter photo</Text>
                     </Pressable>
                   </View>
@@ -1117,12 +1225,12 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                       <View key={idx} style={styles.galleryThumbWrapper}>
                         <Image source={{ uri: url }} style={styles.galleryThumb} />
                         <Pressable style={styles.deleteThumbBtn} onPress={() => handleRemoveGalleryPhoto(idx)}>
-                          <X size={12} color="#FFFFFF" strokeWidth={3} />
+                          <X size={12} color={Brand.white} strokeWidth={2} />
                         </Pressable>
                       </View>
                     ))}
                     {formGalleryUrls.length === 0 && (
-                      <Text style={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic' }}>Aucune photo dans la galerie.</Text>
+                      <Text style={{ fontSize: 12, color: Brand.inkSoft, fontStyle: 'italic' }}>Aucune photo dans la galerie.</Text>
                     )}
                   </ScrollView>
                 </View>
@@ -1130,7 +1238,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                 {/* Submit Action Button */}
                 <Pressable style={styles.saveSubmitBtn} onPress={handleSaveSpot} disabled={isUploading}>
                   {isUploading ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <ActivityIndicator color={Brand.white} size="small" />
                   ) : (
                     <Text style={styles.saveSubmitBtnText}>{editingSpotId ? 'Enregistrer les modifications →' : 'Publier l\'adresse →'}</Text>
                   )}
@@ -1152,7 +1260,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                   value={catFormName}
                   onChangeText={setCatFormName}
                   placeholder="Ex: Brunch & Douceurs"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={Brand.inkSoft}
                 />
 
                 <Text style={styles.inputLabel}>Slug (Identifiant unique)</Text>
@@ -1161,17 +1269,17 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                   value={catFormSlug}
                   onChangeText={setCatFormSlug}
                   placeholder="Ex: brunch-douceurs"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={Brand.inkSoft}
                 />
 
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.inputLabel}>Couleur Hex (#Hex)</Text>
-                    <TextInput style={styles.input} value={catFormColor} onChangeText={setCatFormColor} placeholder="#C52824" placeholderTextColor="#94A3B8" />
+                    <TextInput style={styles.input} value={catFormColor} onChangeText={setCatFormColor} placeholder={Brand.primary} placeholderTextColor={Brand.inkSoft} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.inputLabel}>Icône Lucide</Text>
-                    <TextInput style={styles.input} value={catFormIcon} onChangeText={setCatFormIcon} placeholder="Coffee" placeholderTextColor="#94A3B8" />
+                    <TextInput style={styles.input} value={catFormIcon} onChangeText={setCatFormIcon} placeholder="Coffee" placeholderTextColor={Brand.inkSoft} />
                   </View>
                 </View>
 
@@ -1196,8 +1304,8 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                   return (
                     <View key={cat.id} style={styles.catAdminCard}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                        <View style={[styles.catIconCircle, { backgroundColor: `${cat.color || '#C52824'}20` }]}>
-                          <Tag size={20} color={cat.color || '#C52824'} />
+                        <View style={[styles.catIconCircle, { backgroundColor: `${cat.color || Brand.primary}20` }]}>
+                          <Tag size={20} color={cat.color || Brand.primary} />
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.catAdminTitle}>{cat.name}</Text>
@@ -1206,13 +1314,13 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                       </View>
                       <View style={{ flexDirection: 'row', gap: 6 }}>
                         <Pressable style={styles.editActionBtn} onPress={() => handleOpenEditCategory(cat)}>
-                          <Edit3 size={14} color="#1E293B" />
+                          <Edit3 size={14} color={Brand.ink} />
                         </Pressable>
                         <Pressable
                           style={styles.deleteActionBtn}
                           onPress={() => setDeleteConfirmModal({ visible: true, type: 'category', id: cat.id, name: cat.name })}
                         >
-                          <Trash2 size={14} color="#C52824" />
+                          <Trash2 size={14} color={Brand.primaryDeep} />
                         </Pressable>
                       </View>
                     </View>
@@ -1231,7 +1339,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                   style={[styles.eventTabPill, eventTabFilter === 'all' && styles.eventTabPillActive]}
                   onPress={() => setEventTabFilter('all')}
                 >
-                  <Calendar size={13} color={eventTabFilter === 'all' ? '#1E293B' : '#64748B'} style={{ marginRight: 6 }} />
+                  <Calendar size={13} color={eventTabFilter === 'all' ? Brand.ink : Brand.inkSoft} style={{ marginRight: 6 }} />
                   <Text style={[styles.eventTabPillText, eventTabFilter === 'all' && styles.eventTabPillTextActive]}>
                     Tous ({events.length})
                   </Text>
@@ -1240,7 +1348,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                   style={[styles.eventTabPill, eventTabFilter === 'upcoming' && styles.eventTabPillActive]}
                   onPress={() => setEventTabFilter('upcoming')}
                 >
-                  <Clock size={13} color={eventTabFilter === 'upcoming' ? '#1E293B' : '#64748B'} style={{ marginRight: 6 }} />
+                  <Clock size={13} color={eventTabFilter === 'upcoming' ? Brand.ink : Brand.inkSoft} style={{ marginRight: 6 }} />
                   <Text style={[styles.eventTabPillText, eventTabFilter === 'upcoming' && styles.eventTabPillTextActive]}>
                     À venir ({upcomingCount})
                   </Text>
@@ -1249,7 +1357,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                   style={[styles.eventTabPill, eventTabFilter === 'archived' && styles.eventTabPillActive]}
                   onPress={() => setEventTabFilter('archived')}
                 >
-                  <Archive size={13} color={eventTabFilter === 'archived' ? '#1E293B' : '#64748B'} style={{ marginRight: 6 }} />
+                  <Archive size={13} color={eventTabFilter === 'archived' ? Brand.ink : Brand.inkSoft} style={{ marginRight: 6 }} />
                   <Text style={[styles.eventTabPillText, eventTabFilter === 'archived' && styles.eventTabPillTextActive]}>
                     Archivés ({archivedCount})
                   </Text>
@@ -1261,54 +1369,54 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                 <View style={styles.formContainer}>
                   <Text style={styles.formSectionTitle}>{editingEventId ? 'Modifier l\'événement' : 'Créer un événement'}</Text>
                   
-                  <TextInput style={styles.input} value={eventFormTitle} onChangeText={setEventFormTitle} placeholder="Titre de l'événement *" placeholderTextColor="#94A3B8" />
-                  <TextInput style={styles.input} value={eventFormDesc} onChangeText={setEventFormDesc} placeholder="Description *" placeholderTextColor="#94A3B8" multiline />
+                  <TextInput style={styles.input} value={eventFormTitle} onChangeText={setEventFormTitle} placeholder="Titre de l'événement *" placeholderTextColor={Brand.inkSoft} />
+                  <TextInput style={styles.input} value={eventFormDesc} onChangeText={setEventFormDesc} placeholder="Description *" placeholderTextColor={Brand.inkSoft} multiline />
                   
                   <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormDate} onChangeText={setEventFormDate} placeholder="Date (AAAA-MM-JJ ou JJ/MM/AAAA) *" placeholderTextColor="#94A3B8" />
-                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormTime} onChangeText={setEventFormTime} placeholder="Heure (ex: 19:00)" placeholderTextColor="#94A3B8" />
+                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormDate} onChangeText={setEventFormDate} placeholder="Date (AAAA-MM-JJ ou JJ/MM/AAAA) *" placeholderTextColor={Brand.inkSoft} />
+                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormTime} onChangeText={setEventFormTime} placeholder="Heure (ex: 19:00)" placeholderTextColor={Brand.inkSoft} />
                   </View>
 
                   {/* Raccourcis date rapide */}
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 11, color: '#64748B', marginRight: 2 }}>Raccourcis :</Text>
+                    <Text style={{ fontSize: 12, color: Brand.inkSoft, marginRight: 2 }}>Raccourcis :</Text>
                     <Pressable
-                      style={{ backgroundColor: '#F1F5F9', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}
+                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: Brand.line }}
                       onPress={() => setQuickDate(0)}
                     >
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#334155' }}>Aujourd'hui</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#3A3A48' }}>Aujourd'hui</Text>
                     </Pressable>
                     <Pressable
-                      style={{ backgroundColor: '#F1F5F9', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}
+                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: Brand.line }}
                       onPress={() => setQuickDate(1)}
                     >
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#334155' }}>Demain</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#3A3A48' }}>Demain</Text>
                     </Pressable>
                     <Pressable
-                      style={{ backgroundColor: '#F1F5F9', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}
+                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: Brand.line }}
                       onPress={() => setQuickDate(7)}
                     >
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#334155' }}>Dans 7 j</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#3A3A48' }}>Dans 7 j</Text>
                     </Pressable>
                     <Pressable
-                      style={{ backgroundColor: '#F1F5F9', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}
+                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: Brand.line }}
                       onPress={() => setQuickDate(30)}
                     >
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#334155' }}>Dans 1 mois</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#3A3A48' }}>Dans 1 mois</Text>
                     </Pressable>
                   </View>
 
-                  <TextInput style={styles.input} value={eventFormLocation} onChangeText={setEventFormLocation} placeholder="Lieu *" placeholderTextColor="#94A3B8" />
+                  <TextInput style={styles.input} value={eventFormLocation} onChangeText={setEventFormLocation} placeholder="Lieu *" placeholderTextColor={Brand.inkSoft} />
 
                   <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormPrice} onChangeText={setEventFormPrice} keyboardType="numeric" placeholder="Tarif (€)" placeholderTextColor="#94A3B8" />
+                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormPrice} onChangeText={setEventFormPrice} keyboardType="numeric" placeholder="Tarif (€)" placeholderTextColor={Brand.inkSoft} />
                     <TextInput
                       style={[styles.input, { flex: 1 }]}
                       value={eventFormMaxPlaces}
                       onChangeText={setEventFormMaxPlaces}
                       keyboardType="numeric"
                       placeholder="Places max (ex: 50)"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={Brand.inkSoft}
                     />
                   </View>
 
@@ -1317,7 +1425,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                     value={eventFormBookingUrl}
                     onChangeText={setEventFormBookingUrl}
                     placeholder="Lien de réservation (https://...)"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={Brand.inkSoft}
                     autoCapitalize="none"
                     keyboardType="url"
                   />
@@ -1328,7 +1436,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                     </Pressable>
                     {editingEventId && (
                       <Pressable
-                        style={[styles.saveSubmitBtn, { backgroundColor: '#94A3B8', paddingHorizontal: 16 }]}
+                        style={[styles.saveSubmitBtn, { backgroundColor: Brand.inkMute, paddingHorizontal: 16 }]}
                         onPress={() => handleOpenEditEvent(null)}
                       >
                         <Text style={styles.saveSubmitBtnText}>Annuler</Text>
@@ -1338,7 +1446,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                 </View>
 
                 {/* Events List */}
-                <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E293B', marginTop: 12 }}>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: Brand.ink, marginTop: 12 }}>
                   {filteredEvents.length} événements {eventTabFilter === 'all' ? 'au total' : eventTabFilter === 'upcoming' ? 'à venir' : 'passés (archivés)'}
                 </Text>
 
@@ -1347,18 +1455,18 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                     <View style={styles.spotCardBody}>
                       <Text style={styles.spotCardTitle}>{evt.title}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Calendar size={11} color="#64748B" />
+                        <Calendar size={11} color={Brand.inkSoft} />
                         <Text style={styles.spotCardAddress}>{evt.event_date} à {evt.event_time} - {evt.location}</Text>
                       </View>
                       <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
                         <Text style={styles.spotCardRating}>{evt.price ? `${evt.price} €` : 'Gratuit'}</Text>
                         {evt.max_places ? (
-                          <Text style={{ fontSize: 11, color: '#8B5CF6', fontWeight: '700', backgroundColor: '#EDE9FE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                          <Text style={{ fontSize: 12, color: Brand.violet, fontWeight: '700', backgroundColor: '#EDE9FE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
                             {evt.max_places} places
                           </Text>
                         ) : null}
                         {evt.booking_url ? (
-                          <Text style={{ fontSize: 11, color: '#0891B2', fontWeight: '700', backgroundColor: '#ECFEFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                          <Text style={{ fontSize: 12, color: '#0891B2', fontWeight: '700', backgroundColor: '#ECFEFF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
                             Lien réservation
                           </Text>
                         ) : null}
@@ -1369,13 +1477,13 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                         style={styles.actionBtnEdit}
                         onPress={() => handleOpenEditEvent(evt)}
                       >
-                        <Edit3 size={16} color="#4F46E5" strokeWidth={2.5} />
+                        <Edit3 size={16} color="#4F46E5" strokeWidth={2} />
                       </Pressable>
                       <Pressable
                         style={styles.actionBtnDelete}
                         onPress={() => setDeleteConfirmModal({ visible: true, type: 'event', id: evt.id, name: evt.title })}
                       >
-                        <Trash2 size={16} color="#C52824" strokeWidth={2.5} />
+                        <Trash2 size={16} color={Brand.primaryDeep} strokeWidth={2} />
                       </Pressable>
                     </View>
                   </View>
@@ -1386,14 +1494,14 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
 
           {/* ── TAB 5: TOP PARTENAIRES (STYLE NETFLIX) ── */}
           {activeTab === 'partners' && (
-            <ScrollView style={{ flex: 1, padding: 16 }} contentContainerStyle={{ paddingBottom: 60 }}>
+            <ScrollView ref={partnersScrollRef} style={{ flex: 1, padding: 16 }} contentContainerStyle={{ paddingBottom: 60 }}>
               <View style={styles.formCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <Sparkles size={22} color="#E5A93B" />
-                  <Text style={styles.sectionHeaderTitle}>Nouveau Partenaire Sponsorisé (Top Netflix)</Text>
+                  <Sparkles size={22} color={Brand.chouchou} />
+                  <Text style={styles.sectionHeaderTitle}>{editingPartnerId ? 'Modifier le partenaire' : 'Nouveau partenaire du Top'}</Text>
                 </View>
-                <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 16 }}>
-                  Les partenaires apparaîtront dans le carrousel Top 1..10 de la page d'accueil classés par rang et prix payé.
+                <Text style={{ fontSize: 13, color: Brand.inkSoft, marginBottom: 16 }}>
+                  Les partenaires actifs apparaissent dans le Top de la page d'accueil, dans l'ordre du rang. Changer le rang décale les autres partenaires automatiquement.
                 </Text>
 
                 {/* ── Sélecteur d'adresse existante avec moteur de recherche ── */}
@@ -1417,7 +1525,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                     style={{
                       flex: 1,
                       fontSize: 14,
-                      color: partnerFormSpotId ? '#1E293B' : '#94A3B8',
+                      color: partnerFormSpotId ? Brand.ink : Brand.inkMute,
                       fontWeight: partnerFormSpotId ? '700' : '400',
                     }}
                     numberOfLines={1}
@@ -1437,10 +1545,10 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                           setPartnerAddressSearch('');
                         }}
                       >
-                        <X size={14} color="#94A3B8" />
+                        <X size={14} color={Brand.inkMute} />
                       </Pressable>
                     )}
-                    <MapPin size={16} color="#C52824" />
+                    <MapPin size={16} color={Brand.primaryDeep} />
                   </View>
                 </Pressable>
 
@@ -1448,9 +1556,9 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                   <View
                     style={{
                       borderWidth: 2,
-                      borderColor: '#1E293B',
+                      borderColor: Brand.ink,
                       borderRadius: 12,
-                      backgroundColor: '#FAF5EF',
+                      backgroundColor: Brand.bg,
                       marginTop: 4,
                       overflow: 'hidden',
                       shadowColor: '#000',
@@ -1467,24 +1575,24 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                         flexDirection: 'row',
                         alignItems: 'center',
                         borderBottomWidth: 2,
-                        borderBottomColor: '#1E293B',
+                        borderBottomColor: Brand.ink,
                         paddingHorizontal: 12,
                         paddingVertical: 8,
-                        backgroundColor: '#FFFFFF',
+                        backgroundColor: Brand.white,
                         gap: 8,
                       }}
                     >
-                      <Search size={16} color="#C52824" />
+                      <Search size={16} color={Brand.primaryDeep} />
                       <TextInput
                         autoFocus
                         placeholder={`Rechercher parmi ${spots.length} adresses…`}
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={Brand.inkSoft}
                         value={partnerAddressSearch}
                         onChangeText={setPartnerAddressSearch}
                         style={{
                           flex: 1,
                           fontSize: 14,
-                          color: '#1E293B',
+                          color: Brand.ink,
                           fontWeight: '600',
                           height: 36,
                         }}
@@ -1493,7 +1601,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                       />
                       {partnerAddressSearch.length > 0 && (
                         <Pressable hitSlop={8} onPress={() => setPartnerAddressSearch('')}>
-                          <X size={13} color="#94A3B8" />
+                          <X size={13} color={Brand.inkMute} />
                         </Pressable>
                       )}
                     </View>
@@ -1540,7 +1648,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                                 paddingHorizontal: 14,
                                 backgroundColor: isSelected ? '#FFF0F0' : 'transparent',
                                 borderBottomWidth: 1,
-                                borderBottomColor: '#F1F5F9',
+                                borderBottomColor: '#F5F0F2',
                                 gap: 10,
                               }}
                             >
@@ -1553,7 +1661,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                                     height: 36,
                                     borderRadius: 8,
                                     borderWidth: 1.5,
-                                    borderColor: isSelected ? '#C52824' : '#E2E8F0',
+                                    borderColor: isSelected ? Brand.primary : Brand.line,
                                   }}
                                 />
                               ) : (
@@ -1562,12 +1670,12 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                                     width: 36,
                                     height: 36,
                                     borderRadius: 8,
-                                    backgroundColor: '#F1F5F9',
+                                    backgroundColor: '#F5F0F2',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                   }}
                                 >
-                                  <MapPin size={14} color="#94A3B8" />
+                                  <MapPin size={14} color={Brand.inkMute} />
                                 </View>
                               )}
                               <View style={{ flex: 1 }}>
@@ -1575,7 +1683,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                                   style={{
                                     fontSize: 13,
                                     fontWeight: '800',
-                                    color: isSelected ? '#C52824' : '#1E293B',
+                                    color: isSelected ? Brand.primary : Brand.ink,
                                   }}
                                   numberOfLines={1}
                                 >
@@ -1584,8 +1692,8 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                                 {(s.address || s.location) && (
                                   <Text
                                     style={{
-                                      fontSize: 11,
-                                      color: '#64748B',
+                                      fontSize: 12,
+                                      color: Brand.inkSoft,
                                       fontWeight: '500',
                                       marginTop: 1,
                                     }}
@@ -1596,7 +1704,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                                 )}
                               </View>
                               {isSelected && (
-                                <CheckCircle size={18} color="#C52824" />
+                                <CheckCircle size={18} color={Brand.primaryDeep} />
                               )}
                             </Pressable>
                           );
@@ -1610,7 +1718,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                         );
                       }).length === 0 && (
                         <View style={{ padding: 20, alignItems: 'center' }}>
-                          <Text style={{ color: '#94A3B8', fontSize: 13, fontWeight: '600' }}>
+                          <Text style={{ color: Brand.inkSoft, fontSize: 13, fontWeight: '600' }}>
                             Aucune adresse trouvée pour "{partnerAddressSearch}"
                           </Text>
                         </View>
@@ -1629,13 +1737,13 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                       marginBottom: 2,
                       backgroundColor: '#F0FDF4',
                       borderWidth: 1.5,
-                      borderColor: '#10B981',
+                      borderColor: '#1FA67A',
                       borderRadius: 8,
                       paddingHorizontal: 10,
                       paddingVertical: 6,
                     }}
                   >
-                    <CheckCircle size={14} color="#10B981" />
+                    <CheckCircle size={14} color="#1FA67A" />
                     <Text style={{ fontSize: 12, color: '#065F46', fontWeight: '700', flex: 1 }} numberOfLines={1}>
                       Lié à : {partnerFormSpotName}
                     </Text>
@@ -1645,16 +1753,16 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                 <Text style={[styles.inputLabel, { marginTop: 14 }]}>Nom du partenaire / commerce *</Text>
                 <TextInput
                   placeholder="Ex: Le Bibent, Brasserie Flo…"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={Brand.inkSoft}
                   value={partnerFormTitle}
                   onChangeText={setPartnerFormTitle}
                   style={styles.input}
                 />
 
-                <Text style={styles.inputLabel}>Sous-titre / Offre exclusive</Text>
+                <Text style={styles.inputLabel}>Description affichée aux utilisateurs (facultatif)</Text>
                 <TextInput
-                  placeholder="Ex: 1 Coupe de champagne offerte pour tout repas..."
-                  placeholderTextColor="#94A3B8"
+                  placeholder="Ex: Brasserie historique, place du Capitole"
+                  placeholderTextColor={Brand.inkSoft}
                   value={partnerFormSubtitle}
                   onChangeText={setPartnerFormSubtitle}
                   style={styles.input}
@@ -1663,7 +1771,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                 <Text style={styles.inputLabel}>URL de l'image de couverture (HD)</Text>
                 <TextInput
                   placeholder="https://..."
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={Brand.inkSoft}
                   value={partnerFormImage}
                   onChangeText={setPartnerFormImage}
                   style={styles.input}
@@ -1675,18 +1783,18 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                     <TextInput
                       placeholder="1"
                       keyboardType="numeric"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={Brand.inkSoft}
                       value={partnerFormRank}
                       onChangeText={setPartnerFormRank}
                       style={styles.input}
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Montant payé (€)</Text>
+                    <Text style={styles.inputLabel}>Montant payé (€) · interne, jamais affiché</Text>
                     <TextInput
                       placeholder="150"
                       keyboardType="numeric"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={Brand.inkSoft}
                       value={partnerFormPrice}
                       onChangeText={setPartnerFormPrice}
                       style={styles.input}
@@ -1700,7 +1808,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                     <TextInput
                       placeholder="30"
                       keyboardType="numeric"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={Brand.inkSoft}
                       value={partnerFormDays}
                       onChangeText={setPartnerFormDays}
                       style={styles.input}
@@ -1711,7 +1819,7 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                     <TextInput
                       placeholder="24"
                       keyboardType="numeric"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={Brand.inkSoft}
                       value={partnerFormNotifyHours}
                       onChangeText={setPartnerFormNotifyHours}
                       style={styles.input}
@@ -1729,9 +1837,14 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                   onPress={handleSavePartner}
                 >
                   <Text style={styles.saveSubmitBtnText}>
-                    {isSubmittingPartner ? 'Enregistrement...' : 'Classer et mettre en avant'}
+                    {isSubmittingPartner ? 'Enregistrement...' : editingPartnerId ? 'Enregistrer les modifications' : 'Ajouter au Top'}
                   </Text>
                 </Pressable>
+                {editingPartnerId && (
+                  <Pressable style={[styles.partnerCancelEdit]} onPress={resetPartnerForm}>
+                    <Text style={styles.partnerCancelEditText}>Annuler la modification</Text>
+                  </Pressable>
+                )}
               </View>
 
               {/* Partners List */}
@@ -1740,7 +1853,12 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                   Classement Actif des Partenaires ({partners.length})
                 </Text>
 
-                {partners.map((p, idx) => (
+                {partners.length === 0 && (
+                  <Text style={{ fontSize: 14, color: Brand.inkSoft, textAlign: 'center', paddingVertical: 24 }}>
+                    Aucun partenaire dans le Top pour le moment.
+                  </Text>
+                )}
+                {sortedPartners().map((p, idx, arr) => (
                   <View key={p.id || idx} style={styles.partnerAdminCard}>
                     <View style={styles.partnerRankBadge}>
                       <Text style={styles.partnerRankText}>#{p.rank_position || idx + 1}</Text>
@@ -1755,10 +1873,43 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
                       style={[styles.partnerStatusPill, p.is_active ? styles.partnerActivePill : styles.partnerInactivePill]}
                       onPress={() => handleTogglePartnerActive(p)}
                     >
-                      <Text style={[styles.partnerStatusText, { color: p.is_active ? '#065F46' : '#EF4444' }]}>
+                      <Text style={[styles.partnerStatusText, { color: p.is_active ? '#065F46' : Brand.primary }]}>
                         {p.is_active ? 'Actif' : 'Inactif'}
                       </Text>
                     </Pressable>
+
+                    <View style={styles.partnerActions}>
+                      <Pressable
+                        style={[styles.partnerActionBtn, idx === 0 && styles.partnerActionBtnDisabled]}
+                        disabled={idx === 0}
+                        onPress={() => handleMovePartner(p, -1)}
+                        accessibilityLabel="Monter dans le classement"
+                      >
+                        <ArrowUp size={16} color={Brand.ink} strokeWidth={2} />
+                      </Pressable>
+                      <Pressable
+                        style={[styles.partnerActionBtn, idx === arr.length - 1 && styles.partnerActionBtnDisabled]}
+                        disabled={idx === arr.length - 1}
+                        onPress={() => handleMovePartner(p, 1)}
+                        accessibilityLabel="Descendre dans le classement"
+                      >
+                        <ArrowDown size={16} color={Brand.ink} strokeWidth={2} />
+                      </Pressable>
+                      <Pressable
+                        style={styles.partnerActionBtn}
+                        onPress={() => handleOpenEditPartner(p)}
+                        accessibilityLabel="Modifier le partenaire"
+                      >
+                        <Edit3 size={16} color={Brand.ink} strokeWidth={2} />
+                      </Pressable>
+                      <Pressable
+                        style={[styles.partnerActionBtn, styles.partnerActionBtnDanger]}
+                        onPress={() => setDeleteConfirmModal({ visible: true, type: 'partner', id: p.id, name: p.title })}
+                        accessibilityLabel="Retirer le partenaire"
+                      >
+                        <Trash2 size={16} color={Brand.primaryDeep} strokeWidth={2} />
+                      </Pressable>
+                    </View>
                   </View>
                 ))}
               </View>
@@ -1774,12 +1925,12 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
             <View style={styles.confirmBackdrop}>
               <View style={styles.confirmBox}>
                 <View style={styles.confirmHeader}>
-                  <AlertTriangle size={32} color="#C52824" />
+                  <AlertTriangle size={32} color={Brand.primaryDeep} />
                   <Text style={styles.confirmTitle}>Confirmation de suppression</Text>
                 </View>
                 <Text style={styles.confirmMessage}>
                   Voulez-vous vraiment supprimer définitivement{'\n'}
-                  <Text style={{ fontWeight: '900', color: '#C52824' }}>"{deleteConfirmModal.name}"</Text> ?{'\n\n'}
+                  <Text style={{ fontWeight: '800', color: Brand.primaryDeep }}>"{deleteConfirmModal.name}"</Text> ?{'\n\n'}
                   Cette action est irréversible.
                 </Text>
                 <View style={styles.confirmActions}>
@@ -1800,9 +1951,42 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
 }
 
 const styles = StyleSheet.create({
+  partnerActions: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3E7DB',
+  },
+  partnerActionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#F5F0F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  partnerActionBtnDisabled: {
+    opacity: 0.35,
+  },
+  partnerActionBtnDanger: {
+    backgroundColor: Brand.primarySoft,
+  },
+  partnerCancelEdit: {
+    alignSelf: 'center',
+    paddingVertical: 12,
+  },
+  partnerCancelEditText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Brand.inkSoft,
+  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
   },
   adminHeader: {
     flexDirection: 'row',
@@ -1812,22 +1996,22 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0, 0, 0, 0.06)',
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontWeight: '800',
+    color: Brand.ink,
     letterSpacing: -0.3,
   },
   iconBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
@@ -1837,7 +2021,7 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   tabBar: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0, 0, 0, 0.06)',
     maxHeight: 56,
@@ -1851,14 +2035,14 @@ const styles = StyleSheet.create({
   tabBtn: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    backgroundColor: Brand.bg,
     flexDirection: 'row',
     alignItems: 'center',
   },
   tabBtnActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#0F172A',
+    backgroundColor: Brand.white,
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
@@ -1867,10 +2051,10 @@ const styles = StyleSheet.create({
   tabBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748B',
+    color: Brand.inkSoft,
   },
   tabBtnTextActive: {
-    color: '#C52824',
+    color: Brand.primaryDeep,
     fontWeight: '800',
   },
   searchSection: {
@@ -1880,11 +2064,11 @@ const styles = StyleSheet.create({
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: Brand.white,
+    borderRadius: 20,
     paddingHorizontal: 14,
     height: 46,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -1894,7 +2078,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
-    color: '#1E293B',
+    color: Brand.ink,
     ...Platform.select({
       web: {
         outlineStyle: 'none',
@@ -1908,28 +2092,28 @@ const styles = StyleSheet.create({
   catPill: {
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#0F172A',
+    borderRadius: 24,
+    backgroundColor: Brand.white,
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 1,
   },
   catPillActive: {
-    backgroundColor: '#C52824',
-    shadowColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
+    shadowColor: Brand.ink,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.14,
     shadowRadius: 6,
   },
   catPillText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748B',
+    color: Brand.inkSoft,
   },
   catPillTextActive: {
-    color: '#FFFFFF',
+    color: Brand.white,
   },
   listHeaderRow: {
     flexDirection: 'row',
@@ -1939,18 +2123,18 @@ const styles = StyleSheet.create({
   },
   listHeaderCount: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#64748B',
+    fontWeight: '700',
+    color: Brand.inkSoft,
   },
   addInlineBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#10B981',
-    borderRadius: 10,
+    backgroundColor: '#1FA67A',
+    borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    shadowColor: '#10B981',
+    shadowColor: '#1FA67A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -1958,17 +2142,17 @@ const styles = StyleSheet.create({
   },
   addInlineBtnText: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: Brand.white,
   },
   spotCard: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: Brand.white,
+    borderRadius: 20,
     padding: 12,
     gap: 12,
     alignItems: 'center',
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 12,
@@ -1977,8 +2161,8 @@ const styles = StyleSheet.create({
   spotCardImage: {
     width: 64,
     height: 64,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    borderRadius: 20,
+    backgroundColor: '#F5F0F2',
   },
   spotCardBody: {
     flex: 1,
@@ -1986,13 +2170,13 @@ const styles = StyleSheet.create({
   },
   spotCardTitle: {
     fontSize: 14,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: Brand.ink,
   },
   spotCardAddress: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#64748B',
+    color: Brand.inkSoft,
   },
   spotCardBadgeRow: {
     flexDirection: 'row',
@@ -2001,19 +2185,19 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   miniBadge: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F5F0F2',
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
   miniBadgeText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#475569',
+    color: '#4A4A58',
   },
   spotCardRating: {
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#D97706',
   },
   spotCardActions: {
@@ -2023,25 +2207,25 @@ const styles = StyleSheet.create({
   actionBtnEdit: {
     width: 34,
     height: 34,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    backgroundColor: '#F5F0F2',
     justifyContent: 'center',
     alignItems: 'center',
   },
   actionBtnDelete: {
     width: 34,
     height: 34,
-    borderRadius: 8,
-    backgroundColor: '#FEE2E2',
+    borderRadius: 12,
+    backgroundColor: Brand.primarySoft,
     justifyContent: 'center',
     alignItems: 'center',
   },
   formContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: Brand.white,
+    borderRadius: 20,
     padding: 18,
     gap: 12,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.06,
     shadowRadius: 16,
@@ -2049,26 +2233,26 @@ const styles = StyleSheet.create({
   },
   formSectionTitle: {
     fontSize: 16,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontWeight: '800',
+    color: Brand.ink,
     marginBottom: 4,
   },
   inputLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#475569',
+    color: '#4A4A58',
     marginTop: 4,
   },
   input: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Brand.bg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
+    borderColor: Brand.line,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 13,
     fontWeight: '600',
-    color: '#1E293B',
+    color: Brand.ink,
     ...Platform.select({
       web: {
         outlineStyle: 'none',
@@ -2083,14 +2267,14 @@ const styles = StyleSheet.create({
   coverPreview: {
     width: 72,
     height: 72,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    borderRadius: 20,
+    backgroundColor: '#F5F0F2',
   },
   coverPlaceholder: {
     width: 72,
     height: 72,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    borderRadius: 20,
+    backgroundColor: '#F5F0F2',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 4,
@@ -2099,27 +2283,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#C52824',
-    borderRadius: 10,
+    backgroundColor: Brand.primaryDeep,
+    borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    shadowColor: '#C52824',
+    shadowColor: Brand.ink,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.14,
     shadowRadius: 6,
     elevation: 2,
   },
   uploadBtnText: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: Brand.white,
   },
   geocodeBtn: {
-    backgroundColor: '#3B82F6',
-    borderRadius: 10,
+    backgroundColor: Brand.violet,
+    borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    shadowColor: '#3B82F6',
+    shadowColor: Brand.violet,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -2129,30 +2313,30 @@ const styles = StyleSheet.create({
   },
   geocodeBtnText: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: Brand.white,
   },
   galleryManagerSection: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    backgroundColor: Brand.bg,
+    borderRadius: 20,
     padding: 12,
     marginTop: 6,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Brand.line,
   },
   addPhotoSmallBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#10B981',
-    borderRadius: 8,
+    backgroundColor: '#1FA67A',
+    borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   addPhotoSmallBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    color: Brand.white,
   },
   galleryThumbWrapper: {
     position: 'relative',
@@ -2162,8 +2346,8 @@ const styles = StyleSheet.create({
   galleryThumb: {
     width: 60,
     height: 60,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    backgroundColor: '#F5F0F2',
   },
   deleteThumbBtn: {
     position: 'absolute',
@@ -2172,28 +2356,28 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#FFFFFF',
+    borderColor: Brand.white,
   },
   saveSubmitBtn: {
-    backgroundColor: '#C52824',
-    borderRadius: 12,
+    backgroundColor: Brand.primaryDeep,
+    borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 10,
-    shadowColor: '#C52824',
+    shadowColor: Brand.ink,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.14,
     shadowRadius: 8,
     elevation: 3,
   },
   saveSubmitBtnText: {
     fontSize: 14,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: Brand.white,
   },
   eventTabRow: {
     flexDirection: 'row',
@@ -2203,15 +2387,15 @@ const styles = StyleSheet.create({
   eventTabPill: {
     flex: 1,
     paddingVertical: 9,
-    borderRadius: 10,
-    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    backgroundColor: Brand.bg,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
   },
   eventTabPillActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#0F172A',
+    backgroundColor: Brand.white,
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
@@ -2220,15 +2404,15 @@ const styles = StyleSheet.create({
   eventTabPillText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748B',
+    color: Brand.inkSoft,
   },
   eventTabPillTextActive: {
-    color: '#1E293B',
+    color: Brand.ink,
     fontWeight: '800',
   },
   confirmBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    backgroundColor: 'rgba(43, 29, 70, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -2240,13 +2424,13 @@ const styles = StyleSheet.create({
     }),
   },
   confirmBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    backgroundColor: Brand.white,
+    borderRadius: 24,
     padding: 24,
     width: '100%',
     maxWidth: 360,
     gap: 14,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.16,
     shadowRadius: 24,
@@ -2259,14 +2443,14 @@ const styles = StyleSheet.create({
   },
   confirmTitle: {
     fontSize: 16,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontWeight: '800',
+    color: Brand.ink,
     flex: 1,
   },
   confirmMessage: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#475569',
+    color: '#4A4A58',
     lineHeight: 20,
   },
   confirmActions: {
@@ -2276,41 +2460,41 @@ const styles = StyleSheet.create({
   },
   cancelBtn: {
     flex: 1,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 10,
+    backgroundColor: '#F5F0F2',
+    borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
   },
   cancelBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#475569',
+    color: '#4A4A58',
   },
   deleteBtn: {
     flex: 1,
-    backgroundColor: '#C52824',
-    borderRadius: 10,
+    backgroundColor: Brand.primaryDeep,
+    borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
-    shadowColor: '#C52824',
+    shadowColor: Brand.ink,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.14,
     shadowRadius: 6,
     elevation: 2,
   },
   deleteBtnText: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: Brand.white,
   },
   catAdminCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    backgroundColor: Brand.white,
+    borderRadius: 18,
     padding: 14,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -2325,64 +2509,64 @@ const styles = StyleSheet.create({
   },
   catAdminTitle: {
     fontSize: 14,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: Brand.ink,
   },
   catAdminSub: {
-    fontSize: 11,
-    color: '#64748B',
+    fontSize: 12,
+    color: Brand.inkSoft,
     fontWeight: '600',
   },
   toggleSwitchBtn: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Brand.bg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
+    borderColor: Brand.line,
+    borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   toggleSwitchBtnActive: {
-    backgroundColor: '#E5A93B',
-    borderColor: '#E5A93B',
+    backgroundColor: Brand.chouchou,
+    borderColor: Brand.chouchou,
   },
   toggleSwitchBtnActiveNew: {
-    backgroundColor: '#C52824',
-    borderColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
+    borderColor: Brand.primary,
   },
   toggleSwitchText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontSize: 12,
+    fontWeight: '700',
+    color: Brand.ink,
     textAlign: 'center',
   },
   toggleSwitchTextActive: {
-    color: '#FFFFFF',
+    color: Brand.white,
   },
   editActionBtn: {
     width: 34,
     height: 34,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    backgroundColor: '#F5F0F2',
     justifyContent: 'center',
     alignItems: 'center',
   },
   deleteActionBtn: {
     width: 34,
     height: 34,
-    borderRadius: 8,
-    backgroundColor: '#FEE2E2',
+    borderRadius: 12,
+    backgroundColor: Brand.primarySoft,
     justifyContent: 'center',
     alignItems: 'center',
   },
 
   formCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: Brand.white,
+    borderRadius: 20,
     padding: 18,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 16,
@@ -2391,54 +2575,55 @@ const styles = StyleSheet.create({
   },
   sectionHeaderTitle: {
     fontSize: 16,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontWeight: '800',
+    color: Brand.ink,
   },
 
   // ── PARTNERS STYLES ──
   partnerAdminCard: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    backgroundColor: Brand.white,
+    borderRadius: 18,
     padding: 12,
     marginBottom: 10,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
   },
   partnerRankBadge: {
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
     marginRight: 6,
   },
   partnerRankText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
+    color: Brand.white,
+    fontWeight: '700',
     fontSize: 12,
   },
   partnerThumb: {
     width: 52,
     height: 52,
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    backgroundColor: '#F5F0F2',
   },
   partnerTitle: {
     fontSize: 14,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: Brand.ink,
   },
   partnerSub: {
-    fontSize: 11,
-    color: '#64748B',
+    fontSize: 12,
+    color: Brand.inkSoft,
     fontWeight: '600',
   },
   partnerMeta: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#D97706',
     fontWeight: '700',
     marginTop: 2,
@@ -2446,16 +2631,16 @@ const styles = StyleSheet.create({
   partnerStatusPill: {
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   partnerActivePill: {
     backgroundColor: '#D1FAE5',
   },
   partnerInactivePill: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: Brand.primarySoft,
   },
   partnerStatusText: {
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

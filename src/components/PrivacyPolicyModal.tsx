@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { X, ShieldCheck, Lock, MapPin, Trash2, Mail } from 'lucide-react-native';
 
+import { Brand } from '../constants/brand';
 interface PrivacyPolicyModalProps {
   visible: boolean;
   onClose: () => void;
@@ -30,7 +31,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
             {/* Header */}
             <View style={styles.header}>
               <View style={styles.headerTitleRow}>
-                <ShieldCheck size={22} color="#C52824" />
+                <ShieldCheck size={22} color={Brand.primaryDeep} />
                 <Text style={styles.headerTitle}>Politique de Confidentialité</Text>
               </View>
               <Pressable
@@ -39,7 +40,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
                 hitSlop={10}
                 accessibilityLabel="Fermer"
               >
-                <X size={20} color="#64748B" />
+                <X size={20} color={Brand.inkSoft} />
               </Pressable>
             </View>
 
@@ -58,7 +59,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
               {/* Section 1 */}
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
-                  <Lock size={18} color="#0F172A" />
+                  <Lock size={18} color="#24242E" />
                   <Text style={styles.sectionTitle}>1. Respect total de votre anonymat</Text>
                 </View>
                 <Text style={styles.paragraph}>
@@ -75,7 +76,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
               {/* Section 2 */}
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
-                  <MapPin size={18} color="#0F172A" />
+                  <MapPin size={18} color="#24242E" />
                   <Text style={styles.sectionTitle}>2. Géolocalisation & Respect de la vie privée</Text>
                 </View>
                 <Text style={styles.paragraph}>
@@ -89,7 +90,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
               {/* Section 3 */}
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
-                  <ShieldCheck size={18} color="#0F172A" />
+                  <ShieldCheck size={18} color="#24242E" />
                   <Text style={styles.sectionTitle}>3. Absence d'accès aux capteurs sensibles</Text>
                 </View>
                 <Text style={styles.paragraph}>
@@ -100,7 +101,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
               {/* Section 4 */}
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
-                  <Lock size={18} color="#0F172A" />
+                  <Lock size={18} color="#24242E" />
                   <Text style={styles.sectionTitle}>4. Hébergement & Sécurité des flux</Text>
                 </View>
                 <Text style={styles.paragraph}>
@@ -117,7 +118,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
               {/* Section 5 */}
               <View style={[styles.section, { marginBottom: 30 }]}>
                 <View style={styles.sectionHeaderRow}>
-                  <Trash2 size={18} color="#0F172A" />
+                  <Trash2 size={18} color="#24242E" />
                   <Text style={styles.sectionTitle}>5. Droits RGPD & Réinitialisation</Text>
                 </View>
                 <Text style={styles.paragraph}>
@@ -152,7 +153,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: 'rgba(43, 29, 70, 0.65)',
     justifyContent: 'flex-end',
   },
   safeContainer: {
@@ -160,7 +161,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     maxHeight: '90%',
@@ -175,7 +176,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 18,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: '#F5F0F2',
   },
   headerTitleRow: {
     flexDirection: 'row',
@@ -183,15 +184,15 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#24242E',
   },
   closeBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F5F0F2',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -204,19 +205,19 @@ const styles = StyleSheet.create({
   },
   lastUpdate: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: Brand.inkSoft,
     marginBottom: 12,
     fontWeight: '500',
   },
   introText: {
     fontSize: 14,
-    color: '#334155',
+    color: '#3A3A48',
     lineHeight: 22,
     marginBottom: 20,
   },
   boldText: {
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#24242E',
   },
   section: {
     marginBottom: 22,
@@ -228,54 +229,52 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#24242E',
   },
   paragraph: {
-    fontSize: 13.5,
-    color: '#475569',
+    fontSize: 13,
+    color: '#4A4A58',
     lineHeight: 21,
     marginBottom: 8,
   },
   bulletPoint: {
     fontSize: 13,
-    color: '#475569',
+    color: '#4A4A58',
     lineHeight: 20,
     marginLeft: 8,
     marginBottom: 6,
   },
   highlightBox: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: Brand.primarySoft,
     padding: 10,
-    borderRadius: 10,
-    borderLeftWidth: 3,
-    borderLeftColor: '#C52824',
+    borderRadius: 12,
     marginTop: 6,
   },
   contactEmail: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#C52824',
+    color: Brand.primaryDeep,
     marginVertical: 4,
   },
   footer: {
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    backgroundColor: '#FFFFFF',
+    borderTopColor: '#F5F0F2',
+    backgroundColor: Brand.white,
   },
   confirmBtn: {
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
     paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   confirmBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
+    color: Brand.white,
+    fontSize: 16,
     fontWeight: '700',
   },
 });

@@ -5,9 +5,11 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   Easing,
+  useReducedMotion,
 } from 'react-native-reanimated';
 import { Home, Search, Map, CreditCard, LucideIcon } from 'lucide-react-native';
 
+import { Brand } from '../constants/brand';
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export type TabType = 'home' | 'search' | 'map' | 'cards';
@@ -29,16 +31,17 @@ interface TabButtonProps {
 const APPLE_EASE = Easing.bezier(0.25, 0.1, 0.25, 1);
 
 function TabButton({ Icon, isActive, onPress, color, accessibilityLabel }: TabButtonProps) {
+  const reduceMotion = useReducedMotion();
   const scale = useSharedValue(1);
   const tileOpacity = useSharedValue(0);
 
   useEffect(() => {
     scale.value = withTiming(isActive ? 1.05 : 1, {
-      duration: 250,
+      duration: reduceMotion ? 0 : 250,
       easing: APPLE_EASE,
     });
     tileOpacity.value = withTiming(isActive ? 1 : 0, {
-      duration: 250,
+      duration: reduceMotion ? 0 : 250,
       easing: APPLE_EASE,
     });
   }, [isActive, scale, tileOpacity]);
@@ -53,11 +56,11 @@ function TabButton({ Icon, isActive, onPress, color, accessibilityLabel }: TabBu
   }));
 
   const handlePressIn = () => {
-    scale.value = withTiming(0.95, { duration: 100, easing: APPLE_EASE });
+    scale.value = withTiming(0.95, { duration: reduceMotion ? 0 : 100, easing: APPLE_EASE });
   };
 
   const handlePressOut = () => {
-    scale.value = withTiming(isActive ? 1.05 : 1, { duration: 150, easing: APPLE_EASE });
+    scale.value = withTiming(isActive ? 1.05 : 1, { duration: reduceMotion ? 0 : 150, easing: APPLE_EASE });
   };
 
   return (
@@ -73,6 +76,7 @@ function TabButton({ Icon, isActive, onPress, color, accessibilityLabel }: TabBu
 
       <Icon
         color={color}
+        fill={isActive ? 'rgba(232, 74, 95, 0.2)' : 'none'}
         size={22}
         strokeWidth={isActive ? 2.4 : 1.8}
         style={styles.iconStyle}
@@ -83,16 +87,17 @@ function TabButton({ Icon, isActive, onPress, color, accessibilityLabel }: TabBu
 }
 
 export default function FloatingDock({ activeTab, onChangeTab, visible = true }: FloatingDockProps) {
+  const reduceMotion = useReducedMotion();
   const translateY = useSharedValue(0);
   const opacity = useSharedValue(1);
 
   useEffect(() => {
     translateY.value = withTiming(visible ? 0 : 160, {
-      duration: 280,
+      duration: reduceMotion ? 0 : 280,
       easing: APPLE_EASE,
     });
     opacity.value = withTiming(visible ? 1 : 0, {
-      duration: 220,
+      duration: reduceMotion ? 0 : 220,
       easing: APPLE_EASE,
     });
   }, [visible]);
@@ -130,7 +135,7 @@ export default function FloatingDock({ activeTab, onChangeTab, visible = true }:
               Icon={tab.icon}
               isActive={isActive}
               onPress={() => onChangeTab(tab.type)}
-              color={isActive ? '#C52824' : '#64748B'}
+              color={isActive ? Brand.primary : Brand.inkSoft}
               accessibilityLabel={`tab-${tab.type}`}
             />
           );
@@ -154,13 +159,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     height: 64,
-    borderRadius: 20,
+    borderRadius: 28,
     width: '100%',
     maxWidth: 380,
     paddingHorizontal: 12,
     backgroundColor: Platform.OS === 'ios' ? 'rgba(255, 255, 255, 0.88)' : 'rgba(255, 255, 255, 0.96)',
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: Brand.line,
     position: 'relative',
     overflow: 'hidden',
     ...Platform.select({
@@ -169,12 +174,12 @@ const styles = StyleSheet.create({
         elevation: 6,
       },
       web: {
-        boxShadow: '0 8px 24px 0 rgba(15, 23, 42, 0.08)',
+        boxShadow: '0 8px 24px 0 rgba(43, 29, 70, 0.08)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
       } as any,
     }),
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.10,
     shadowRadius: 16,
@@ -190,10 +195,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 44,
     height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(197, 40, 36, 0.08)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(232, 74, 95, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(197, 40, 36, 0.15)',
+    borderColor: 'rgba(232, 74, 95, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: -1,
@@ -207,6 +212,6 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
   },
 });

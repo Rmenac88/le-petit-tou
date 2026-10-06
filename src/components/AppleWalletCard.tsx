@@ -8,6 +8,7 @@ import {
   Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
+import Stars from './Stars';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -26,6 +27,7 @@ import { getOrCreateDeviceId } from '../lib/deviceIdentity';
 import { authService } from '../lib/authService';
 import { discoveryStore } from '../lib/discoveryStore';
 
+import { Brand } from '../constants/brand';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = Math.min(SCREEN_WIDTH - 40, 360);
 // Format Apple Wallet / Carte bancaire ISO/IEC 7810 (ratio ~ 1.586 : 1)
@@ -41,7 +43,7 @@ const triggerHaptic = () => {
   } catch (e) {}
 };
 
-export type CardSkin = 'titanium' | 'crimson' | 'obsidian';
+export type CardSkin = 'sidereal' | 'titanium' | 'crimson' | 'obsidian';
 
 interface Props {
   activeSkin: CardSkin;
@@ -127,6 +129,14 @@ export default function AppleWalletCard({
       );
     }
 
+    if (activeSkin === 'sidereal') {
+      return (
+        <View style={[styles.cardCover, { backgroundColor: Brand.night }]}>
+          <Stars />
+        </View>
+      );
+    }
+
     if (activeSkin === 'titanium') {
       return (
         <Image
@@ -183,7 +193,7 @@ export default function AppleWalletCard({
 
           {/* Contactless waves icon */}
           <View style={styles.nfcWrap}>
-            <Wifi size={22} color="#E5A93B" style={{ transform: [{ rotate: '90deg' }] }} strokeWidth={2.4} />
+            <Wifi size={22} color={Brand.chouchou} style={{ transform: [{ rotate: '90deg' }] }} strokeWidth={2} />
           </View>
         </View>
 
@@ -198,7 +208,7 @@ export default function AppleWalletCard({
 
           {/* Hologram Badge */}
           <View style={styles.hologramBadge}>
-            <Sparkles size={11} color="#E5A93B" strokeWidth={2.5} style={{ marginRight: 4 }} />
+            <Sparkles size={11} color={Brand.chouchou} strokeWidth={2} style={{ marginRight: 4 }} />
             <Text style={styles.hologramText}>OFFICIEL 2026</Text>
           </View>
         </View>
@@ -248,7 +258,7 @@ export default function AppleWalletCard({
         {/* Pass Scan & Security Info */}
         <View style={styles.backContentRow}>
           <View style={styles.qrCodeBox}>
-            <QrCode size={52} color="#FFFFFF" strokeWidth={1.8} />
+            <QrCode size={52} color={Brand.white} strokeWidth={1.8} />
           </View>
 
           <View style={styles.backInfoTextWrap}>
@@ -257,7 +267,7 @@ export default function AppleWalletCard({
               Présentez cet écran chez les commerçants partenaires Le Petit Tou pour bénéficier de vos privilèges exclusifs.
             </Text>
             <View style={styles.secureSealRow}>
-              <ShieldCheck size={12} color="#10B981" strokeWidth={2.4} style={{ marginRight: 4 }} />
+              <ShieldCheck size={12} color="#1FA67A" strokeWidth={2} style={{ marginRight: 4 }} />
               <Text style={styles.secureSealText}>Certifié Le Petit Tou 2026</Text>
             </View>
           </View>
@@ -279,9 +289,10 @@ const styles = StyleSheet.create({
     height: CARD_HEIGHT,
     alignSelf: 'center',
     position: 'relative',
+    borderRadius: 22,
     ...Platform.select({
       ios: {
-        shadowColor: '#000000',
+        shadowColor: Brand.ink,
         shadowOffset: { width: 0, height: 16 },
         shadowOpacity: 0.28,
         shadowRadius: 26,
@@ -300,19 +311,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: 22,
+    borderRadius: 20,
     overflow: 'hidden',
     backfaceVisibility: 'hidden',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   frontFace: {
     padding: 20,
     justifyContent: 'space-between',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#24242E',
   },
   backFace: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#24242E',
     justifyContent: 'space-between',
     paddingBottom: 12,
   },
@@ -321,10 +332,10 @@ const styles = StyleSheet.create({
   },
   glassLayer: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    backgroundColor: 'rgba(43, 29, 70, 0.42)',
     borderWidth: 1,
-    borderColor: 'rgba(229, 169, 59, 0.25)',
-    borderRadius: 22,
+    borderColor: 'rgba(242, 184, 53, 0.25)',
+    borderRadius: 20,
   },
   backShadeLayer: {
     ...StyleSheet.absoluteFill,
@@ -337,7 +348,7 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: 'rgba(197, 40, 36, 0.35)',
+    backgroundColor: 'rgba(232, 74, 95, 0.35)',
   },
   obsidianGlowGold: {
     position: 'absolute',
@@ -346,7 +357,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: 'rgba(229, 169, 59, 0.25)',
+    backgroundColor: 'rgba(242, 184, 53, 0.25)',
   },
 
   // ─── Front Face Layout ───
@@ -360,18 +371,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   brandTitleGold: {
-    color: '#FAF5EF',
+    color: Brand.bg,
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '800',
     letterSpacing: 2.2,
     textShadowColor: 'rgba(0, 0, 0, 0.6)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
   brandSubtitle: {
-    color: '#E5A93B',
-    fontSize: 9,
-    fontWeight: '800',
+    color: Brand.chouchou,
+    fontSize: 12,
+    fontWeight: '700',
     letterSpacing: 1.2,
     marginTop: 2,
   },
@@ -433,14 +444,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.14)',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 14,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(229, 169, 59, 0.45)',
+    borderColor: 'rgba(242, 184, 53, 0.45)',
   },
   hologramText: {
-    color: '#FAF5EF',
-    fontSize: 9,
-    fontWeight: '800',
+    color: Brand.bg,
+    fontSize: 12,
+    fontWeight: '700',
     letterSpacing: 1,
   },
 
@@ -452,14 +463,14 @@ const styles = StyleSheet.create({
   },
   cardholderLabel: {
     color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 8,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.8,
   },
   cardholderName: {
-    color: '#FFFFFF',
+    color: Brand.white,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 1.2,
     marginTop: 1,
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
@@ -468,29 +479,29 @@ const styles = StyleSheet.create({
   },
   cardholderId: {
     color: 'rgba(255, 255, 255, 0.75)',
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     letterSpacing: 1,
     marginTop: 2,
   },
   pointsBadgeWrap: {
     alignItems: 'flex-end',
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    backgroundColor: 'rgba(43, 29, 70, 0.75)',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   pointsValueText: {
-    color: '#E5A93B',
+    color: Brand.chouchou,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
   pointsSubText: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.5,
     marginTop: 1,
@@ -517,31 +528,31 @@ const styles = StyleSheet.create({
   signatureStrip: {
     flex: 1,
     height: 24,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Brand.line,
     borderRadius: 4,
     justifyContent: 'center',
     paddingHorizontal: 8,
     overflow: 'hidden',
   },
   signaturePattern: {
-    color: '#94A3B8',
-    fontSize: 7,
+    color: Brand.inkSoft,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.5,
   },
   cvvBox: {
     width: 38,
     height: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     borderRadius: 4,
     marginLeft: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   cvvText: {
-    color: '#0F172A',
-    fontSize: 10,
-    fontWeight: '800',
+    color: '#24242E',
+    fontSize: 12,
+    fontWeight: '700',
     letterSpacing: 1,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
@@ -555,7 +566,7 @@ const styles = StyleSheet.create({
   qrCodeBox: {
     width: 60,
     height: 60,
-    borderRadius: 10,
+    borderRadius: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -567,14 +578,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backInfoTitle: {
-    color: '#FFFFFF',
+    color: Brand.white,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 0.4,
   },
   backInfoDesc: {
     color: 'rgba(255, 255, 255, 0.72)',
-    fontSize: 9,
+    fontSize: 12,
     lineHeight: 13,
     marginTop: 2,
   },
@@ -584,8 +595,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   secureSealText: {
-    color: '#10B981',
-    fontSize: 9,
+    color: '#1FA67A',
+    fontSize: 12,
     fontWeight: '700',
   },
   backFooterRow: {
@@ -596,7 +607,7 @@ const styles = StyleSheet.create({
   },
   backFooterHint: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
   },
 });

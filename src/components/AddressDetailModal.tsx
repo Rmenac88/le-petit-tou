@@ -26,10 +26,15 @@ import {
   Sparkles,
   MessageSquareQuote,
   CheckCircle,
+  Check,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react-native';
 import { getOptimizedImageUrl } from '../lib/imageOptimizer';
 import { discoveryStore } from '../lib/discoveryStore';
 
+import { formatRating } from '../lib/formatRating';
+import { Brand } from '../constants/brand';
 const { width, height } = Dimensions.get('window');
 
 export interface SpotDetail {
@@ -128,7 +133,7 @@ export default function AddressDetailModal({
 
   // Clean full review text
   const rawReviewText = spot.full_description || spot.description ||
-    "Une adresse incontournable sélectionnée avec soin par l'équipe du Petit Tou. Venez vivre une expérience authentique au cœur de Toulouse.";
+    "La critique de cette adresse arrive bientôt.";
   
   // Clean any trailing truncation dots if present
   const cleanedReviewText = rawReviewText.replace(/[\.…\s]+$/, '').trim();
@@ -192,14 +197,15 @@ export default function AddressDetailModal({
 
             {/* Top Action Buttons (Back & Favorite / Likes) */}
             <View style={styles.topActionsRow}>
-              <Pressable style={styles.iconCircleBtn} onPress={onClose}>
-                <ArrowLeft size={22} color="#1E293B" strokeWidth={2.5} />
+              <Pressable style={styles.iconCircleBtn} onPress={onClose} accessibilityLabel="Retour">
+                <ArrowLeft size={22} color={Brand.ink} strokeWidth={2} />
               </Pressable>
               <Pressable
                 style={[
                   styles.iconCircleBtn,
                   likesCount > 0 && styles.iconPillBtn,
                 ]}
+                accessibilityLabel={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
                 onPress={() => {
                   if (onToggleFavorite && spot.id) {
                     onToggleFavorite(spot.id);
@@ -210,9 +216,9 @@ export default function AddressDetailModal({
               >
                 <Heart
                   size={20}
-                  color={isFavorite ? '#C52824' : '#1E293B'}
-                  fill={isFavorite ? '#C52824' : 'transparent'}
-                  strokeWidth={2.5}
+                  color={isFavorite ? Brand.primary : Brand.ink}
+                  fill={isFavorite ? Brand.primary : 'transparent'}
+                  strokeWidth={2}
                 />
                 {likesCount > 0 && (
                   <Text style={[styles.likeCountTopText, isFavorite && styles.likeCountTopTextActive]}>
@@ -242,25 +248,210 @@ export default function AddressDetailModal({
             {/* Location & Rating */}
             <View style={styles.metaRow}>
               <View style={styles.ratingBox}>
-                <Star size={16} color="#E5A93B" fill="#E5A93B" />
-                <Text style={styles.ratingText}>{spot.rating ? spot.rating.toFixed(1) : '4.8'}</Text>
-                <Text style={styles.ratingCount}>(124 avis)</Text>
+                <Star size={16} color={Brand.chouchou} fill={Brand.chouchou} />
+                <Text style={styles.ratingText}>{formatRating(spot.rating)}</Text>
               </View>
               <Text style={styles.dotSeparator}>•</Text>
               <Text style={styles.locationSub}>{spot.location || 'Toulouse Centre'}</Text>
             </View>
 
-            {/* Address line */}
+            {/* Address line (masquée si on ne connaît que le nom) */}
+            {!!spot.address && spot.address !== 'Toulouse' && spot.address !== 'Toulouse Centre' && (
             <View style={styles.addressLineRow}>
-              <MapPin size={18} color="#C52824" style={{ marginRight: 6 }} />
+              <MapPin size={18} color={Brand.primaryDeep} style={{ marginRight: 6 }} />
               <Text style={styles.addressLineText}>
-                {spot.address && spot.address !== 'Toulouse' && spot.address !== 'Toulouse Centre'
-                  ? spot.address 
-                  : `${spot.title}, Toulouse`}
+                {spot.address}
               </Text>
             </View>
+            )}
 
-            {/* Action Buttons Row: Redirect to Map & Native Navigation */}
+            {/* L'avis du Petit Tou Card */}
+            <View style={styles.petitTouReviewCard}>
+              <View style={styles.petitTouReviewHeader}>
+                <Quote size={22} color={Brand.primary} fill={Brand.primary} style={{ marginRight: 8 }} />
+                <Text style={styles.petitTouReviewTitle}>La critique du Petit Tou</Text>
+              </View>
+              <Text style={styles.petitTouReviewText}>
+                {displayText}
+              </Text>
+
+              {isLongDescription && (
+                <Pressable
+                  style={styles.expandToggleBtn}
+                  onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                >
+                  <Text style={styles.expandToggleText}>
+                    {isDescriptionExpanded ? 'Voir moins' : 'Voir plus'}
+                  </Text>
+                  {isDescriptionExpanded ? (
+                    <ChevronUp size={16} color={Brand.primaryDeep} strokeWidth={2} />
+                  ) : (
+                    <ChevronDown size={16} color={Brand.primaryDeep} strokeWidth={2} />
+                  )}
+                </Pressable>
+              )}
+            </View>
+
+            {/* Discovery / Gamification Check-in Banner */}
+            <Pressable
+              style={[
+                styles.discoveryBanner,
+                isDiscovered && styles.discoveryBannerDiscovered,
+              ]}
+              onPress={handleDiscover}
+              disabled={isDiscovered || isDiscovering}
+            >
+              <View style={styles.discoveryIconCircle}>
+                {isDiscovered ? (
+                  <CheckCircle size={22} color="#1FA67A" strokeWidth={2} />
+                ) : (
+                  <Sparkles size={22} color={Brand.chouchou} strokeWidth={2} />
+                )}
+              </View>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.discoveryTitle}>
+                  {isDiscovered ? 'Adresse déjà découverte !' : 'Découvrir cette adresse'}
+                </Text>
+                <Text style={styles.discoverySubtitle}>
+                  {isDiscovered
+                    ? 'Cette pépite est comptabilisée dans votre collection d\'adresses.'
+                    : spot.is_recommended
+                    ? 'Coup de cœur du Petit Tou • +25 points'
+                    : 'Gagnez +10 points pour votre progression.'}
+                </Text>
+              </View>
+              <View style={[styles.discoveryPtsBadge, isDiscovered && styles.discoveryPtsBadgeDiscovered]}>
+                {isDiscovered && <Check size={14} color="#065F46" strokeWidth={2} />}
+                <Text style={[styles.discoveryPtsText, isDiscovered && styles.discoveryPtsTextDiscovered]}>
+                  {isDiscovered ? 'Validé' : spot.is_recommended ? '+25 pts' : '+10 pts'}
+                </Text>
+              </View>
+            </Pressable>
+
+            {/* Breadcrumb Category Chips */}
+            {spot.breadcrumbs && spot.breadcrumbs.length > 0 && (
+              <View style={styles.breadcrumbChipsRow}>
+                {spot.breadcrumbs.map((crumb, idx) => (
+                  <View key={idx} style={styles.crumbChip}>
+                    <Text style={styles.crumbChipText}>{crumb}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Feature Tags Badges */}
+            {spot.tags && spot.tags.length > 0 && (
+              <View style={styles.tagsSectionBox}>
+                <Text style={styles.sectionHeaderTitle}>Équipements & Services</Text>
+                <View style={styles.tagsWrapRow}>
+                  {spot.tags.map((tag, idx) => (
+                    <View key={idx} style={styles.featureTagBadge}>
+                      <Text style={styles.featureTagText}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Practical Info (Hours, Phone, Web) */}
+            <View style={styles.practicalInfoCard}>
+              <Text style={styles.sectionHeaderTitle}>Informations pratiques</Text>
+              
+              <View style={styles.infoRow}>
+                <Clock size={18} color={Brand.inkSoft} style={styles.infoIcon} />
+                <Text style={styles.infoText}>
+                  {spot.hours && spot.hours.trim() ? spot.hours : 'Horaires non communiqués'}
+                </Text>
+              </View>
+
+              {spot.phone ? (
+                <Pressable
+                  style={styles.infoRow}
+                  onPress={() => {
+                    const clean = spot.phone?.replace(/[^\d\+]/g, '');
+                    if (clean) Linking.openURL(`tel:${clean}`);
+                  }}
+                >
+                  <Phone size={18} color={Brand.primaryDeep} style={styles.infoIcon} />
+                  <Text style={[styles.infoText, { color: Brand.primaryDeep, fontWeight: '700' }]}>
+                    {spot.phone}
+                  </Text>
+                </Pressable>
+              ) : (
+                <View style={styles.infoRow}>
+                  <Phone size={18} color={Brand.inkSoft} style={styles.infoIcon} />
+                  <Text style={[styles.infoText, { color: Brand.inkSoft }]}>
+                    Téléphone non renseigné
+                  </Text>
+                </View>
+              )}
+
+              {spot.website ? (
+                <Pressable
+                  style={styles.infoRow}
+                  onPress={() => {
+                    let url = spot.website?.trim() || '';
+                    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                      url = 'https://' + url;
+                    }
+                    Linking.openURL(url).catch(() => {});
+                  }}
+                >
+                  <Globe size={18} color={Brand.primaryDeep} style={styles.infoIcon} />
+                  <Text
+                    style={[styles.infoText, { color: Brand.primaryDeep, fontWeight: '700' }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {spot.website.replace(/^https?:\/\//i, '')}
+                  </Text>
+                </Pressable>
+              ) : (
+                <View style={styles.infoRow}>
+                  <Globe size={18} color={Brand.inkSoft} style={styles.infoIcon} />
+                  <Text style={[styles.infoText, { color: Brand.inkSoft }]}>
+                    Site web non renseigné
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Reviews / Avis */}
+            <View style={styles.sectionBox}>
+              <View style={styles.reviewsHeaderRow}>
+                <Text style={styles.sectionHeaderTitle}>Avis & Retours</Text>
+              </View>
+
+              {spot.reviews && spot.reviews.length > 0 ? (
+                spot.reviews.map((rev) => (
+                  <View key={rev.id} style={styles.reviewCard}>
+                    <View style={styles.reviewHeader}>
+                      <Text style={styles.reviewAuthor}>{rev.author}</Text>
+                      <View style={styles.reviewStars}>
+                        <Star size={14} color={Brand.chouchou} fill={Brand.chouchou} />
+                        <Text style={styles.reviewRatingVal}>{rev.rating}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.reviewComment}>{rev.comment}</Text>
+                    <Text style={styles.reviewDate}>{rev.date}{rev.source ? ` • via ${rev.source}` : ''}</Text>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyReviewsCard}>
+                  <MessageSquareQuote size={32} color="#E3DCE0" style={{ marginBottom: 8 }} />
+                  <Text style={styles.emptyReviewsTitle}>Aucun avis pour l'instant</Text>
+                  <Text style={styles.emptyReviewsSub}>
+                    Soyez le premier à partager votre expérience dans cet établissement lors de votre visite !
+                  </Text>
+                </View>
+              )}
+            </View>
+
+          </View>
+        </ScrollView>
+
+        {/* Barre d'actions flottante (une main) */}
+        <View style={styles.floatingBar}>
             <View style={styles.ctaRow}>
               <Pressable
                 style={styles.primaryCtaBtn}
@@ -284,8 +475,8 @@ export default function AddressDetailModal({
                   });
                 }}
               >
-                <Navigation size={20} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 8 }} />
-                <Text style={styles.primaryCtaText}>Itinéraire (Maps)</Text>
+                <Navigation size={20} color={Brand.white} strokeWidth={2} style={{ marginRight: 8 }} />
+                <Text style={styles.primaryCtaText}>On y va !</Text>
               </Pressable>
 
               <Pressable
@@ -295,215 +486,50 @@ export default function AddressDetailModal({
                   onGoToMap(spot.id);
                 }}
               >
-                <MapPin size={20} color="#1E293B" strokeWidth={2.5} style={{ marginRight: 6 }} />
-                <Text style={styles.secondaryCtaText}>Carte in-app</Text>
+                <MapPin size={20} color={Brand.ink} strokeWidth={2} style={{ marginRight: 6 }} />
+                <Text style={styles.secondaryCtaText}>Sur la carte</Text>
               </Pressable>
             </View>
 
-            {/* Discovery / Gamification Check-in Banner */}
-            <Pressable
-              style={[
-                styles.discoveryBanner,
-                isDiscovered && styles.discoveryBannerDiscovered,
-              ]}
-              onPress={handleDiscover}
-              disabled={isDiscovered || isDiscovering}
-            >
-              <View style={styles.discoveryIconCircle}>
-                {isDiscovered ? (
-                  <CheckCircle size={22} color="#10B981" strokeWidth={2.5} />
-                ) : (
-                  <Sparkles size={22} color="#E5A93B" strokeWidth={2.5} />
-                )}
-              </View>
-              <View style={{ flex: 1, paddingRight: 8 }}>
-                <Text style={styles.discoveryTitle}>
-                  {isDiscovered ? 'Adresse déjà découverte !' : 'Découvrir cette adresse'}
-                </Text>
-                <Text style={styles.discoverySubtitle}>
-                  {isDiscovered
-                    ? 'Cette pépite est comptabilisée dans votre collection d\'adresses.'
-                    : spot.is_recommended
-                    ? 'Coup de cœur du Petit Tou • +25 points'
-                    : 'Gagnez +10 points pour votre progression.'}
-                </Text>
-              </View>
-              <View style={[styles.discoveryPtsBadge, isDiscovered && styles.discoveryPtsBadgeDiscovered]}>
-                <Text style={[styles.discoveryPtsText, isDiscovered && styles.discoveryPtsTextDiscovered]}>
-                  {isDiscovered ? '✓ Validé' : spot.is_recommended ? '+25 pts' : '+10 pts'}
-                </Text>
-              </View>
-            </Pressable>
-
-            {/* Breadcrumb Category Chips */}
-            {spot.breadcrumbs && spot.breadcrumbs.length > 0 && (
-              <View style={styles.breadcrumbChipsRow}>
-                {spot.breadcrumbs.map((crumb, idx) => (
-                  <View key={idx} style={styles.crumbChip}>
-                    <Text style={styles.crumbChipText}>{crumb}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* L'avis du Petit Tou Card */}
-            <View style={styles.petitTouReviewCard}>
-              <View style={styles.petitTouReviewHeader}>
-                <Quote size={20} color="#E5A93B" style={{ marginRight: 8 }} />
-                <Text style={styles.petitTouReviewTitle}>L'avis du Petit Tou</Text>
-              </View>
-              <Text style={styles.petitTouReviewText}>
-                {displayText}
-              </Text>
-
-              {isLongDescription && (
-                <Pressable
-                  style={styles.expandToggleBtn}
-                  onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                >
-                  <Text style={styles.expandToggleText}>
-                    {isDescriptionExpanded ? 'Voir moins ▲' : 'Voir plus ▼'}
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-
-            {/* Feature Tags Badges */}
-            {spot.tags && spot.tags.length > 0 && (
-              <View style={styles.tagsSectionBox}>
-                <Text style={styles.sectionHeaderTitle}>Équipements & Services</Text>
-                <View style={styles.tagsWrapRow}>
-                  {spot.tags.map((tag, idx) => (
-                    <View key={idx} style={styles.featureTagBadge}>
-                      <Text style={styles.featureTagText}>{tag}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Practical Info (Hours, Phone, Web) */}
-            <View style={styles.practicalInfoCard}>
-              <Text style={styles.sectionHeaderTitle}>Informations pratiques</Text>
-              
-              <View style={styles.infoRow}>
-                <Clock size={18} color="#64748B" style={styles.infoIcon} />
-                <Text style={styles.infoText}>
-                  {spot.hours && spot.hours.trim() ? spot.hours : 'Horaires non communiqués'}
-                </Text>
-              </View>
-
-              {spot.phone ? (
-                <Pressable
-                  style={styles.infoRow}
-                  onPress={() => {
-                    const clean = spot.phone?.replace(/[^\d\+]/g, '');
-                    if (clean) Linking.openURL(`tel:${clean}`);
-                  }}
-                >
-                  <Phone size={18} color="#C52824" style={styles.infoIcon} />
-                  <Text style={[styles.infoText, { color: '#C52824', fontWeight: '700' }]}>
-                    {spot.phone}
-                  </Text>
-                </Pressable>
-              ) : (
-                <View style={styles.infoRow}>
-                  <Phone size={18} color="#64748B" style={styles.infoIcon} />
-                  <Text style={[styles.infoText, { color: '#94A3B8' }]}>
-                    Téléphone non renseigné
-                  </Text>
-                </View>
-              )}
-
-              {spot.website ? (
-                <Pressable
-                  style={styles.infoRow}
-                  onPress={() => {
-                    let url = spot.website?.trim() || '';
-                    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                      url = 'https://' + url;
-                    }
-                    Linking.openURL(url).catch(() => {});
-                  }}
-                >
-                  <Globe size={18} color="#C52824" style={styles.infoIcon} />
-                  <Text
-                    style={[styles.infoText, { color: '#C52824', fontWeight: '700' }]}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {spot.website.replace(/^https?:\/\//i, '')}
-                  </Text>
-                </Pressable>
-              ) : (
-                <View style={styles.infoRow}>
-                  <Globe size={18} color="#64748B" style={styles.infoIcon} />
-                  <Text style={[styles.infoText, { color: '#94A3B8' }]}>
-                    Site web non renseigné
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Reviews / Avis */}
-            <View style={styles.sectionBox}>
-              <View style={styles.reviewsHeaderRow}>
-                <Text style={styles.sectionHeaderTitle}>Avis & Retours</Text>
-              </View>
-
-              {spot.reviews && spot.reviews.length > 0 ? (
-                spot.reviews.map((rev) => (
-                  <View key={rev.id} style={styles.reviewCard}>
-                    <View style={styles.reviewHeader}>
-                      <Text style={styles.reviewAuthor}>{rev.author}</Text>
-                      <View style={styles.reviewStars}>
-                        <Star size={14} color="#E5A93B" fill="#E5A93B" />
-                        <Text style={styles.reviewRatingVal}>{rev.rating}</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.reviewComment}>{rev.comment}</Text>
-                    <Text style={styles.reviewDate}>{rev.date}{rev.source ? ` • via ${rev.source}` : ''}</Text>
-                  </View>
-                ))
-              ) : (
-                <View style={styles.emptyReviewsCard}>
-                  <MessageSquareQuote size={32} color="#CBD5E1" style={{ marginBottom: 8 }} />
-                  <Text style={styles.emptyReviewsTitle}>Aucun avis pour l'instant</Text>
-                  <Text style={styles.emptyReviewsSub}>
-                    Soyez le premier à partager votre expérience dans cet établissement lors de votre visite !
-                  </Text>
-                </View>
-              )}
-            </View>
-
-          </View>
-        </ScrollView>
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  floatingBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 26,
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    borderTopWidth: 1,
+    borderTopColor: Brand.line,
+  },
   modalOverlay: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
     zIndex: 9999,
   },
   modalContainer: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 60,
+    paddingBottom: 130,
   },
   carouselContainer: {
     width: width,
     height: 300,
     position: 'relative',
-    backgroundColor: '#1E293B',
+    backgroundColor: Brand.ink,
   },
   carouselImage: {
     width: width,
@@ -525,7 +551,7 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
   },
   dotInactive: {
     width: 8,
@@ -548,7 +574,7 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 10,
@@ -564,17 +590,17 @@ const styles = StyleSheet.create({
   likeCountTopText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1E293B',
+    color: Brand.ink,
   },
   likeCountTopTextActive: {
-    color: '#C52824',
+    color: Brand.primaryDeep,
   },
   bodyContent: {
     padding: 24,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     marginTop: -20,
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
   },
   badgeRow: {
     flexDirection: 'row',
@@ -583,26 +609,25 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   categoryBadge: {
-    backgroundColor: 'rgba(197, 40, 36, 0.08)',
+    backgroundColor: 'rgba(232, 74, 95, 0.08)',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 28,
     borderWidth: 0,
   },
   categoryBadgeText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#C52824',
-    textTransform: 'uppercase',
+    color: Brand.primaryDeep,
     letterSpacing: 0.5,
   },
   budgetBadge: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 24,
     borderWidth: 0,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
@@ -610,18 +635,18 @@ const styles = StyleSheet.create({
   },
   budgetText: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: Brand.ink,
   },
   priceText: {
     fontSize: 16,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontWeight: '800',
+    color: Brand.ink,
   },
   titleText: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontSize: 28,
+    fontWeight: '800',
+    color: Brand.ink,
     marginBottom: 8,
     letterSpacing: -0.5,
   },
@@ -636,24 +661,24 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   ratingText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#1E293B',
+    color: Brand.ink,
   },
   ratingCount: {
     fontSize: 13,
-    color: '#64748B',
+    color: Brand.inkSoft,
     fontWeight: '500',
   },
   dotSeparator: {
     marginHorizontal: 8,
-    color: '#CBD5E1',
+    color: '#E3DCE0',
     fontWeight: 'bold',
   },
   locationSub: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748B',
+    color: Brand.inkSoft,
   },
   addressLineRow: {
     flexDirection: 'row',
@@ -661,53 +686,53 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   addressLineText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
+    color: Brand.ink,
     flex: 1,
   },
   ctaRow: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 0,
   },
   primaryCtaBtn: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#C52824',
-    borderRadius: 14,
+    backgroundColor: Brand.primaryDeep,
+    borderRadius: 20,
     height: 52,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 0,
-    shadowColor: '#C52824',
+    shadowColor: Brand.ink,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.14,
     shadowRadius: 10,
     elevation: 4,
   },
   secondaryCtaBtn: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    backgroundColor: Brand.white,
+    borderRadius: 20,
     height: 52,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 0,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
   },
   secondaryCtaText: {
-    color: '#1E293B',
-    fontSize: 15,
+    color: Brand.ink,
+    fontSize: 16,
     fontWeight: '800',
   },
   primaryCtaText: {
-    color: '#FFFFFF',
+    color: Brand.white,
     fontSize: 16,
     fontWeight: '800',
   },
@@ -715,27 +740,27 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   practicalInfoCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: Brand.white,
+    borderRadius: 20,
     padding: 18,
     marginBottom: 20,
     borderWidth: 0,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.07,
     shadowRadius: 16,
     elevation: 3,
   },
   sectionHeaderTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '800',
-    color: '#1E293B',
+    color: Brand.ink,
     marginBottom: 14,
   },
   descriptionText: {
-    fontSize: 15,
+    fontSize: 16,
     lineHeight: 24,
-    color: '#334155',
+    color: '#3A3A48',
     fontWeight: '600',
   },
   infoRow: {
@@ -749,7 +774,7 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1E293B',
+    color: Brand.ink,
   },
   reviewsHeaderRow: {
     flexDirection: 'row',
@@ -760,24 +785,24 @@ const styles = StyleSheet.create({
   googleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(229, 169, 59, 0.12)',
+    backgroundColor: 'rgba(242, 184, 53, 0.12)',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 0,
   },
   googleBadgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: '#D97706',
   },
   reviewCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: Brand.white,
+    borderRadius: 20,
     padding: 18,
     borderWidth: 0,
     marginBottom: 12,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.07,
     shadowRadius: 16,
@@ -790,9 +815,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   reviewAuthor: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#1E293B',
+    color: Brand.ink,
   },
   reviewStars: {
     flexDirection: 'row',
@@ -801,41 +826,41 @@ const styles = StyleSheet.create({
   },
   reviewRatingVal: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: Brand.ink,
   },
   reviewComment: {
     fontSize: 14,
-    color: '#475569',
+    color: '#4A4A58',
     lineHeight: 20,
     marginBottom: 8,
   },
   reviewDate: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: Brand.inkSoft,
     fontWeight: '600',
   },
   emptyReviewsCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: Brand.white,
+    borderRadius: 20,
     padding: 24,
     alignItems: 'center',
     borderWidth: 0,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 12,
     elevation: 2,
   },
   emptyReviewsTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#1E293B',
+    color: Brand.ink,
     marginBottom: 4,
   },
   emptyReviewsSub: {
     fontSize: 13,
-    color: '#64748B',
+    color: Brand.inkSoft,
     textAlign: 'center',
     lineHeight: 18,
   },
@@ -846,35 +871,28 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   crumbChip: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     borderWidth: 0,
-    borderRadius: 20,
+    borderRadius: 24,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 2,
   },
   crumbChipText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontSize: 12,
+    fontWeight: '700',
+    color: Brand.ink,
   },
   petitTouReviewCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.primarySoft,
     borderWidth: 0,
-    borderRadius: 16,
-    padding: 18,
+    borderRadius: 28,
+    padding: 20,
     marginBottom: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: '#E5A93B',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.07,
-    shadowRadius: 16,
-    elevation: 3,
   },
   petitTouReviewHeader: {
     flexDirection: 'row',
@@ -882,38 +900,41 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   petitTouReviewTitle: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#1E293B',
-    letterSpacing: 0.2,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#A82840',
   },
   petitTouReviewText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
-    color: '#334155',
-    lineHeight: 22,
+    color: Brand.ink,
+    lineHeight: 23,
   },
   expandToggleBtn: {
     alignSelf: 'flex-start',
     marginTop: 10,
-    backgroundColor: 'rgba(197, 40, 36, 0.08)',
+    backgroundColor: 'rgba(232, 74, 95, 0.08)',
     borderWidth: 0,
-    borderRadius: 20,
+    borderRadius: 28,
     paddingHorizontal: 14,
     paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minHeight: 44,
   },
   expandToggleText: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#C52824',
+    fontWeight: '700',
+    color: Brand.primaryDeep,
   },
   tagsSectionBox: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     borderWidth: 0,
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 18,
     marginBottom: 20,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.07,
     shadowRadius: 16,
@@ -926,78 +947,81 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   featureTagBadge: {
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
     borderWidth: 0,
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   featureTagText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontSize: 12,
+    fontWeight: '700',
+    color: Brand.ink,
   },
   discoveryBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FAF5EF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 14,
+    backgroundColor: Brand.bg,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    borderRadius: 18,
     padding: 12,
     marginBottom: 20,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
     elevation: 3,
     gap: 10,
   },
   discoveryBannerDiscovered: {
     backgroundColor: '#F0FDF4',
-    borderColor: '#10B981',
+    borderColor: '#1FA67A',
     shadowColor: '#059669',
   },
   discoveryIconCircle: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
+    backgroundColor: Brand.white,
+    borderWidth: 1,
+    borderColor: Brand.line,
     justifyContent: 'center',
     alignItems: 'center',
   },
   discoveryTitle: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: Brand.ink,
     marginBottom: 2,
   },
   discoverySubtitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#64748B',
+    color: Brand.inkSoft,
     lineHeight: 14,
   },
   discoveryPtsBadge: {
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
     paddingHorizontal: 8,
     paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   discoveryPtsBadgeDiscovered: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#1FA67A',
     borderColor: '#065F46',
   },
   discoveryPtsText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '900',
+    color: Brand.white,
+    fontSize: 12,
+    fontWeight: '700',
   },
   discoveryPtsTextDiscovered: {
-    color: '#FFFFFF',
+    color: Brand.white,
   },
 });

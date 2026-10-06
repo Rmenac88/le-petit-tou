@@ -117,7 +117,7 @@ def add_partner(title, subtitle, image_url, rank, price, days, notify_hours, spo
     
     payload = {
         "title": title,
-        "subtitle": subtitle or f"Offre exclusive membre Le Petit Tou - {price}€ offert",
+        "subtitle": subtitle or "",  # le montant payé reste interne, jamais affiché aux utilisateurs
         "image_url": image_url or "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800",
         "badge_text": badge or (f"TOP #{rank} PARTENAIRE" if rank <= 3 else "PARTENAIRE OFFICIEL"),
         "sponsorship_tier": "platinum" if rank == 1 else ("gold" if rank <= 3 else "silver"),

@@ -42,6 +42,7 @@ import { supabase } from '../../lib/supabase';
 import { appCache } from '../../lib/dataCache';
 import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
 import PlaceDetailSheet from '../PlaceDetailSheet';
+import { PLACEHOLDER_PHOTO } from '../../constants/placeholder';
 import { classifySpot, getBudgetInfo } from '../../lib/categoryResolver';
 import { placesRepository } from '../../lib/placesRepository';
 import {
@@ -51,6 +52,8 @@ import {
 } from '../../lib/likesStore';
 import { discoveryStore } from '../../lib/discoveryStore';
 
+import { formatRating } from '../../lib/formatRating';
+import { Brand } from '../../constants/brand';
 // Conditional dynamic imports to prevent native modules breaking the web bundle
 let NativeMapView: any = null;
 let NativeMarker: any = null;
@@ -89,14 +92,14 @@ const LEAN_MAP_MARKERS = PT_SPOTS.map((s: any) => ({
 
 // Beautiful custom stylized theme for Google Maps (Cream/Slate/Red palette)
 const customGoogleMapStyle = [
-  { elementType: "geometry", stylers: [{ color: "#FAF5EF" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#FAF5EF" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#1E293B" }] },
+  { elementType: "geometry", stylers: [{ color: Brand.bg }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: Brand.bg }] },
+  { elementType: "labels.text.fill", stylers: [{ color: Brand.ink }] },
   { featureType: "water", elementType: "geometry", stylers: [{ color: "#D1E2EC" }] },
-  { featureType: "road", elementType: "geometry.fill", stylers: [{ color: "#FFFFFF" }] },
-  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#E2E8F0" }] },
+  { featureType: "road", elementType: "geometry.fill", stylers: [{ color: Brand.white }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: Brand.line }] },
   { featureType: "poi", elementType: "geometry", stylers: [{ color: "#F1ECE4" }] },
-  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#FAF5EF" }] }
+  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: Brand.bg }] }
 ];
 
 // Safe Alert wrapper to prevent runtime crashes on web browser
@@ -120,13 +123,13 @@ const triggerHaptic = () => {
 
 export const getMarkerColor = (category: string) => {
   switch (category || 'food') {
-    case 'food': return '#C52824';     // Rouge
-    case 'drinks': return '#E5A93B';   // Or
-    case 'shopping': return '#3B82F6'; // Bleu
-    case 'beauty': return '#EC4899';   // Rose
-    case 'culture': return '#10B981';  // Vert
-    case 'sport': return '#6366F1';    // Violet/Indigo
-    default: return '#C52824';
+    case 'food': return Brand.primary;     // Rouge
+    case 'drinks': return Brand.chouchou;   // Or
+    case 'shopping': return Brand.violet; // Bleu
+    case 'beauty': return Brand.primary;   // Rose
+    case 'culture': return '#1FA67A';  // Vert
+    case 'sport': return Brand.violet;    // Violet/Indigo
+    default: return Brand.primary;
   }
 };
 
@@ -144,9 +147,9 @@ export const getCategoryLabel = (category: string) => {
 
 export const renderCategoryIcon = (category: string) => {
   const size = 11;
-  const color = "#FFFFFF";
+  const color = Brand.white;
   const IconComponent = getCategoryIcon(category, category);
-  return <IconComponent size={size} color={color} strokeWidth={2.4} />;
+  return <IconComponent size={size} color={color} strokeWidth={2} />;
 };
 
 export default function MapView({
@@ -235,9 +238,10 @@ export default function MapView({
 
   useEffect(() => {
     if (onToggleDock) {
-      onToggleDock(!filterSheetVisible && !showFullAddressModal);
+      // Le dock se cache aussi quand la fiche d'une adresse est ouverte (il masquait ses boutons)
+      onToggleDock(!filterSheetVisible && !showFullAddressModal && !selectedSpot);
     }
-  }, [filterSheetVisible, showFullAddressModal, onToggleDock]);
+  }, [filterSheetVisible, showFullAddressModal, selectedSpot, onToggleDock]);
   const slideAnim = useRef(new Animated.Value(300)).current;
   const filterAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
 
@@ -1058,7 +1062,7 @@ export default function MapView({
       <View style={styles.permissionContainer}>
         <View style={styles.permissionCard}>
           <View style={styles.permissionIconWrapper}>
-            <Compass size={40} color="#C52824" />
+            <Compass size={40} color={Brand.primaryDeep} />
           </View>
           <Text style={styles.permissionTitle}>Activer la carte ?</Text>
           <Text style={styles.permissionDesc}>
@@ -1066,7 +1070,7 @@ export default function MapView({
           </Text>
 
           {loading ? (
-            <ActivityIndicator size="small" color="#C52824" style={{ marginTop: 20 }} />
+            <ActivityIndicator size="small" color={Brand.primaryDeep} style={{ marginTop: 20 }} />
           ) : (
             <Pressable
               style={({ pressed }) => [
@@ -1168,12 +1172,12 @@ export default function MapView({
               <>
                 <NativePolyline
                   coordinates={activeRoute.routeCoordinates}
-                  strokeColor="#1E293B"
+                  strokeColor={Brand.ink}
                   strokeWidth={7}
                 />
                 <NativePolyline
                   coordinates={activeRoute.routeCoordinates}
-                  strokeColor="#C52824"
+                  strokeColor={Brand.primary}
                   strokeWidth={4.5}
                 />
               </>
@@ -1185,7 +1189,7 @@ export default function MapView({
       {/* Real Neo-Brutalist Search Bar with Live TextInput */}
       <View style={styles.searchBarContainer}>
         <View style={styles.searchIconBadge}>
-          <Search size={16} color="#FFFFFF" strokeWidth={2.6} />
+          <Search size={16} color={Brand.white} strokeWidth={2} />
         </View>
 
         <TextInput
@@ -1195,7 +1199,7 @@ export default function MapView({
               ? `Rechercher (${filteredSpots.length} adresses)...`
               : "Rechercher une adresse..."
           }
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={Brand.inkSoft}
           value={searchQuery}
           onChangeText={(text) => {
             setSearchQuery(text);
@@ -1216,7 +1220,7 @@ export default function MapView({
             }}
             accessibilityLabel="Effacer la recherche"
           >
-            <X size={15} color="#64748B" strokeWidth={2.5} />
+            <X size={15} color={Brand.inkSoft} strokeWidth={2} />
           </Pressable>
         )}
 
@@ -1234,8 +1238,8 @@ export default function MapView({
         >
           <SlidersHorizontal
             size={17}
-            color={filterSheetVisible ? '#C52824' : '#1E293B'}
-            strokeWidth={2.4}
+            color={filterSheetVisible ? Brand.primary : Brand.ink}
+            strokeWidth={2}
           />
         </Pressable>
       </View>
@@ -1275,7 +1279,7 @@ export default function MapView({
                   </Text>
                 </View>
                 <View style={styles.suggestionRating}>
-                  <Text style={styles.suggestionRatingText}>⭐ {spot.rating || '4.8'}</Text>
+                  <Text style={styles.suggestionRatingText}>{formatRating(spot.rating)}</Text>
                 </View>
               </Pressable>
             ))}
@@ -1309,7 +1313,7 @@ export default function MapView({
                 activeRoute.isFromUserLocation && styles.itineraryBadgeGps,
               ]}
             >
-              <Navigation size={16} color="#FFFFFF" strokeWidth={2.5} />
+              <Navigation size={16} color={Brand.white} strokeWidth={2} />
             </View>
             <View style={styles.itineraryTexts}>
               <View style={styles.itineraryHeaderLine}>
@@ -1325,13 +1329,13 @@ export default function MapView({
                   ]}
                 >
                   <Text style={styles.itineraryOriginBadgeText}>
-                    {activeRoute.isFromUserLocation ? '📍 GPS' : '🏛️ Capitole'}
+                    {activeRoute.isFromUserLocation ? 'GPS' : 'Capitole'}
                   </Text>
                 </View>
               </View>
               <Text style={styles.itineraryDestination} numberOfLines={1}>
                 {activeRoute.isFromUserLocation ? 'Depuis votre position vers ' : 'Vers '}
-                <Text style={{ color: '#FAF5EF', fontWeight: '800' }}>
+                <Text style={{ color: Brand.bg, fontWeight: '800' }}>
                   {activeRoute.spotName}
                 </Text>
               </Text>
@@ -1356,7 +1360,7 @@ export default function MapView({
               onPress={handleClearRoute}
               accessibilityLabel="Fermer l'itinéraire"
             >
-              <X size={16} color="#FFFFFF" strokeWidth={2.5} />
+              <X size={16} color={Brand.white} strokeWidth={2} />
             </Pressable>
           </View>
         </View>
@@ -1375,13 +1379,13 @@ export default function MapView({
           contentContainerStyle={styles.categoryScrollContent}
         >
           {[
-            { label: 'Tous (790)', value: null, icon: Compass, color: '#1E293B' },
-            { label: 'Restos (286)', value: 'food', icon: Utensils, color: '#C52824' },
-            { label: 'Shopping (231)', value: 'shopping', icon: ShoppingBag, color: '#3B82F6' },
-            { label: 'Bars & Cafés (141)', value: 'drinks', icon: Wine, color: '#E5A93B' },
-            { label: 'Beauté (71)', value: 'beauty', icon: Scissors, color: '#EC4899' },
-            { label: 'Culture (43)', value: 'culture', icon: Landmark, color: '#10B981' },
-            { label: 'Sport (17)', value: 'sport', icon: Dumbbell, color: '#6366F1' },
+            { label: 'Tous (790)', value: null, icon: Compass, color: Brand.ink },
+            { label: 'Restos (286)', value: 'food', icon: Utensils, color: Brand.primaryDeep },
+            { label: 'Shopping (231)', value: 'shopping', icon: ShoppingBag, color: Brand.violet },
+            { label: 'Bars & Cafés (141)', value: 'drinks', icon: Wine, color: Brand.chouchou },
+            { label: 'Beauté (71)', value: 'beauty', icon: Scissors, color: Brand.primary },
+            { label: 'Culture (43)', value: 'culture', icon: Landmark, color: '#1FA67A' },
+            { label: 'Sport (17)', value: 'sport', icon: Dumbbell, color: Brand.violet },
           ].map((catItem) => {
             const isSelected = category === catItem.value;
             const IconComp = catItem.icon;
@@ -1392,7 +1396,7 @@ export default function MapView({
                   styles.categoryPill,
                   isSelected && {
                     backgroundColor: catItem.color,
-                    borderColor: '#1E293B',
+                    borderColor: Brand.ink,
                   },
                 ]}
                 onPress={() => {
@@ -1400,7 +1404,7 @@ export default function MapView({
                   setCategory(isSelected ? null : catItem.value);
                 }}
               >
-                <IconComp size={14} color={isSelected ? '#FFFFFF' : catItem.color} strokeWidth={2.4} style={{ marginRight: 6 }} />
+                <IconComp size={14} color={isSelected ? Brand.white : catItem.color} strokeWidth={2} style={{ marginRight: 6 }} />
                 <Text
                   style={[
                     styles.categoryPillText,
@@ -1448,7 +1452,7 @@ export default function MapView({
             lng: selectedSpot.lng,
             rating: selectedSpot.rating || 4.8,
             price_level: selectedSpot.price_max ? `Jusqu'à ${selectedSpot.price_max}€` : '€€',
-            image_url: selectedSpot.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80',
+            image_url: selectedSpot.image_url || PLACEHOLDER_PHOTO,
             photos: selectedSpot.gallery_urls && selectedSpot.gallery_urls.length > 0 ? [selectedSpot.image_url, ...selectedSpot.gallery_urls] : (selectedSpot.image_url ? [selectedSpot.image_url] : []),
             phone: selectedSpot.telephone || selectedSpot.phone || '',
             website: selectedSpot.site_web || selectedSpot.website || '',
@@ -1498,7 +1502,7 @@ export default function MapView({
           onPress={handleResetToulouseView}
           accessibilityLabel="Vue d'ensemble Toulouse"
         >
-          <Compass size={22} color="#FFFFFF" strokeWidth={2.6} />
+          <Compass size={22} color={Brand.white} strokeWidth={2} />
         </Pressable>
 
         {/* Center on Me Button */}
@@ -1510,7 +1514,7 @@ export default function MapView({
           onPress={handleCenterOnMe}
           accessibilityLabel="Ma position"
         >
-          <Navigation size={20} color="#1E293B" strokeWidth={2.4} />
+          <Navigation size={20} color={Brand.ink} strokeWidth={2} />
         </Pressable>
       </View>
 
@@ -1525,7 +1529,7 @@ export default function MapView({
           <View {...filterPanResponder.panHandlers} style={styles.drawerDragZone}>
             <View style={styles.drawerIndicator} />
             <Pressable style={styles.closeDrawerBtn} onPress={handleCloseFilters}>
-              <X size={20} color="#1E293B" />
+              <X size={20} color={Brand.ink} />
             </Pressable>
           </View>
 
@@ -1533,10 +1537,10 @@ export default function MapView({
             {/* Search Input Bar */}
             <View style={styles.searchBarRow}>
               <View style={styles.drawerSearchBarContainer}>
-                <Search size={18} color="#64748B" style={styles.searchIcon} />
+                <Search size={18} color={Brand.inkSoft} style={styles.searchIcon} />
                 <TextInput
                   placeholder="Brunch"
-                  placeholderTextColor="#64748B"
+                  placeholderTextColor={Brand.inkSoft}
                   value={searchQuery}
                   onChangeText={setSearchQuery}
                   style={styles.searchBarInput}
@@ -1679,7 +1683,7 @@ export default function MapView({
                     }}
                     style={[styles.chip, isSelected && styles.chipActive]}
                   >
-                    <IconComp size={14} color={isSelected ? '#FFFFFF' : '#64748B'} strokeWidth={2.2} style={{ marginRight: 6 }} />
+                    <IconComp size={14} color={isSelected ? Brand.white : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
                     <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
                       {c.label}
                     </Text>
@@ -1746,7 +1750,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     position: 'relative',
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
   },
   webMap: {
     position: 'absolute',
@@ -1765,49 +1769,50 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     padding: 20,
   },
   permissionCard: {
     width: '100%',
     maxWidth: 320,
     padding: 24,
-    backgroundColor: '#FAF5EF',
-    borderRadius: 12,
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 6, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    backgroundColor: Brand.bg,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 3,
     alignItems: 'center',
   },
   permissionIconWrapper: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
-    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: Brand.line,
+    backgroundColor: Brand.white,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 3,
   },
   permissionTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontSize: 22,
+    fontWeight: '800',
+    color: Brand.ink,
     marginBottom: 10,
     textAlign: 'center',
   },
   permissionDesc: {
     fontSize: 13,
-    color: '#64748B',
+    color: Brand.inkSoft,
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: 24,
@@ -1816,25 +1821,26 @@ const styles = StyleSheet.create({
   permissionBtn: {
     width: '100%',
     height: 48,
-    borderRadius: 8,
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
-    backgroundColor: '#C52824',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    backgroundColor: Brand.primaryDeep,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 3,
   },
   permissionBtnPressed: {
     transform: [{ translateX: 3 }, { translateY: 3 }],
     shadowOffset: { width: 0, height: 0 },
   },
   permissionBtnText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: Brand.white,
   },
   skipBtn: {
     marginTop: 18,
@@ -1842,7 +1848,7 @@ const styles = StyleSheet.create({
   skipBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748B',
+    color: Brand.inkSoft,
     textDecorationLine: 'underline',
   },
   // Dynamic Island Search Pill
@@ -1853,25 +1859,25 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 440,
     height: 52,
-    borderRadius: 18,
-    backgroundColor: '#FAF5EF',
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
+    borderRadius: 20,
+    backgroundColor: Brand.bg,
+    borderWidth: 1,
+    borderColor: Brand.line,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 6,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 3,
     zIndex: 99,
   },
   searchIconBadge: {
     width: 32,
     height: 32,
-    borderRadius: 10,
-    backgroundColor: '#C52824',
+    borderRadius: 12,
+    backgroundColor: Brand.primaryDeep,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
@@ -1881,7 +1887,7 @@ const styles = StyleSheet.create({
     height: '100%',
     fontSize: 13,
     fontWeight: '700',
-    color: '#1E293B',
+    color: Brand.ink,
     paddingVertical: 0,
   },
   searchClearBtn: {
@@ -1896,13 +1902,13 @@ const styles = StyleSheet.create({
   searchDivider: {
     width: 1.5,
     height: 24,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: '#E3DCE0',
     marginRight: 6,
   },
   searchFilterBtn: {
     width: 34,
     height: 34,
-    borderRadius: 10,
+    borderRadius: 12,
     backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1911,7 +1917,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.92 }],
   },
   searchFilterBtnActive: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: Brand.primarySoft,
   },
 
   // Autocomplete Suggestions Dropdown Card
@@ -1922,15 +1928,15 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 440,
     maxHeight: 280,
-    backgroundColor: '#FAF5EF',
-    borderRadius: 16,
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 8,
+    backgroundColor: Brand.bg,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 3,
     zIndex: 98,
     overflow: 'hidden',
   },
@@ -1943,7 +1949,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: Brand.line,
   },
   suggestionRowPressed: {
     backgroundColor: '#F1E9DE',
@@ -1960,26 +1966,26 @@ const styles = StyleSheet.create({
   },
   suggestionTitle: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: Brand.ink,
   },
   suggestionSubtitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '500',
-    color: '#64748B',
+    color: Brand.inkSoft,
     marginTop: 2,
   },
   suggestionRating: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#FFF3D6',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#F59E0B',
   },
   suggestionRatingText: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#92400E',
   },
   suggestionEmpty: {
@@ -1988,7 +1994,7 @@ const styles = StyleSheet.create({
   },
   suggestionEmptyText: {
     fontSize: 12,
-    color: '#64748B',
+    color: Brand.inkSoft,
     fontWeight: '600',
   },
   suggestionFooter: {
@@ -1998,8 +2004,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   suggestionFooterText: {
-    fontSize: 11,
-    color: '#C52824',
+    fontSize: 12,
+    color: Brand.primaryDeep,
     fontWeight: '700',
   },
 
@@ -2009,16 +2015,16 @@ const styles = StyleSheet.create({
     top: Platform.OS === 'ios' ? 114 : 94,
     left: 16,
     right: 16,
-    backgroundColor: '#1E293B',
-    borderRadius: 14,
+    backgroundColor: Brand.ink,
+    borderRadius: 18,
     borderWidth: 2,
-    borderColor: '#C52824',
+    borderColor: Brand.primary,
     paddingHorizontal: 12,
     paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000000',
+    shadowColor: Brand.ink,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -2035,16 +2041,16 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
   itineraryBadgeGps: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#1FA67A',
   },
   itineraryBadgeIcon: {
-    fontSize: 15,
+    fontSize: 16,
   },
   itineraryOriginBadge: {
     paddingHorizontal: 7,
@@ -2056,17 +2062,17 @@ const styles = StyleSheet.create({
   itineraryOriginBadgeGps: {
     backgroundColor: 'rgba(16, 185, 129, 0.25)',
     borderWidth: 1,
-    borderColor: '#10B981',
+    borderColor: '#1FA67A',
   },
   itineraryOriginBadgeManual: {
-    backgroundColor: 'rgba(229, 169, 59, 0.25)',
+    backgroundColor: 'rgba(242, 184, 53, 0.25)',
     borderWidth: 1,
-    borderColor: '#E5A93B',
+    borderColor: Brand.chouchou,
   },
   itineraryOriginBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#FAF5EF',
+    fontSize: 12,
+    fontWeight: '700',
+    color: Brand.bg,
   },
   itineraryTexts: {
     flex: 1,
@@ -2078,21 +2084,21 @@ const styles = StyleSheet.create({
   },
   itineraryDuration: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#FAF5EF',
+    fontWeight: '700',
+    color: Brand.bg,
   },
   itineraryDot: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: Brand.inkSoft,
   },
   itineraryDistance: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#E5A93B',
+    color: Brand.chouchou,
   },
   itineraryDestination: {
-    fontSize: 11,
-    color: '#94A3B8',
+    fontSize: 12,
+    color: Brand.inkSoft,
     fontWeight: '600',
     marginTop: 1,
   },
@@ -2105,14 +2111,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     paddingHorizontal: 9,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   itineraryExternalBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#FAF5EF',
+    fontSize: 12,
+    fontWeight: '700',
+    color: Brand.bg,
   },
   itineraryCloseBtn: {
     width: 28,
@@ -2144,17 +2150,18 @@ const styles = StyleSheet.create({
   categoryPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FAF5EF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 20,
+    backgroundColor: Brand.bg,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    borderRadius: 24,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
     elevation: 3,
+    minHeight: 44,
   },
   categoryPillIcon: {
     fontSize: 13,
@@ -2162,11 +2169,11 @@ const styles = StyleSheet.create({
   },
   categoryPillText: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: Brand.ink,
   },
   categoryPillTextSelected: {
-    color: '#FFFFFF',
+    color: Brand.white,
   },
   
   // Floating Action Buttons — colonne verticale à droite
@@ -2182,65 +2189,66 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
-    backgroundColor: '#FAF5EF',
+    borderWidth: 1,
+    borderColor: Brand.line,
+    backgroundColor: Brand.bg,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 3,
   },
   floatingRoundBtnPressed: {
     transform: [{ translateX: 2 }, { translateY: 2 }],
     shadowOffset: { width: 1, height: 1 },
   },
   macroViewBtn: {
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
   },
   perspective3dBtn: {
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
   },
   perspective3dBtnActive: {
-    backgroundColor: '#E5A93B',
-    borderColor: '#1E293B',
+    backgroundColor: Brand.chouchou,
+    borderColor: Brand.ink,
   },
   perspective3dText: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: Brand.ink,
     letterSpacing: 0.5,
   },
   perspective3dTextActive: {
-    color: '#FFFFFF',
+    color: Brand.white,
   },
   filterBtnActive: {
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
   },
   nativeMarker: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
+    borderWidth: 1,
+    borderColor: Brand.line,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 3,
   },
   nativeMarkerSelected: {
     transform: [{ scale: 1.35 }, { translateY: -4 }],
     shadowOffset: { width: 4, height: 4 },
-    borderWidth: 3,
+    borderWidth: 1,
   },
   nativeMarkerDiscovered: {
-    borderColor: '#10B981',
+    borderColor: '#1FA67A',
     borderWidth: 2.8,
-    shadowColor: '#10B981',
+    shadowColor: '#1FA67A',
     shadowOpacity: 0.6,
   },
   discoveredBadgeDot: {
@@ -2250,20 +2258,20 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#10B981',
+    backgroundColor: '#1FA67A',
     borderWidth: 1.5,
-    borderColor: '#FFFFFF',
+    borderColor: Brand.white,
   },
   markerRed: {
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
   },
   markerGold: {
-    backgroundColor: '#E5A93B',
+    backgroundColor: Brand.chouchou,
   },
   markerText: {
     fontSize: 16,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontWeight: '800',
+    color: Brand.white,
     lineHeight: 20,
   },
 
@@ -2279,11 +2287,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: Brand.white,
+    borderRadius: 20,
     borderWidth: 0,
     padding: 16,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
     shadowRadius: 20,
@@ -2292,11 +2300,11 @@ const styles = StyleSheet.create({
   },
   cardAccentRed: {
     borderTopWidth: 4,
-    borderTopColor: '#C52824',
+    borderTopColor: Brand.primary,
   },
   cardAccentGold: {
     borderTopWidth: 4,
-    borderTopColor: '#E5A93B',
+    borderTopColor: Brand.chouchou,
   },
   cardLeft: {
     flex: 1,
@@ -2314,30 +2322,30 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 0,
   },
   tagRed: {
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
   },
   tagGold: {
-    backgroundColor: '#E5A93B',
+    backgroundColor: Brand.chouchou,
   },
   catTagText: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: Brand.white,
     textTransform: 'uppercase',
   },
   visitTag: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 12,
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
     borderWidth: 0,
   },
   visitTagText: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '800',
     color: '#065F46',
     textTransform: 'uppercase',
@@ -2345,14 +2353,14 @@ const styles = StyleSheet.create({
   budgetTag: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    backgroundColor: '#F5F0F2',
     borderWidth: 0,
   },
   budgetTagText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontSize: 12,
+    fontWeight: '700',
+    color: Brand.ink,
   },
   budgetHeaderRow: {
     flexDirection: 'row',
@@ -2364,17 +2372,17 @@ const styles = StyleSheet.create({
   budgetHelperText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#C52824',
+    color: Brand.primaryDeep,
   },
   detailsTitle: {
     fontSize: 16,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontWeight: '800',
+    color: Brand.ink,
     marginBottom: 4,
   },
   detailsDesc: {
-    fontSize: 11,
-    color: '#64748B',
+    fontSize: 12,
+    color: Brand.inkSoft,
     fontWeight: '600',
     lineHeight: 14,
   },
@@ -2393,18 +2401,18 @@ const styles = StyleSheet.create({
     gap: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 2,
   },
   likeBtnInactive: {
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
   },
   likeBtnActive: {
-    backgroundColor: '#C52824',
-    borderColor: '#1E293B',
+    backgroundColor: Brand.primaryDeep,
+    borderColor: Brand.ink,
   },
   likeBtnPressed: {
     transform: [{ scale: 0.96 }],
@@ -2416,17 +2424,17 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
     shadowRadius: 8,
     elevation: 2,
   },
   itineraryBtnRed: {
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
   },
   itineraryBtnGold: {
-    backgroundColor: '#E5A93B',
+    backgroundColor: Brand.chouchou,
   },
   itineraryBtnPressed: {
     transform: [{ scale: 0.96 }],
@@ -2438,14 +2446,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderTopWidth: 3,
-    borderColor: '#1E293B',
+    borderColor: Brand.ink,
     zIndex: 100,
     height: '92%',
-    shadowColor: '#1E293B',
+    shadowColor: Brand.ink,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 10,
@@ -2458,13 +2466,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
     borderBottomWidth: 1.5,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: Brand.line,
   },
   drawerIndicator: {
     width: 48,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: '#E3DCE0',
     marginTop: 8,
     marginBottom: 8,
   },
@@ -2487,16 +2495,17 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 8,
+    backgroundColor: Brand.white,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    borderRadius: 12,
     paddingHorizontal: 12,
     height: 44,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 3,
   },
   searchIcon: {
     marginRight: 8,
@@ -2505,12 +2514,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '600',
-    color: '#1E293B',
+    color: Brand.ink,
   },
   cancelBtnText: {
     fontSize: 14,
-    fontWeight: '800',
-    color: '#C52824',
+    fontWeight: '700',
+    color: Brand.primaryDeep,
   },
   subTabsContainer: {
     flexDirection: 'row',
@@ -2523,19 +2532,19 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   subTabItemActive: {
-    backgroundColor: 'rgba(197, 40, 36, 0.08)',
+    backgroundColor: 'rgba(232, 74, 95, 0.08)',
   },
   subTabText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#64748B',
+    color: Brand.inkSoft,
   },
   subTabTextActive: {
-    color: '#C52824',
+    color: Brand.primaryDeep,
   },
   divider: {
     height: 2,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Brand.line,
     marginVertical: 14,
   },
   sectionHeader: {
@@ -2546,37 +2555,38 @@ const styles = StyleSheet.create({
   },
   sectionHeading: {
     fontSize: 18,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontWeight: '800',
+    color: Brand.ink,
   },
   resetBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748B',
+    color: Brand.inkSoft,
   },
   filterLabel: {
     fontSize: 14,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: Brand.ink,
     marginBottom: 12,
     marginTop: 10,
   },
   
   budgetValueBadge: {
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
     paddingHorizontal: 10,
     paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 3,
   },
   budgetValueBadgeText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
+    color: Brand.white,
+    fontWeight: '700',
     fontSize: 13,
   },
   
@@ -2589,32 +2599,32 @@ const styles = StyleSheet.create({
   sliderTrack: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Brand.line,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: '#E3DCE0',
     position: 'relative',
     marginVertical: 14,
   },
   sliderTrackActive: {
     height: '100%',
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
     borderRadius: 4,
   },
   sliderHandle: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
     borderWidth: 3,
-    borderColor: '#C52824',
+    borderColor: Brand.primary,
     position: 'absolute',
     top: -8,
     marginLeft: -11,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 3,
   },
   sliderLabels: {
     flexDirection: 'row',
@@ -2627,20 +2637,20 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    borderColor: Brand.line,
+    backgroundColor: Brand.white,
   },
   sliderLabelBtnActive: {
-    backgroundColor: 'rgba(197, 40, 36, 0.12)',
-    borderColor: '#C52824',
+    backgroundColor: 'rgba(232, 74, 95, 0.12)',
+    borderColor: Brand.primary,
   },
   sliderLabelText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#64748B',
+    color: Brand.inkSoft,
   },
   sliderLabelTextActive: {
-    color: '#C52824',
+    color: Brand.primaryDeep,
     fontWeight: '800',
   },
 
@@ -2655,26 +2665,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    backgroundColor: Brand.white,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 3,
   },
   chipActive: {
-    backgroundColor: '#C52824',
-    borderColor: '#1E293B',
+    backgroundColor: Brand.primaryDeep,
+    borderColor: Brand.ink,
     shadowOffset: { width: 0, height: 0 },
   },
   chipText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#1E293B',
+    color: Brand.ink,
   },
   chipTextActive: {
-    color: '#FFFFFF',
+    color: Brand.white,
   },
 
   // Switch Toggle Styles
@@ -2687,29 +2698,29 @@ const styles = StyleSheet.create({
   },
   toggleLabel: {
     fontSize: 14,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: Brand.ink,
   },
   customSwitch: {
     width: 50,
     height: 28,
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 3,
     justifyContent: 'center',
   },
   switchActive: {
-    backgroundColor: '#1E293B',
+    backgroundColor: Brand.ink,
   },
   switchInactive: {
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Brand.line,
     borderWidth: 2,
-    borderColor: '#CBD5E1',
+    borderColor: '#E3DCE0',
   },
   switchThumb: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
@@ -2727,25 +2738,26 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 48,
     borderRadius: 24,
-    borderWidth: 2.5,
-    borderColor: '#1E293B',
-    backgroundColor: '#E5A93B', // Golden background color
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    backgroundColor: Brand.chouchou, // Golden background color
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 10,
+    elevation: 3,
   },
   submitFilterBtnPressed: {
     transform: [{ translateX: 2 }, { translateY: 2 }],
     shadowOffset: { width: 0, height: 0 },
   },
   submitFilterBtnText: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    color: Brand.white,
     textShadowColor: 'rgba(0,0,0,0.15)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 1,
@@ -2758,7 +2770,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(30, 41, 59, 0.7)',
+    backgroundColor: 'rgba(43, 29, 70, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -2767,15 +2779,15 @@ const styles = StyleSheet.create({
   loginCardModal: {
     width: '100%',
     maxWidth: 360,
-    backgroundColor: '#FAF5EF',
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: '#1E293B',
+    backgroundColor: Brand.bg,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: Brand.line,
     overflow: 'hidden',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 6, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 8,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 3,
   },
 });

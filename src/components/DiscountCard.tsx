@@ -30,6 +30,7 @@ import {
 import { DiscountCard, discountCardsStore } from '../lib/discountCardsStore';
 import { getOptimizedImageUrl } from '../lib/imageOptimizer';
 
+import { Brand } from '../constants/brand';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = Math.min(SCREEN_WIDTH - 32, 380);
 const CARD_HEIGHT = 224;
@@ -148,7 +149,7 @@ export default function DiscountCardItem({ card, onUseSuccess }: Props) {
         style={[
           styles.cardFace,
           styles.frontFace,
-          { backgroundColor: card.card_color_secondary || '#1E293B' },
+          { backgroundColor: card.card_color_secondary || Brand.ink },
           frontAnimatedStyle,
         ]}
       >
@@ -167,7 +168,7 @@ export default function DiscountCardItem({ card, onUseSuccess }: Props) {
             {
               backgroundColor: card.card_color_primary
                 ? `${card.card_color_primary}D9`
-                : 'rgba(15, 23, 42, 0.82)',
+                : 'rgba(43, 29, 70, 0.82)',
             },
           ]}
         />
@@ -175,7 +176,7 @@ export default function DiscountCardItem({ card, onUseSuccess }: Props) {
         {/* Card Header: Brand & Badge */}
         <View style={styles.cardHeaderRow}>
           <View style={styles.brandBadge}>
-            <Sparkles size={13} color="#E5A93B" strokeWidth={2.5} style={{ marginRight: 5 }} />
+            <Sparkles size={13} color={Brand.chouchou} strokeWidth={2} style={{ marginRight: 5 }} />
             <Text style={styles.brandBadgeText}>LE PETIT TOU</Text>
           </View>
 
@@ -199,7 +200,7 @@ export default function DiscountCardItem({ card, onUseSuccess }: Props) {
 
           {/* Discount Value Badge */}
           <View style={styles.discountValuePill}>
-            <Gift size={16} color="#FFFFFF" strokeWidth={2.2} style={{ marginRight: 6 }} />
+            <Gift size={16} color={Brand.white} strokeWidth={2} style={{ marginRight: 6 }} />
             <Text style={styles.discountValueText}>{card.discount_value}</Text>
           </View>
         </View>
@@ -214,7 +215,7 @@ export default function DiscountCardItem({ card, onUseSuccess }: Props) {
             <Text
               style={[
                 styles.usageCounterText,
-                isExhausted && { color: '#EF4444' },
+                isExhausted && { color: Brand.primary },
               ]}
             >
               {isExhausted
@@ -225,7 +226,7 @@ export default function DiscountCardItem({ card, onUseSuccess }: Props) {
 
           <View style={styles.flipActionPill}>
             <Text style={styles.flipActionText}>Détails & Code</Text>
-            <RotateCcw size={12} color="#FFFFFF" style={{ marginLeft: 4 }} />
+            <RotateCcw size={12} color={Brand.white} style={{ marginLeft: 4 }} />
           </View>
         </Pressable>
       </Animated.View>
@@ -252,7 +253,7 @@ export default function DiscountCardItem({ card, onUseSuccess }: Props) {
             onPress={handleFlip}
             accessibilityLabel="Retourner la carte"
           >
-            <RotateCcw size={14} color="#64748B" />
+            <RotateCcw size={14} color={Brand.inkSoft} />
           </Pressable>
         </View>
 
@@ -270,7 +271,7 @@ export default function DiscountCardItem({ card, onUseSuccess }: Props) {
                 styles.gaugeFill,
                 {
                   width: `${(1 - progressRatio) * 100}%`,
-                  backgroundColor: isExhausted ? '#CBD5E1' : '#10B981',
+                  backgroundColor: isExhausted ? '#E3DCE0' : '#1FA67A',
                 },
               ]}
             />
@@ -286,7 +287,7 @@ export default function DiscountCardItem({ card, onUseSuccess }: Props) {
           )}
           {card.terms && (
             <View style={styles.termsSubRow}>
-              <Info size={11} color="#64748B" style={{ marginRight: 4, marginTop: 1 }} />
+              <Info size={11} color={Brand.inkSoft} style={{ marginRight: 4, marginTop: 1 }} />
               <Text style={styles.termsSubText} numberOfLines={2}>
                 {card.terms}
               </Text>
@@ -298,7 +299,7 @@ export default function DiscountCardItem({ card, onUseSuccess }: Props) {
         <View style={styles.backActionArea}>
           {successToast ? (
             <View style={styles.successBanner}>
-              <CheckCircle size={16} color="#059669" strokeWidth={2.4} style={{ marginRight: 6 }} />
+              <CheckCircle size={16} color="#059669" strokeWidth={2} style={{ marginRight: 6 }} />
               <Text style={styles.successBannerText}>Avantage validé avec succès !</Text>
             </View>
           ) : isExhausted ? (
@@ -315,10 +316,10 @@ export default function DiscountCardItem({ card, onUseSuccess }: Props) {
               disabled={isUsing}
             >
               {isUsing ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={Brand.white} />
               ) : (
                 <>
-                  <ShieldCheck size={16} color="#FFFFFF" strokeWidth={2.2} style={{ marginRight: 6 }} />
+                  <ShieldCheck size={16} color={Brand.white} strokeWidth={2} style={{ marginRight: 6 }} />
                   <Text style={styles.useCardBtnText}>Utiliser cet avantage</Text>
                 </>
               )}
@@ -350,10 +351,10 @@ const styles = StyleSheet.create({
     backfaceVisibility: 'hidden',
     overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: Brand.line,
     ...Platform.select({
       ios: {
-        shadowColor: '#0F172A',
+        shadowColor: '#24242E',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.12,
         shadowRadius: 18,
@@ -362,7 +363,7 @@ const styles = StyleSheet.create({
         elevation: 6,
       },
       web: {
-        boxShadow: '0 10px 28px -4px rgba(15, 23, 42, 0.14)',
+        boxShadow: '0 10px 28px -4px rgba(43, 29, 70, 0.14)',
       } as any,
     }),
   },
@@ -370,8 +371,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.22)',
   },
   backFace: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E2E8F0',
+    backgroundColor: Brand.white,
+    borderColor: Brand.line,
   },
   cardCoverImage: {
     ...StyleSheet.absoluteFill,
@@ -388,30 +389,30 @@ const styles = StyleSheet.create({
   brandBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: 'rgba(43, 29, 70, 0.65)',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: 'rgba(229, 169, 59, 0.35)',
+    borderColor: 'rgba(242, 184, 53, 0.35)',
   },
   brandBadgeText: {
-    color: '#FAF5EF',
-    fontSize: 10,
-    fontWeight: '800',
+    color: Brand.bg,
+    fontSize: 12,
+    fontWeight: '700',
     letterSpacing: 1.2,
   },
   statusBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 14,
+    borderRadius: 20,
     borderWidth: 0.8,
     borderColor: 'rgba(255, 255, 255, 0.35)',
   },
   statusBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
+    color: Brand.white,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.6,
   },
@@ -420,7 +421,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   partnerTitle: {
-    color: '#FFFFFF',
+    color: Brand.white,
     fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.4,
@@ -439,10 +440,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.4)',
     ...Platform.select({
@@ -456,14 +457,14 @@ const styles = StyleSheet.create({
         elevation: 3,
       },
       web: {
-        boxShadow: '0 2px 8px rgba(197, 40, 36, 0.4)',
+        boxShadow: '0 2px 8px rgba(232, 74, 95, 0.4)',
       } as any,
     }),
   },
   discountValueText: {
-    color: '#FFFFFF',
+    color: Brand.white,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
     letterSpacing: 0.2,
   },
   cardFooterRow: {
@@ -476,16 +477,16 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 255, 255, 0.18)',
   },
   usageCounterPill: {
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    backgroundColor: 'rgba(43, 29, 70, 0.7)',
     paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 0.8,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   usageCounterText: {
-    color: '#FAF5EF',
-    fontSize: 11,
+    color: Brand.bg,
+    fontSize: 12,
     fontWeight: '700',
   },
   flipActionPill: {
@@ -494,11 +495,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 14,
+    borderRadius: 20,
   },
   flipActionText: {
-    color: '#FFFFFF',
-    fontSize: 11,
+    color: Brand.white,
+    fontSize: 12,
     fontWeight: '600',
   },
 
@@ -509,21 +510,21 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   backPartnerTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#24242E',
   },
   backDiscountValue: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#C52824',
+    fontWeight: '700',
+    color: Brand.primaryDeep,
     marginTop: 2,
   },
   backFlipBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F5F0F2',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -537,20 +538,20 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   gaugeLabel: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#64748B',
+    color: Brand.inkSoft,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   gaugeValue: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#24242E',
   },
   gaugeTrack: {
     height: 6,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F5F0F2',
     borderRadius: 3,
     overflow: 'hidden',
   },
@@ -559,16 +560,16 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   termsBox: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Brand.bg,
     padding: 8,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Brand.line,
     marginVertical: 4,
   },
   termsText: {
-    fontSize: 11,
-    color: '#334155',
+    fontSize: 12,
+    color: '#3A3A48',
     lineHeight: 15,
     fontWeight: '500',
   },
@@ -578,8 +579,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   termsSubText: {
-    fontSize: 10,
-    color: '#64748B',
+    fontSize: 12,
+    color: Brand.inkSoft,
     lineHeight: 14,
     flex: 1,
   },
@@ -590,12 +591,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
     height: 40,
-    borderRadius: 12,
-    shadowColor: '#C52824',
+    borderRadius: 20,
+    shadowColor: Brand.ink,
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.14,
     shadowRadius: 6,
     elevation: 3,
   },
@@ -604,20 +605,20 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }],
   },
   useCardBtnText: {
-    color: '#FFFFFF',
+    color: Brand.white,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 0.3,
   },
   exhaustedBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F5F0F2',
     height: 40,
-    borderRadius: 12,
+    borderRadius: 20,
   },
   exhaustedBtnText: {
-    color: '#94A3B8',
+    color: Brand.inkSoft,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -629,11 +630,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#A7F3D0',
     height: 40,
-    borderRadius: 12,
+    borderRadius: 20,
   },
   successBannerText: {
     color: '#065F46',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
   },
 });

@@ -12,6 +12,7 @@ import {
   Animated,
   ActivityIndicator,
 } from 'react-native';
+import { PLACEHOLDER_PHOTO } from '../constants/placeholder';
 import { Image } from 'expo-image';
 import {
   Heart,
@@ -28,10 +29,12 @@ import {
   ChevronDown,
   X,
   ArrowUpRight,
+  Check,
 } from 'lucide-react-native';
 import { getOptimizedImageUrl } from '../lib/imageOptimizer';
 import { discoveryStore } from '../lib/discoveryStore';
 
+import { Brand } from '../constants/brand';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const COMPACT_HEIGHT = 165;
@@ -176,8 +179,8 @@ export default function PlaceDetailSheet({
 
   const spotName = spot.title || spot.name || 'Adresse Toulouse';
   const categoryLabel = spot.category || spot.cat || 'Sélection';
-  const rawReview = spot.full_description || spot.description || spot.desc || "Une adresse sélectionnée avec soin par Le Petit Tou au cœur de Toulouse.";
-  const coverPhoto = spot.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800';
+  const rawReview = spot.full_description || spot.description || spot.desc || "La critique de cette adresse arrive bientôt.";
+  const coverPhoto = spot.image_url || PLACEHOLDER_PHOTO;
   const allPhotos = spot.photos && spot.photos.length > 0
     ? spot.photos
     : spot.gallery_urls && spot.gallery_urls.length > 0
@@ -202,9 +205,9 @@ export default function PlaceDetailSheet({
           accessibilityLabel={isExpanded ? 'Réduire la fiche' : 'Agrandir la fiche'}
         >
           {isExpanded ? (
-            <ChevronDown size={20} color="#64748B" />
+            <ChevronDown size={20} color={Brand.inkSoft} />
           ) : (
-            <ChevronUp size={20} color="#64748B" />
+            <ChevronUp size={20} color={Brand.inkSoft} />
           )}
         </Pressable>
       </View>
@@ -230,7 +233,7 @@ export default function PlaceDetailSheet({
         >
           <View style={styles.badgeRow}>
             <View style={styles.catPill}>
-              <Text style={styles.catPillText}>{categoryLabel}</Text>
+              <Text style={styles.catPillText} numberOfLines={1}>{categoryLabel}</Text>
             </View>
 
             {spot.budget_label && (
@@ -241,7 +244,8 @@ export default function PlaceDetailSheet({
 
             {isDiscovered ? (
               <View style={styles.discoveredPill}>
-                <Text style={styles.discoveredPillText}>✓ Découvert</Text>
+                <Check size={12} color="#166534" strokeWidth={2} />
+                <Text style={styles.discoveredPillText}>Découvert</Text>
               </View>
             ) : (
               <View style={styles.pointsBadge}>
@@ -257,7 +261,7 @@ export default function PlaceDetailSheet({
           </Text>
 
           <Text style={styles.spotAddressText} numberOfLines={1}>
-            📍 {spot.address || spot.location || 'Toulouse Centre'}
+            {spot.address || spot.location || 'Toulouse Centre'}
           </Text>
         </Pressable>
 
@@ -275,8 +279,8 @@ export default function PlaceDetailSheet({
           >
             <Heart
               size={18}
-              color={isFavorite ? '#FFFFFF' : '#1E293B'}
-              fill={isFavorite ? '#FFFFFF' : 'none'}
+              color={isFavorite ? Brand.white : Brand.ink}
+              fill={isFavorite ? Brand.white : 'none'}
             />
           </Pressable>
 
@@ -290,9 +294,9 @@ export default function PlaceDetailSheet({
             accessibilityLabel="Calculer l'itinéraire"
           >
             {routeLoading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator size="small" color={Brand.white} />
             ) : (
-              <ArrowUpRight size={19} color="#FFFFFF" strokeWidth={2.8} />
+              <ArrowUpRight size={19} color={Brand.white} strokeWidth={2} />
             )}
           </Pressable>
         </View>
@@ -355,9 +359,9 @@ export default function PlaceDetailSheet({
           >
             <View style={styles.discoveryIconCircle}>
               {isDiscovered ? (
-                <CheckCircle size={22} color="#10B981" strokeWidth={2.5} />
+                <CheckCircle size={22} color="#1FA67A" strokeWidth={2} />
               ) : (
-                <Sparkles size={22} color="#E5A93B" strokeWidth={2.5} />
+                <Sparkles size={22} color={Brand.chouchou} strokeWidth={2} />
               )}
             </View>
             <View style={{ flex: 1, paddingHorizontal: 10 }}>
@@ -379,7 +383,7 @@ export default function PlaceDetailSheet({
               ]}
             >
               <Text style={styles.pointsTagText}>
-                {isDiscovered ? '✓ Validé' : spot.is_recommended ? '+25 pts' : '+10 pts'}
+                {isDiscovered ? 'Validé' : spot.is_recommended ? '+25 pts' : '+10 pts'}
               </Text>
             </View>
           </Pressable>
@@ -387,8 +391,8 @@ export default function PlaceDetailSheet({
           {/* Avis Écrit Officiel du Petit Tou */}
           <View style={styles.reviewCard}>
             <View style={styles.reviewCardHeader}>
-              <Quote size={18} color="#E5A93B" style={{ marginRight: 6 }} />
-              <Text style={styles.reviewCardTitle}>L'avis du Petit Tou</Text>
+              <Quote size={20} color={Brand.primary} fill={Brand.primary} style={{ marginRight: 6 }} />
+              <Text style={styles.reviewCardTitle}>La critique du Petit Tou</Text>
             </View>
             <Text style={styles.reviewCardBody}>{rawReview}</Text>
           </View>
@@ -401,7 +405,7 @@ export default function PlaceDetailSheet({
                 style={styles.metaInfoRow}
                 onPress={() => Linking.openURL(`tel:${spot.phone || spot.telephone}`)}
               >
-                <Phone size={17} color="#C52824" />
+                <Phone size={17} color={Brand.primaryDeep} />
                 <Text style={styles.metaInfoLink}>
                   {spot.phone || spot.telephone}
                 </Text>
@@ -424,7 +428,7 @@ export default function PlaceDetailSheet({
             {/* Horaires */}
             {(spot.hours || spot.horaires) && (
               <View style={styles.metaInfoRow}>
-                <Clock size={17} color="#1E293B" />
+                <Clock size={17} color={Brand.ink} />
                 <Text style={styles.metaInfoText}>
                   {spot.hours || spot.horaires}
                 </Text>
@@ -449,12 +453,12 @@ export default function PlaceDetailSheet({
               style={styles.primaryMapsBtn}
               onPress={() => onOpenItinerary(spot)}
             >
-              <Navigation size={18} color="#FFFFFF" strokeWidth={2.4} style={{ marginRight: 8 }} />
+              <Navigation size={18} color={Brand.white} strokeWidth={2} style={{ marginRight: 8 }} />
               <Text style={styles.primaryMapsBtnText}>Itinéraire GPS</Text>
             </Pressable>
 
             <Pressable style={styles.closeBtn} onPress={onClose}>
-              <X size={18} color="#1E293B" />
+              <X size={18} color={Brand.ink} />
             </Pressable>
           </View>
         </ScrollView>
@@ -469,14 +473,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: Brand.line,
     overflow: 'hidden',
     zIndex: 900,
-    shadowColor: '#0F172A',
+    shadowColor: '#24242E',
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.12,
     shadowRadius: 24,
@@ -488,13 +492,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
   },
   dragPill: {
     width: 38,
     height: 4.5,
     borderRadius: 3,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: '#E3DCE0',
   },
   expandToggleBtn: {
     position: 'absolute',
@@ -512,129 +516,137 @@ const styles = StyleSheet.create({
   compactThumb: {
     width: 72,
     height: 72,
-    borderRadius: 14,
-    backgroundColor: '#F1F5F9',
+    borderRadius: 20,
+    backgroundColor: '#F5F0F2',
   },
   compactMeta: {
     flex: 1,
+    minWidth: 0,
     justifyContent: 'center',
     gap: 3,
   },
   badgeRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 6,
     marginBottom: 2,
   },
   catPill: {
+    maxWidth: '100%',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
-    backgroundColor: '#FAF5EF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    backgroundColor: Brand.primarySoft,
   },
   catPillText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '800',
-    color: '#1E293B',
+    color: '#A82840',
     textTransform: 'uppercase',
   },
   budgetPill: {
+    flexShrink: 0,
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 6,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Brand.bg,
   },
   budgetPillText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#64748B',
+    color: Brand.inkSoft,
   },
   discoveredPill: {
+    flexShrink: 0,
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 6,
     backgroundColor: '#DCFCE7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   discoveredPillText: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#166534',
   },
   pointsBadge: {
+    flexShrink: 0,
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 6,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#FFF3D6',
   },
   pointsBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#B45309',
   },
   spotNameText: {
     fontSize: 16,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontWeight: '800',
+    color: Brand.ink,
     letterSpacing: -0.2,
   },
   spotAddressText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#64748B',
+    color: Brand.inkSoft,
   },
   compactActionsCol: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexShrink: 0,
   },
   compactLikeBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FAF5EF',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Brand.bg,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: Brand.line,
     justifyContent: 'center',
     alignItems: 'center',
   },
   compactLikeBtnActive: {
-    backgroundColor: '#C52824',
-    borderColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
+    borderColor: Brand.primary,
   },
   compactRouteBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#C52824',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Brand.primaryDeep,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#C52824',
+    shadowColor: Brand.ink,
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.14,
     shadowRadius: 6,
     elevation: 3,
   },
   expandedScrollArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
   },
   expandedScrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 40,
+    paddingBottom: 56,
     gap: 16,
   },
   photoCarouselWrapper: {
     position: 'relative',
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
     marginTop: 4,
   },
   carouselPhoto: {
     width: SCREEN_WIDTH - 32,
     height: 190,
-    borderRadius: 16,
+    borderRadius: 20,
   },
   dotsIndicatorRow: {
     position: 'absolute',
@@ -652,73 +664,72 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   carouselDotActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Brand.white,
     width: 14,
   },
   discoveryBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FAF5EF',
-    borderWidth: 2,
-    borderColor: '#1E293B',
-    borderRadius: 16,
+    backgroundColor: Brand.bg,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    borderRadius: 20,
     padding: 14,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
+    shadowColor: Brand.night,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
     elevation: 3,
   },
   discoveryBannerActive: {
     backgroundColor: '#F0FDF4',
-    borderColor: '#10B981',
+    borderColor: '#1FA67A',
     shadowColor: '#059669',
   },
   discoveryIconCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
+    backgroundColor: Brand.white,
+    borderWidth: 1,
+    borderColor: Brand.line,
     justifyContent: 'center',
     alignItems: 'center',
   },
   discoveryBannerTitle: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: Brand.ink,
     marginBottom: 2,
   },
   discoveryBannerSub: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#64748B',
+    color: Brand.inkSoft,
     lineHeight: 14,
   },
   pointsTag: {
-    backgroundColor: '#C52824',
+    backgroundColor: Brand.primaryDeep,
     paddingHorizontal: 9,
     paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#1E293B',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Brand.line,
   },
   pointsTagDone: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#1FA67A',
     borderColor: '#065F46',
   },
   pointsTagText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '900',
+    color: Brand.white,
+    fontSize: 12,
+    fontWeight: '700',
   },
   reviewCard: {
-    backgroundColor: '#FAF5EF',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    backgroundColor: Brand.primarySoft,
+    borderRadius: 28,
+    padding: 18,
+    borderWidth: 0,
   },
   reviewCardHeader: {
     flexDirection: 'row',
@@ -726,25 +737,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   reviewCardTitle: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#1E293B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#A82840',
   },
   reviewCardBody: {
     fontSize: 13,
     lineHeight: 20,
-    color: '#334155',
+    color: '#3A3A48',
     fontWeight: '500',
   },
   metaInfoBox: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
+    backgroundColor: Brand.bg,
+    borderRadius: 20,
     padding: 14,
     gap: 10,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Brand.line,
   },
   metaInfoRow: {
     flexDirection: 'row',
@@ -760,7 +769,7 @@ const styles = StyleSheet.create({
   metaInfoText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#475569',
+    color: '#4A4A58',
     flex: 1,
   },
   tagsContainer: {
@@ -769,17 +778,17 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tagBadge: {
-    backgroundColor: '#FAF5EF',
+    backgroundColor: Brand.bg,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Brand.line,
   },
   tagBadgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#475569',
+    color: '#4A4A58',
   },
   bottomActionsRow: {
     flexDirection: 'row',
@@ -790,27 +799,27 @@ const styles = StyleSheet.create({
   primaryMapsBtn: {
     flex: 1,
     height: 48,
-    borderRadius: 14,
-    backgroundColor: '#C52824',
+    borderRadius: 20,
+    backgroundColor: Brand.primaryDeep,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#C52824',
+    shadowColor: Brand.ink,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.14,
     shadowRadius: 8,
     elevation: 3,
   },
   primaryMapsBtnText: {
     fontSize: 14,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: Brand.white,
   },
   closeBtn: {
     width: 48,
     height: 48,
-    borderRadius: 14,
-    backgroundColor: '#F1F5F9',
+    borderRadius: 20,
+    backgroundColor: '#F5F0F2',
     justifyContent: 'center',
     alignItems: 'center',
   },
