@@ -2136,15 +2136,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 89,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'stretch',
     paddingVertical: 4,
   },
   categoryScrollContent: {
     paddingHorizontal: 20,
     gap: 8,
     alignItems: 'center',
-    justifyContent: 'center',
     flexDirection: 'row',
   },
   categoryPill: {
