@@ -1,5 +1,7 @@
 -- ==============================================================================
 -- LE PETIT TOU — SCRIPT DE SÉCURISATION RLS & CONFORMITÉ STORE / RGPD
+-- ATTENTION : la fonction verify_admin_access est désormais remplacée par celle de
+-- 005_admin_secure_writes.sql. Lance 005 APRÈS ce script si tu le rejoues.
 -- ==============================================================================
 
 -- 1. Table des rôles administrateurs
@@ -35,10 +37,9 @@ BEGIN
         RETURN TRUE;
     END IF;
 
-    -- Comparaison sécurisée côté serveur (Clé maître unique ultra-sécurisée)
-    IF trim(access_code) = 'LPT#2026_Xk9!v7Qm-Z8t*Toulouse' THEN
-        RETURN TRUE;
-    END IF;
+    -- SUPPRIMÉ : l'ancienne comparaison avec un code écrit en clair a été retirée
+    -- (code à considérer comme compromis). Le contrôle du code admin se fait
+    -- désormais par empreinte, voir 005_admin_secure_writes.sql.
 
     RETURN FALSE;
 END;
