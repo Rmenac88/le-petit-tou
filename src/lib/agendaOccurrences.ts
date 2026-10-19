@@ -26,6 +26,7 @@ export interface Occurrence {
 }
 
 const DAY_MS = 86400000;
+const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const WEEKDAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 
 function toUtcMs(isoDate: string): number {
@@ -47,6 +48,20 @@ export function addDays(isoDate: string, days: number): string {
 
 export function weekdayLabel(isoDate: string): string {
   return WEEKDAYS[new Date(toUtcMs(isoDate)).getUTCDay()];
+}
+
+/** Libellé d'une puce de jour : « jeu. » et « 22 ». */
+export function dayChipLabel(isoDate: string): { weekday: string; day: string } {
+  return {
+    weekday: `${weekdayLabel(isoDate).slice(0, 3)}.`,
+    day: String(Number(isoDate.slice(8, 10))),
+  };
+}
+
+/** Date en toutes lettres : « jeudi 22 octobre ». */
+export function formatDateFr(isoDate: string): string {
+  const month = MONTHS[Number(isoDate.slice(5, 7)) - 1];
+  return `${weekdayLabel(isoDate)} ${Number(isoDate.slice(8, 10))} ${month}`;
 }
 
 export function buildDayStrip(todayIso: string, count: number): string[] {

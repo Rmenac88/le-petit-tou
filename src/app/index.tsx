@@ -6,6 +6,7 @@ import HomeView from '@/components/views/HomeView';
 import SearchView from '@/components/views/SearchView';
 import MapView from '@/components/views/MapView';
 import CardsView from '@/components/views/CardsView';
+import AgendaView from '@/components/views/AgendaView';
 
 import { Brand } from '../constants/brand';
 export default function HomeScreen() {
@@ -15,12 +16,14 @@ export default function HomeScreen() {
   const [hasVisitedMap, setHasVisitedMap] = useState(false);
   const [hasVisitedSearch, setHasVisitedSearch] = useState(false);
   const [hasVisitedCards, setHasVisitedCards] = useState(false);
+  const [hasVisitedAgenda, setHasVisitedAgenda] = useState(false);
 
   React.useEffect(() => {
     setIsDockVisible(true);
     if (activeTab === 'map') setHasVisitedMap(true);
     if (activeTab === 'search') setHasVisitedSearch(true);
     if (activeTab === 'cards') setHasVisitedCards(true);
+    if (activeTab === 'agenda') setHasVisitedAgenda(true);
   }, [activeTab]);
 
   const handleSelectSpotForMap = (id: string) => {
@@ -94,6 +97,21 @@ export default function HomeScreen() {
           >
             <View style={styles.column}>
               <CardsView />
+            </View>
+          </View>
+        )}
+
+        {/* Agenda Tab (Mounted on first visit, then kept in memory for 0ms switch) */}
+        {hasVisitedAgenda && (
+          <View
+            pointerEvents={activeTab === 'agenda' ? 'auto' : 'none'}
+            style={[
+              styles.tabViewWrapper,
+              activeTab === 'agenda' ? styles.tabViewActive : styles.tabViewHidden,
+            ]}
+          >
+            <View style={styles.column}>
+              <AgendaView onToggleDock={setIsDockVisible} onSelectSpot={handleSelectSpotForMap} />
             </View>
           </View>
         )}

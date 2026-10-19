@@ -7,12 +7,12 @@ import Animated, {
   Easing,
   useReducedMotion,
 } from 'react-native-reanimated';
-import { Home, Search, Map, CreditCard, LucideIcon } from 'lucide-react-native';
+import { Home, Search, Map, CreditCard, CalendarDays, LucideIcon } from 'lucide-react-native';
 
 import { Brand } from '../constants/brand';
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export type TabType = 'home' | 'search' | 'map' | 'cards';
+export type TabType = 'home' | 'search' | 'map' | 'cards' | 'agenda';
 
 interface FloatingDockProps {
   activeTab: TabType;
@@ -115,6 +115,7 @@ export default function FloatingDock({ activeTab, onChangeTab, visible = true }:
     { type: 'search', icon: Search },
     { type: 'map', icon: Map },
     { type: 'cards', icon: CreditCard },
+    { type: 'agenda', icon: CalendarDays },
   ];
 
   return (

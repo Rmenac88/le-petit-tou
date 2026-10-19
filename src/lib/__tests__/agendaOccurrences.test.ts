@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   addDays,
   buildDayStrip,
+  dayChipLabel,
+  formatDateFr,
   expandOccurrences,
   isValidTimeRange,
   weekdayLabel,
@@ -126,4 +128,14 @@ test('isValidTimeRange accepte une fin après le début ou absente', () => {
 test('isValidTimeRange refuse une fin égale ou avant le début', () => {
   assert.equal(isValidTimeRange('19:00', '19:00'), false);
   assert.equal(isValidTimeRange('19:00', '18:00'), false);
+});
+
+test('dayChipLabel donne un jour abrégé et le numéro du jour', () => {
+  assert.deepEqual(dayChipLabel('2026-10-22'), { weekday: 'jeu.', day: '22' });
+  assert.deepEqual(dayChipLabel('2026-11-01'), { weekday: 'dim.', day: '1' });
+});
+
+test('formatDateFr écrit la date en toutes lettres', () => {
+  assert.equal(formatDateFr('2026-10-22'), 'jeudi 22 octobre');
+  assert.equal(formatDateFr('2027-01-01'), 'vendredi 1 janvier');
 });
