@@ -1,6 +1,6 @@
 # Agenda des partenaires — design
 
-Date : 2026-10-19 · Statut : à relire avant plan d'implémentation
+Date : 2026-10-19 · Statut : validée (cadrage + sécurité d'écriture) — plan d'implémentation à écrire
 
 ## Objectif
 
@@ -43,7 +43,7 @@ Nouvelle table Supabase `partner_events` (script `src/scripts/004_partner_events
 | `is_active` | boolean, défaut true | |
 | `created_at` | timestamptz, défaut now() | |
 
-Règles d'accès (RLS) sur le modèle de `secure_admin_and_rls.sql` : lecture publique des lignes `is_active = true` ; toute écriture réservée à l'admin. Index sur `(start_date)` et `(spot_id)`.
+Règles d'accès : **lecture publique** des lignes `is_active = true`, **aucune écriture directe** (RLS activée, aucune politique d'écriture). Toute écriture passe par les fonctions de la section « Sécurité de l'écriture ». Index sur `(start_date)` et `(spot_id)`. La table a été créée à la main dans Supabase (état vérifié : lecture publique OK, écriture anonyme refusée) ; `004_partner_events.sql` la documente à l'identique.
 
 Contraintes : `repeat_weekly_until >= start_date` quand renseignée ; `end_time` après `start_time` quand renseignée (même jour).
 
@@ -69,6 +69,22 @@ Fichiers : `src/components/views/AgendaView.tsx` (+ petits composants dans `src/
 - **États** : chargement (squelette), vide (« Rien de prévu ce jour-là » avec le logo), erreur (« Agenda indisponible pour le moment » + bouton « Réessayer »). Aucun message technique ni mention de `.env`.
 - **Charte** : tokens `Brand`/`Type`/`Radius` uniquement, colonne centrée (720 px max), minimum 12 px, trait d'icône 2.
 
+## Sécurité de l'écriture
+
+Constat (test du 2026-10-19, insertions vides envoyées avec la seule clé publique) : les tables `addresses`, `events` et `sponsored_partners` **acceptent l'écriture anonyme** (rejet uniquement pour cause de colonne vide). Le code admin n'est donc qu'une barrière d'interface pour ces tables. Leur correction est **hors périmètre de l'agenda** ; elle est signalée au commanditaire comme chantier séparé. L'agenda, lui, est protégé côté base dès le départ.
+
+Décision : écriture **uniquement par des fonctions `SECURITY DEFINER` qui vérifient le code admin côté serveur** (option validée), script `src/scripts/005_admin_secure_writes.sql` à exécuter dans l'éditeur SQL de Supabase :
+
+1. **Rotation du code admin.** Nouvelle table `admin_secrets(key text primary key, value text not null)`, RLS activée sans aucune politique (illisible depuis l'extérieur). Elle contient l'empreinte SHA-256 du **nouveau** code, choisi par le commanditaire (le script lui indique où le saisir ; le code n'est jamais écrit dans le dépôt). `verify_admin_access(access_code)` est réécrite pour comparer l'empreinte (`encode(extensions.digest(trim(access_code), 'sha256'), 'hex')`) et ne contient plus aucun code en clair. La branche « compte listé dans `admin_users` » est conservée.
+2. **Trois fonctions** (`SECURITY DEFINER`, `search_path = public, extensions`, `EXECUTE` accordé à `anon` et `authenticated`), chacune commence par `verify_admin_access(p_code)` et lève `forbidden` sinon :
+   - `admin_list_partner_events(p_code)` : toutes les lignes, actives ou non.
+   - `admin_save_partner_event(p_code, p_event jsonb)` : insère ou met à jour (selon la présence de `id`), après validation des champs et des contraintes.
+   - `admin_delete_partner_event(p_code, p_id uuid)` : supprime la ligne et renvoie le nombre de lignes supprimées.
+3. **Côté appli.** `AdminPasswordModal` transmet au portail le code vérifié ; le portail le garde **en mémoire seulement** (jamais dans le stockage local, jamais dans un journal) et le passe aux trois fonctions. L'ancienne empreinte `MASTER_HASH` (secours hors ligne) est **supprimée** du client : elle permettait de tester l'ancien code localement.
+4. **Limites assumées.** Pas de limitation de tentatives en v1 (le code choisi doit être long) ; les autres écrans admin (adresses, événements, partenaires) restent tels quels.
+
+Le dépôt GitHub étant public, `secure_admin_and_rls.sql` contient encore l'ancien code en clair dans son historique : après la rotation, l'ancien code doit être considéré comme **compromis** et ne plus servir nulle part.
+
 ## Admin
 
 Dans `AdminPortalModal.tsx` : nouvel onglet « Agenda (n) ».
@@ -76,7 +92,7 @@ Dans `AdminPortalModal.tsx` : nouvel onglet « Agenda (n) ».
 - Liste des événements (à venir d'abord) : adresse, titre, prochaine date, tag de répétition, état actif.
 - Formulaire d'ajout/modification : choix de l'adresse (recherche dans les 790, comme le sélecteur d'adresse des partenaires), titre, description, date, heure de début, heure de fin, case « Répéter chaque semaine » + date de fin, lieu précis, lien.
 - Actions par ligne : modifier, activer/désactiver, retirer (confirmation).
-- Chaque écriture vérifie la réponse de Supabase (`error` ou 0 ligne) ; en cas de refus (RLS), message clair, aucun faux succès (même principe que le Top Partenaires).
+- Toute lecture complète et toute écriture appellent les fonctions `admin_*` avec le code gardé en mémoire ; chaque réponse est vérifiée (`error`, `forbidden`, 0 ligne) avec un message clair, aucun faux succès.
 
 ## Erreurs et cas limites
 
@@ -92,10 +108,11 @@ Dans `AdminPortalModal.tsx` : nouvel onglet « Agenda (n) ».
 
 ## Fichiers
 
-Créés : `docs/…/2026-10-19-agenda-partenaires-design.md`, `src/scripts/004_partner_events.sql`, `src/lib/agendaOccurrences.ts` (+ test), `src/lib/partnerEventsStore.ts`, `src/components/views/AgendaView.tsx`, `src/components/views/agenda/*`.
-Modifiés : `src/components/FloatingDock.tsx`, `src/app/index.tsx`, `src/components/AdminPortalModal.tsx`, `DESIGN_SYSTEM.md` (une ligne sur l'onglet).
+Créés : `docs/…/2026-10-19-agenda-partenaires-design.md`, `src/scripts/004_partner_events.sql`, `src/scripts/005_admin_secure_writes.sql`, `src/lib/agendaOccurrences.ts` (+ test), `src/lib/partnerEventsStore.ts`, `src/components/views/AgendaView.tsx`, `src/components/views/agenda/*`.
+Modifiés : `src/components/FloatingDock.tsx`, `src/app/index.tsx`, `src/components/AdminPortalModal.tsx`, `src/components/AdminPasswordModal.tsx`, `DESIGN_SYSTEM.md` (une ligne sur l'onglet).
 
 ## Points ouverts (non bloquants)
 
-- La base distante n'est modifiable que par le script SQL lancé à la main ; tant qu'il n'est pas lancé, l'onglet affiche l'état d'erreur.
+- La base distante n'est modifiable que par les scripts SQL lancés à la main ; tant que `005` n'est pas lancé, l'admin ne peut pas écrire dans l'agenda.
+- Le commanditaire doit choisir le nouveau code admin (long, non réutilisé) avant d'exécuter `005`.
 - Aucun framework de test n'est installé dans le projet : le test de `expandOccurrences` sera un script Node exécutable (`node --test`) sans nouvelle dépendance.
