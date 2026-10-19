@@ -11,6 +11,9 @@ const SUPABASE_ANON_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrZXN2YXdha3hibHN1aG16YWVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NDAyMjQsImV4cCI6MjA5ODMxNjIyNH0.62JRaNiBqmrt1zEvsJUHjJf6FQ_4NGjxaynLBbxylOI';
 
+/** Vrai dès que l'URL et la clé publique sont connues (variables d'environnement ou valeurs de repli ci-dessus). */
+export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+
 // Custom Storage adapter to persist auth sessions safely across Web & Native
 const ExpoSecureStoreAdapter = {
   getItem: (key: string) => {

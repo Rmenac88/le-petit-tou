@@ -95,7 +95,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react-native';
 
-import { supabase } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { PLACEHOLDER_PHOTO } from '../../constants/placeholder';
 import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
 import AdminPortalModal from '../AdminPortalModal';
@@ -637,9 +637,7 @@ export default function HomeView({
       setLoading(true);
       
       // Check if keys are set
-      const hasUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-      const hasKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-      if (!hasUrl || !hasKey || !supabase) {
+      if (!isSupabaseConfigured || !supabase) {
         setIsConfigured(false);
         setLoading(false);
         return;
