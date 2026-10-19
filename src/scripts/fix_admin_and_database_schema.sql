@@ -1,3 +1,5 @@
+-- NEUTRALISÉ (audit 2026) : ce script DÉSACTIVAIT la sécurité RLS (tables modifiables par tous).
+-- Les lignes concernées activent désormais la RLS. Lance toujours 006_security_lockdown.sql EN DERNIER.
 -- ==============================================================================
 -- LE PETIT TOU — SCRIPT DE CORRECTION SUPABASE (PORTAIL ADMIN & BASE DE DONNÉES)
 -- ==============================================================================
@@ -30,7 +32,7 @@ ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS is_new boolean DEFAULT fal
 ALTER TABLE public.addresses ALTER COLUMN id SET DEFAULT gen_random_uuid();
 
 -- Configuration des permissions (RLS) : Autoriser la création, modification et suppression
-ALTER TABLE public.addresses DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.addresses ENABLE ROW LEVEL SECURITY;
 
 -- ------------------------------------------------------------------------------
 -- 2. TABLE CATEGORIES (Catégories)
@@ -50,7 +52,7 @@ ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS color text DEFAULT '#C528
 ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS slug text;
 ALTER TABLE public.categories ALTER COLUMN id SET DEFAULT gen_random_uuid();
 
-ALTER TABLE public.categories DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 
 -- Insertion des 19 catégories officielles Le Petit Tou
 INSERT INTO public.categories (id, name, icon_name, color, slug) VALUES
@@ -97,7 +99,7 @@ CREATE TABLE IF NOT EXISTS public.events (
 ALTER TABLE public.events ADD COLUMN IF NOT EXISTS address_id text;
 ALTER TABLE public.events ALTER COLUMN id SET DEFAULT gen_random_uuid();
 
-ALTER TABLE public.events DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 
 -- ------------------------------------------------------------------------------
 -- 4. TABLE SPONSORED_PARTNERS (Top Partenaires Netflix)
@@ -123,7 +125,7 @@ CREATE TABLE IF NOT EXISTS public.sponsored_partners (
 
 ALTER TABLE public.sponsored_partners ALTER COLUMN id SET DEFAULT gen_random_uuid();
 
-ALTER TABLE public.sponsored_partners DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sponsored_partners ENABLE ROW LEVEL SECURITY;
 
 -- ------------------------------------------------------------------------------
 -- 5. RELANCER LE CACHE DU SCHÉMA POSTGREST

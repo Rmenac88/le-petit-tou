@@ -1,3 +1,4 @@
+import { safeWebUrl } from '../lib/safeLinks';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import {
@@ -390,11 +391,8 @@ export default function AddressDetailModal({
                 <Pressable
                   style={styles.infoRow}
                   onPress={() => {
-                    let url = spot.website?.trim() || '';
-                    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                      url = 'https://' + url;
-                    }
-                    Linking.openURL(url).catch(() => {});
+                    const url = safeWebUrl(spot.website);
+                    if (url) Linking.openURL(url).catch(() => {});
                   }}
                 >
                   <Globe size={18} color={Brand.primaryDeep} style={styles.infoIcon} />

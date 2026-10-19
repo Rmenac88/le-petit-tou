@@ -1,3 +1,5 @@
+-- NEUTRALISÉ (audit 2026) : ce script DÉSACTIVAIT la sécurité RLS (tables modifiables par tous).
+-- Les lignes concernées activent désormais la RLS. Lance toujours 006_security_lockdown.sql EN DERNIER.
 -- ==============================================================================
 -- RÉPARATION RAPIDE : ERREUR "public.user_push_tokens does not exist"
 -- ==============================================================================
@@ -22,8 +24,8 @@ CREATE TABLE IF NOT EXISTS public.user_push_tokens (
 );
 
 -- Désactivation de la sécurité RLS pour autoriser toutes les opérations
-ALTER TABLE public.user_push_tokens DISABLE ROW LEVEL SECURITY;
-GRANT ALL ON public.user_push_tokens TO anon, authenticated, service_role;
+ALTER TABLE public.user_push_tokens ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.user_push_tokens TO service_role;
 
 -- 2. Supprimer automatiquement tous les triggers obsolètes attachés à la table 'events'
 DO $$

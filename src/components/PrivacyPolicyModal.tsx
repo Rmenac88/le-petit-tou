@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   View,
@@ -8,16 +8,62 @@ import {
   ScrollView,
   SafeAreaView,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { X, ShieldCheck, Lock, MapPin, Trash2, Mail } from 'lucide-react-native';
 
 import { Brand } from '../constants/brand';
+import { supabase } from '../lib/supabase';
+import { authService } from '../lib/authService';
+import { deleteMyData } from '../lib/dataDeletion';
+import { discoveryStore } from '../lib/discoveryStore';
+import { discountCardsStore } from '../lib/discountCardsStore';
+import { clearDeviceLikedSpotIds } from '../lib/likesStore';
 interface PrivacyPolicyModalProps {
   visible: boolean;
   onClose: () => void;
 }
 
+const showMessage = (title: string, message: string) => {
+  if (Platform.OS === 'web') window.alert(`${title}\n\n${message}`);
+  else Alert.alert(title, message);
+};
+
 export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyModalProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const runDeletion = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await deleteMyData({
+        getUserId: () => authService.getUserId(),
+        rpc: (fn, args) => supabase.rpc(fn, args),
+        clearLocal: async () => {
+          await discoveryStore.resetLocal();
+          await discountCardsStore.resetLocal();
+          await clearDeviceLikedSpotIds();
+          await authService.clearSessionAfterDeletion();
+        },
+      });
+      showMessage(res.ok ? 'Données effacées' : 'Effacement impossible', res.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const confirmDeletion = () => {
+    const text = 'Cette action efface définitivement votre progression, vos cartes utilisées, vos suggestions et vos likes.';
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Effacer mes données ?\n\n${text}`)) runDeletion();
+      return;
+    }
+    Alert.alert('Effacer mes données ?', text, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Effacer', style: 'destructive', onPress: runDeletion },
+    ]);
+  };
+
   return (
     <Modal
       visible={visible}
@@ -50,26 +96,39 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
               contentContainerStyle={styles.bodyContent}
               showsVerticalScrollIndicator={true}
             >
-              <Text style={styles.lastUpdate}>Dernière mise à jour : 14 septembre 2026</Text>
+              <Text style={styles.lastUpdate}>Dernière mise à jour : 19 octobre 2026</Text>
 
               <Text style={styles.introText}>
-                L'association <Text style={styles.boldText}>Le Petit Tou</Text> (association loi 1901, domiciliée au 1 Place Alphonse Jourdain, 31000 Toulouse, France) s'engage à protéger la vie privée et les données personnelles des utilisateurs de son application mobile, conformément au Règlement Général sur la Protection des Données (RGPD) et aux réglementations Apple App Store et Google Play.
+                L'association <Text style={styles.boldText}>Le Petit Tou</Text> (association loi 1901, domiciliée au 1 Place Alphonse Jourdain, 31000 Toulouse, France) est responsable du traitement des données décrites ci-dessous, conformément au Règlement Général sur la Protection des Données (RGPD).
               </Text>
 
               {/* Section 1 */}
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
                   <Lock size={18} color="#24242E" />
-                  <Text style={styles.sectionTitle}>1. Respect total de votre anonymat</Text>
+                  <Text style={styles.sectionTitle}>1. Aucun compte, un identifiant aléatoire</Text>
                 </View>
                 <Text style={styles.paragraph}>
-                  L'application Le Petit Tou est un guide urbain accessible à tous, sans aucune obligation d'inscription ni création de compte :
+                  L'application s'utilise sans inscription : nous ne vous demandons ni nom, ni e-mail, ni mot de passe. Pour faire fonctionner la progression, les cartes privilège et les likes, l'application génère toutefois un identifiant aléatoire propre à votre appareil. Il est conservé dans le stockage sécurisé de votre téléphone (Keychain / Keystore) et envoyé à nos serveurs. Il ne permet pas de vous identifier directement, mais il s'agit d'une donnée personnelle au sens du RGPD.
+                </Text>
+                <Text style={styles.paragraph}>Données associées à cet identifiant, et pourquoi :</Text>
+                <Text style={styles.bulletPoint}>
+                  • <Text style={styles.boldText}>Adresses découvertes et points</Text> (date comprise) : faire fonctionner la progression.
                 </Text>
                 <Text style={styles.bulletPoint}>
-                  • <Text style={styles.boldText}>Aucun compte requis :</Text> Nous ne collectons et ne stockons aucune information nominative (ni nom, prénom, adresse email, mot de passe ou profil).
+                  • <Text style={styles.boldText}>Utilisations des cartes privilège</Text> (nombre, dates) : faire respecter le nombre d'utilisations autorisé par carte.
                 </Text>
                 <Text style={styles.bulletPoint}>
-                  • <Text style={styles.boldText}>Favoris et Likes sur l'appareil :</Text> Vos coups de cœur et adresses favorites sont conservés exclusivement sur votre appareil dans un espace de stockage sécurisé (SecureStore). Aucun profil individuel ni historique personnel n'est transmis à nos serveurs.
+                  • <Text style={styles.boldText}>Likes</Text> : un like par appareil et par adresse. Seul le total par adresse est public.
+                </Text>
+                <Text style={styles.bulletPoint}>
+                  • <Text style={styles.boldText}>Suggestions d'adresses</Text> : le texte que vous saisissez volontairement. N'y indiquez pas de données personnelles vous concernant.
+                </Text>
+                <Text style={styles.bulletPoint}>
+                  • <Text style={styles.boldText}>Statistiques de consultation</Text> : l'adresse consultée, sans identifiant, pour mesurer la fréquentation des fiches.
+                </Text>
+                <Text style={styles.paragraph}>
+                  Base légale : exécution du service demandé (progression, cartes) et intérêt légitime de l'association (statistiques agrégées, prévention des abus). Ces données sont conservées jusqu'à ce que vous les effaciez (section 5).
                 </Text>
               </View>
 
@@ -77,13 +136,13 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
                   <MapPin size={18} color="#24242E" />
-                  <Text style={styles.sectionTitle}>2. Géolocalisation & Respect de la vie privée</Text>
+                  <Text style={styles.sectionTitle}>2. Géolocalisation</Text>
                 </View>
                 <Text style={styles.paragraph}>
-                  La localisation est strictement facultative. Elle n'est demandée qu'à l'ouverture de la carte dans le seul but de centrer la vue et de calculer la distance vers les commerces toulousains les plus proches de vous.
+                  La localisation est facultative. Elle n'est demandée qu'à l'ouverture de la carte, uniquement lorsque l'application est ouverte, pour centrer la vue et calculer les distances. Aucun suivi en arrière-plan n'est actif et votre position n'est pas enregistrée sur nos serveurs.
                 </Text>
-                <Text style={[styles.paragraph, styles.highlightBox]}>
-                  <Text style={styles.boldText}>Important :</Text> Aucun suivi de localisation en arrière-plan n'est actif. Votre position GPS n'est jamais enregistrée ni conservée sur nos serveurs.
+                <Text style={styles.paragraph}>
+                  Si vous demandez un itinéraire à pied, votre position et la destination sont transmises au service de cartographie (Mapbox, États-Unis) qui calcule le trajet. La carte elle-même est fournie par Mapbox, Apple Plans ou Google Maps selon votre appareil, qui peuvent recevoir votre adresse IP.
                 </Text>
               </View>
 
@@ -91,10 +150,13 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
                   <ShieldCheck size={18} color="#24242E" />
-                  <Text style={styles.sectionTitle}>3. Absence d'accès aux capteurs sensibles</Text>
+                  <Text style={styles.sectionTitle}>3. Capteurs et notifications</Text>
                 </View>
                 <Text style={styles.paragraph}>
-                  L'application grand public ne demande et n'utilise aucun accès à l'appareil photo, au microphone, au carnet d'adresses ou à la photothèque de votre téléphone.
+                  L'application n'utilise ni le microphone, ni le carnet d'adresses, ni les notifications. L'accès aux photos n'est demandé que dans l'espace réservé à l'équipe du Petit Tou.
+                </Text>
+                <Text style={styles.paragraph}>
+                  Aucun cookie publicitaire, aucun traceur de mesure d'audience et aucun SDK publicitaire n'est utilisé.
                 </Text>
               </View>
 
@@ -102,16 +164,16 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
                   <Lock size={18} color="#24242E" />
-                  <Text style={styles.sectionTitle}>4. Hébergement & Sécurité des flux</Text>
+                  <Text style={styles.sectionTitle}>4. Destinataires et sécurité</Text>
                 </View>
-                <Text style={styles.paragraph}>
-                  Les informations publiques du guide (adresses des commerces, descriptions, horaires) sont hébergées sur des infrastructures chiffrées :
+                <Text style={styles.bulletPoint}>
+                  • <Text style={styles.boldText}>Supabase Inc. :</Text> hébergement de la base de données (sous-traitant). Échanges chiffrés (HTTPS) ; accès aux données de chaque utilisateur limité par des fonctions serveur.
                 </Text>
                 <Text style={styles.bulletPoint}>
-                  • <Text style={styles.boldText}>Supabase Inc. :</Text> Base de données avec communications chiffrées en transit (TLS 1.3) et au repos (AES-256).
+                  • <Text style={styles.boldText}>Mapbox, Apple, Google :</Text> cartographie et itinéraires (voir section 2). Les photos de certaines fiches sont servies par des hébergeurs d'images qui voient votre adresse IP.
                 </Text>
                 <Text style={styles.bulletPoint}>
-                  • <Text style={styles.boldText}>Zéro revente de données :</Text> Aucune donnée personnelle n'est vendue, louée, partagée ou exploitée à des fins publicitaires ou de ciblage commercial.
+                  • <Text style={styles.boldText}>Aucune revente :</Text> vos données ne sont ni vendues, ni louées, ni utilisées pour de la publicité ciblée.
                 </Text>
               </View>
 
@@ -119,16 +181,29 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
               <View style={[styles.section, { marginBottom: 30 }]}>
                 <View style={styles.sectionHeaderRow}>
                   <Trash2 size={18} color="#24242E" />
-                  <Text style={styles.sectionTitle}>5. Droits RGPD & Réinitialisation</Text>
+                  <Text style={styles.sectionTitle}>5. Vos droits et l'effacement</Text>
                 </View>
                 <Text style={styles.paragraph}>
-                  Dans la mesure où l'application ne recueille aucune donnée personnelle nominative sur ses serveurs, aucun identifiant ni profil n'est conservé.
-                </Text>
-                <Text style={styles.bulletPoint}>
-                  • Vous pouvez à tout moment réinitialiser vos favoris locaux en réinitialisant les données de l'application ou en la désinstallant.
+                  Vous disposez des droits d'accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité. Vous pouvez aussi introduire une réclamation auprès de la CNIL (cnil.fr).
                 </Text>
                 <Text style={styles.paragraph}>
-                  Pour toute question concernant notre politique de confidentialité, vous pouvez contacter notre équipe à :
+                  Le bouton ci-dessous efface immédiatement de nos serveurs et de cet appareil votre progression, vos cartes utilisées, vos suggestions et vos likes. Cette action est définitive.
+                </Text>
+                <Pressable
+                  style={[styles.deleteBtn, isDeleting && { opacity: 0.6 }]}
+                  onPress={confirmDeletion}
+                  disabled={isDeleting}
+                  accessibilityRole="button"
+                  accessibilityLabel="Effacer mes données"
+                >
+                  {isDeleting ? (
+                    <ActivityIndicator color={Brand.white} />
+                  ) : (
+                    <Text style={styles.deleteBtnText}>Effacer mes données</Text>
+                  )}
+                </Pressable>
+                <Text style={styles.paragraph}>
+                  Pour toute autre demande ou question, écrivez-nous :
                 </Text>
                 <Text style={styles.contactEmail}>contact@lepetittou.net</Text>
                 <Text style={styles.paragraph}>
@@ -264,6 +339,19 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F5F0F2',
     backgroundColor: Brand.white,
+  },
+  deleteBtn: {
+    minHeight: 44,
+    borderRadius: 12,
+    backgroundColor: Brand.primaryDeep,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 12,
+  },
+  deleteBtnText: {
+    color: Brand.white,
+    fontSize: 15,
+    fontWeight: '700',
   },
   confirmBtn: {
     backgroundColor: Brand.primaryDeep,

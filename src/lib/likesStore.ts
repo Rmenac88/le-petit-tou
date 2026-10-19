@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { supabase } from './supabase';
+import { getOrCreateDeviceId } from './deviceIdentity';
 
 const LIKES_STORAGE_KEY = 'LPT_DEVICE_LIKED_SPOTS';
 
@@ -30,6 +31,11 @@ const storage = {
       await SecureStore.setItemAsync(key, value);
     } catch (e) {}
   },
+};
+
+// Efface les likes mémorisés sur cet appareil (effacement des données, RGPD)
+export const clearDeviceLikedSpotIds = async (): Promise<void> => {
+  await storage.setItem(LIKES_STORAGE_KEY, '[]');
 };
 
 // Charge la liste des identifiants likés par ce terminal
@@ -124,29 +130,16 @@ export const toggleSpotLike = async (
     } catch (e) {}
   }
 
-  // Synchronisation distante avec Supabase via RPC atomique
+  // Synchronisation distante via fonction serveur (un like par appareil, delta contrôlé côté base)
   (async () => {
     try {
-      const { data, error } = await supabase.rpc('increment_spot_like', {
+      const deviceId = await getOrCreateDeviceId();
+      const { error } = await supabase.rpc('increment_spot_like', {
         p_spot_id: idStr,
         p_delta: delta,
+        p_device_id: deviceId,
       });
-
-      if (error) {
-        // Si la RPC n'est pas encore déployée, tentative d'upsert direct
-        const { data: existing } = await supabase
-          .from('spot_likes')
-          .select('likes_count')
-          .eq('spot_id', idStr)
-          .single();
-
-        const baseVal = existing ? (existing.likes_count || 0) : 0;
-        await supabase.from('spot_likes').upsert({
-          spot_id: idStr,
-          likes_count: Math.max(0, baseVal + delta),
-          updated_at: new Date().toISOString(),
-        });
-      }
+      if (error) console.warn('RPC increment_spot_like error:', error.message);
     } catch (rpcErr) {
       console.warn('RPC increment_spot_like error:', rpcErr);
     }

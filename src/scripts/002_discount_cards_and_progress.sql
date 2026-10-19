@@ -1,3 +1,5 @@
+-- ATTENTION (audit 2026) : les politiques et fonctions de ce script sont REMPLACÉES par 006_security_lockdown.sql.
+-- Ordre d'installation : ce script, puis 004, 005 (nouveau code admin), et 006 EN DERNIER. Ne jamais rejouer ce script après 006.
 -- ==============================================================================
 -- LE PETIT TOU — MIGRATION 002 : CARTES DE RÉDUCTION, UTILISATIONS & PROGRESSION
 -- ==============================================================================

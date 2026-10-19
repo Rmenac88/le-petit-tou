@@ -1,3 +1,4 @@
+import { safeTelUrl, safeWebUrl } from '../lib/safeLinks';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
@@ -403,7 +404,10 @@ export default function PlaceDetailSheet({
             {(spot.phone || spot.telephone) && (
               <Pressable
                 style={styles.metaInfoRow}
-                onPress={() => Linking.openURL(`tel:${spot.phone || spot.telephone}`)}
+                onPress={() => {
+                  const tel = safeTelUrl(spot.phone || spot.telephone);
+                  if (tel) Linking.openURL(tel).catch(() => {});
+                }}
               >
                 <Phone size={17} color={Brand.primaryDeep} />
                 <Text style={styles.metaInfoLink}>
@@ -416,7 +420,10 @@ export default function PlaceDetailSheet({
             {(spot.website || spot.site_web) && (
               <Pressable
                 style={styles.metaInfoRow}
-                onPress={() => Linking.openURL(spot.website || spot.site_web || '')}
+                onPress={() => {
+                  const web = safeWebUrl(spot.website || spot.site_web);
+                  if (web) Linking.openURL(web).catch(() => {});
+                }}
               >
                 <Globe size={17} color="#2563EB" />
                 <Text style={styles.metaInfoLink} numberOfLines={1}>

@@ -59,7 +59,10 @@ export async function adminSavePartnerEvent(code: string, event: SaveInput): Pro
       p_event: event,
     });
     if (error) throw toAgendaError(error);
-    if (!data) throw toAgendaError(null);
+    // Code refusé : le serveur répond null (sans exception, pour que l'échec soit journalisé)
+    if (!data || !(data as PartnerEventRow).id) {
+      throw new AgendaError('forbidden', 'Code admin refusé ou trop de tentatives : réessaie dans quelques minutes.');
+    }
     return data as PartnerEventRow;
   } catch (err) {
     throw err instanceof AgendaError ? err : toAgendaError(err);
@@ -75,6 +78,9 @@ export async function adminDeletePartnerEvent(code: string, id: string): Promise
       p_id: id,
     });
     if (error) throw toAgendaError(error);
+    if (data === -1) {
+      throw new AgendaError('forbidden', 'Code admin refusé ou trop de tentatives : réessaie dans quelques minutes.');
+    }
     return typeof data === 'number' ? data : 0;
   } catch (err) {
     throw err instanceof AgendaError ? err : toAgendaError(err);

@@ -20,8 +20,10 @@ from datetime import datetime, timedelta, timezone
 import urllib.request
 import urllib.parse
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://hyebhmsakbovmfxhghbb.supabase.co")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5ZWJobXNha2Jvdm1meGhnaGJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzODU4ODIsImV4cCI6MjA1NTk2MTg4Mn0.Uq-a77QWp991w8m9xV6F0a2U4k5i7z6l2m8n0q1r3s")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")  # clé service_role : à fournir par variable d'environnement uniquement
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise SystemExit("SUPABASE_URL et SUPABASE_KEY doivent être définies dans l'environnement.")
 
 EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 

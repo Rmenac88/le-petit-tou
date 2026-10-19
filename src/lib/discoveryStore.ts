@@ -81,10 +81,8 @@ class DiscoveryStore {
       await this.flushPendingQueue(userId);
 
       // Récupérer toutes les découvertes enregistrées pour cet utilisateur / terminal
-      const { data, error } = await supabase
-        .from('user_place_discoveries')
-        .select('place_id, points_awarded')
-        .or(`user_id.eq.${userId},device_id.eq.${userId}`);
+      // Lecture via fonction serveur : la table n'est plus accessible directement (migration 006)
+      const { data, error } = await supabase.rpc('get_my_discoveries', { p_device_id: userId });
 
       if (!error && Array.isArray(data)) {
         data.forEach((row: any) => {
@@ -201,6 +199,15 @@ class DiscoveryStore {
       pointsAwarded: points,
       isFirstTime: true,
     };
+  }
+
+  // Effacement local complet (cache, file d'attente) après suppression côté serveur
+  public async resetLocal(): Promise<void> {
+    this.discoveredIds.clear();
+    this.pointsMap.clear();
+    await appStorage.removeItem(DISCOVERIES_STORAGE_KEY);
+    await appStorage.removeItem(PENDING_SYNC_QUEUE_KEY);
+    this.notify();
   }
 
   // 6. Vérifier si une adresse est découverte

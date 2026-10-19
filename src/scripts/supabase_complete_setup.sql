@@ -1,3 +1,6 @@
+-- NEUTRALISÉ (audit 2026) : les DISABLE ROW LEVEL SECURITY ont été remplacés par ENABLE. Lance 006 EN DERNIER.
+-- ATTENTION (audit 2026) : les politiques et fonctions de ce script sont REMPLACÉES par 006_security_lockdown.sql.
+-- Ordre d'installation : ce script, puis 004, 005 (nouveau code admin), et 006 EN DERNIER. Ne jamais rejouer ce script après 006.
 -- ==============================================================================
 -- LE PETIT TOU — SCRIPT GLOBAL SUPABASE : PERFORMANCES, COMMERÇANTS & NOTIFICATIONS
 -- ==============================================================================
@@ -58,7 +61,7 @@ CREATE INDEX IF NOT EXISTS idx_address_views_date
 ON public.address_views (viewed_at DESC);
 
 -- Permissions de lecture/écriture
-ALTER TABLE public.address_views DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.address_views ENABLE ROW LEVEL SECURITY;
 
 
 -- ------------------------------------------------------------------------------
@@ -80,7 +83,7 @@ CREATE TABLE IF NOT EXISTS public.user_push_tokens (
 CREATE INDEX IF NOT EXISTS idx_user_push_tokens_user 
 ON public.user_push_tokens (user_id);
 
-ALTER TABLE public.user_push_tokens DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_push_tokens ENABLE ROW LEVEL SECURITY;
 
 
 -- ------------------------------------------------------------------------------
@@ -138,7 +141,7 @@ ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS full_description text;
 ALTER TABLE public.events ADD COLUMN IF NOT EXISTS address_id text;
 
 -- 1. Sécurisation et permissions de la table addresses
-ALTER TABLE public.addresses DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.addresses ENABLE ROW LEVEL SECURITY;
 
 -- 2. Sécurisation de la table address_views (Vues commerçants)
 ALTER TABLE public.address_views ENABLE ROW LEVEL SECURITY;
@@ -172,7 +175,7 @@ USING (true)
 WITH CHECK (true);
 
 -- 4. Sécurisation de la table sponsored_partners
-ALTER TABLE public.sponsored_partners DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sponsored_partners ENABLE ROW LEVEL SECURITY;
 
 -- 5. Sécurisation de la table merchant_offers
 ALTER TABLE public.merchant_offers ENABLE ROW LEVEL SECURITY;

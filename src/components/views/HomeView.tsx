@@ -1,3 +1,4 @@
+import { safeWebUrl } from '../../lib/safeLinks';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet,
@@ -323,7 +324,7 @@ export const getEventBookingUrl = (event: any): string => {
 };
 
 export const redirectToBookingUrl = (url: string) => {
-  const targetUrl = url && (url.startsWith('http://') || url.startsWith('https://')) ? url : `https://${url || DEFAULT_BOOKING_URL}`;
+  const targetUrl = safeWebUrl(url) ?? safeWebUrl(DEFAULT_BOOKING_URL) ?? DEFAULT_BOOKING_URL;
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     try {
       window.location.href = targetUrl;

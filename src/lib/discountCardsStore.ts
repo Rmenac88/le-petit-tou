@@ -160,10 +160,9 @@ class DiscountCardsStore {
         .eq('is_active', true);
 
       // 2. Charger les utilisations de cet utilisateur / terminal
-      const { data: userCards, error: userCardsError } = await supabase
-        .from('user_discount_cards')
-        .select('discount_card_id, uses_count')
-        .or(`user_id.eq.${userId},device_id.eq.${userId}`);
+      const { data: userCards, error: userCardsError } = await supabase.rpc('get_my_card_usage', {
+        p_device_id: userId,
+      });
 
       const usageMap = new Map<string, number>();
       if (!userCardsError && Array.isArray(userCards)) {
@@ -222,13 +221,21 @@ class DiscountCardsStore {
       };
     }
 
-    // 1. Déduction optimiste locale immédiate (0 ms)
+    // 1. Déduction optimiste locale immédiate (0 ms), annulée si le serveur refuse
+    const previousUses = card.uses_count;
     card.uses_count += 1;
     card.remaining_uses = Math.max(0, card.max_uses - card.uses_count);
     await this.saveLocalCache();
     this.notify();
 
-    // 2. Validation serveur atomique RPC
+    const rollback = async (serverUses?: number) => {
+      card.uses_count = serverUses ?? previousUses;
+      card.remaining_uses = Math.max(0, card.max_uses - card.uses_count);
+      await this.saveLocalCache();
+      this.notify();
+    };
+
+    // 2. Validation serveur atomique (RPC) : seule source de vérité du quota
     try {
       const userId = await authService.getUserId();
       const { data, error } = await supabase.rpc('use_discount_card', {
@@ -236,20 +243,41 @@ class DiscountCardsStore {
         p_device_id: userId,
       });
 
-      if (!error && data && data.success) {
+      if (error) {
+        console.warn('[DiscountCardsStore] RPC use_discount_card error:', error);
+        await rollback();
+        return { success: false, error: 'Connexion impossible : réessayez dans un instant.', remaining_uses: card.remaining_uses };
+      }
+      if (data && data.success) {
         card.uses_count = Number(data.uses_count) || card.uses_count;
-        card.remaining_uses = Number(data.remaining_uses) || card.remaining_uses;
+        card.remaining_uses = Math.max(0, Number(data.remaining_uses));
         await this.saveLocalCache();
         this.notify();
         return { success: true, remaining_uses: card.remaining_uses };
-      } else if (error) {
-        console.warn('[DiscountCardsStore] RPC use_discount_card fallback:', error);
       }
+      // Refus serveur (quota atteint, carte expirée, identité invalide) : on s'aligne sur le serveur
+      await rollback(typeof data?.uses_count === 'number' ? Number(data.uses_count) : undefined);
+      const quota = data?.error === 'QUOTA_MAX_ATTEINT';
+      return {
+        success: false,
+        error: quota
+          ? 'Toutes les utilisations de cette carte ont été consommées.'
+          : 'Cette carte n\'est plus utilisable.',
+        remaining_uses: card.remaining_uses,
+      };
     } catch (e) {
-      console.warn('[DiscountCardsStore] Server error, local count applied:', e);
+      console.warn('[DiscountCardsStore] Server error:', e);
+      await rollback();
+      return { success: false, error: 'Connexion impossible : réessayez dans un instant.', remaining_uses: card.remaining_uses };
     }
+  }
 
-    return { success: true, remaining_uses: card.remaining_uses };
+  // Effacement local après suppression côté serveur : les compteurs repartent de zéro
+  public async resetLocal(): Promise<void> {
+    await appStorage.removeItem(CARDS_STORAGE_KEY);
+    this.cards = DEFAULT_DISCOUNT_CARDS.map((c) => ({ ...c, uses_count: 0, remaining_uses: c.max_uses }));
+    this.notify();
+    await this.syncWithSupabase();
   }
 
   public getCards(): DiscountCard[] {

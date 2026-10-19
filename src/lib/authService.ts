@@ -85,8 +85,19 @@ class AuthService {
     return this.initPromise;
   }
 
+  /** Identifiant déjà connu, ou chaîne vide : ne jamais l'envoyer au serveur tel quel (il le refuserait). */
   public getUserIdSync(): string {
-    return this.cachedUserId || 'anonymous-user';
+    return this.cachedUserId || '';
+  }
+
+  /** Après effacement des données : ferme la session locale éventuelle (le compte a été supprimé côté serveur). */
+  public async clearSessionAfterDeletion(): Promise<void> {
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch {}
+    this.currentSession = null;
+    this.currentUser = null;
+    this.notify();
   }
 
   public async getUserId(): Promise<string> {

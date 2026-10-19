@@ -13,7 +13,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "CFBundleDisplayName": "Le Petit Tou",
-        "NSLocationWhenInUseUsageDescription": "Le Petit Tou utilise votre position lorsque l'application est ouverte pour afficher les établissements toulousains recommandés les plus proches de vous."
+        "NSLocationWhenInUseUsageDescription": "Le Petit Tou utilise votre position lorsque l'application est ouverte pour afficher les établissements toulousains recommandés les plus proches de vous.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -28,7 +29,14 @@
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
       ],
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "web": {
       "output": "single",
@@ -47,7 +55,24 @@
         }
       ],
       "expo-secure-store",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Le Petit Tou accède à vos photos uniquement dans l'espace réservé à l'équipe, pour ajouter des visuels aux adresses.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Le Petit Tou utilise votre position lorsque l'application est ouverte pour afficher les établissements toulousains recommandés les plus proches de vous.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

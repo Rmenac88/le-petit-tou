@@ -1,3 +1,5 @@
+-- NEUTRALISÉ (audit 2026) : ce script DÉSACTIVAIT la sécurité RLS (tables modifiables par tous).
+-- Les lignes concernées activent désormais la RLS. Lance toujours 006_security_lockdown.sql EN DERNIER.
 -- ==============================================================================
 -- LE PETIT TOU — SYSTÈME COMMERÇANT & TRACKING FRÉQUENTATION
 -- ==============================================================================
@@ -25,4 +27,4 @@ CREATE INDEX IF NOT EXISTS idx_address_views_date
 ON public.address_views (viewed_at DESC);
 
 -- 4. Permissions
-ALTER TABLE public.address_views DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.address_views ENABLE ROW LEVEL SECURITY;
