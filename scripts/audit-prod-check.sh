@@ -41,7 +41,9 @@ if [ -n "${OLD_ADMIN_CODE:-}" ]; then
 fi
 
 # 4. Fonctions attendues présentes (006 appliquée)
-for f in admin_write get_my_discoveries get_my_card_usage delete_my_data; do
+r=$(curl -s -X POST "${H[@]}" "$URL/rest/v1/rpc/admin_write" -d '{"p_code":"audit-mauvais-code","p_table":"events","p_op":"insert","p_record":{"title":"x"}}')
+check "fonction déployée et refuse un mauvais code : admin_write" 1 $(echo "$r" | grep -q '"forbidden"' && echo 1 || echo 0)
+for f in get_my_discoveries get_my_card_usage delete_my_data; do
   code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${H[@]}" "$URL/rest/v1/rpc/$f" -d '{}')
   present=1; [ "$code" = "404" ] && present=0
   check "fonction déployée : $f (HTTP $code)" 1 $present
