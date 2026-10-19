@@ -532,6 +532,7 @@ export default function HomeView({
   const [successEvent, setSuccessEvent] = useState<any | null>(null);
   const [infoAlert, setInfoAlert] = useState<{ title: string; message: string; type?: 'info' | 'warning' | 'error' } | null>(null);
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const adminCodeRef = useRef('');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
@@ -2532,7 +2533,8 @@ export default function HomeView({
       <AdminPasswordModal
         visible={showPasswordModal}
         onClose={() => setShowPasswordModal(false)}
-        onSuccess={() => {
+        onSuccess={(code) => {
+          adminCodeRef.current = code; // en mémoire seulement, jamais stocké
           setShowPasswordModal(false);
           setShowAdminModal(true);
         }}
@@ -2542,11 +2544,14 @@ export default function HomeView({
       {showAdminModal && (
         <AdminPortalModal
           visible={showAdminModal}
+          adminCode={adminCodeRef.current}
           onClose={() => {
+            adminCodeRef.current = '';
             setShowAdminModal(false);
             loadSupabaseData(true);
           }}
           onLogout={() => {
+            adminCodeRef.current = '';
             setShowAdminModal(false);
             loadSupabaseData(true);
           }}

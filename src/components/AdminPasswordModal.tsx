@@ -16,20 +16,9 @@ import { Brand } from '../constants/brand';
 interface AdminPasswordModalProps {
   visible: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  /** Reçoit le code vérifié : le portail le garde en mémoire pour ses écritures protégées. */
+  onSuccess: (code: string) => void;
 }
-
-// Empreinte cryptographique SHA-256 du code d'administration (aucun mot de passe en clair)
-const MASTER_HASH = '25a52cccd2b92d04a6faa55b3e1bab0c490dc15f76b9435005c099ad90faa8c4';
-
-const computeHash = async (msg: string): Promise<string> => {
-  if (typeof crypto !== 'undefined' && crypto?.subtle) {
-    const data = new TextEncoder().encode(msg);
-    const buffer = await crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-  return '';
-};
 
 export default function AdminPasswordModal({
   visible,
@@ -55,45 +44,23 @@ export default function AdminPasswordModal({
     setErrorMsg('');
 
     try {
-      // 1. Validation distante sécurisée via RPC Supabase
+      // Vérification uniquement côté serveur (fonction Supabase) : plus aucun contrôle local de secours.
       const { data, error } = await supabase.rpc('verify_admin_access', { access_code: cleanPass });
-      
-      let isValid = !error && data === true;
-
-      // 2. Validation de secours par comparaison de hachage cryptographique
-      if (!isValid) {
-        const hash = await computeHash(cleanPass);
-        if (hash && hash === MASTER_HASH) {
-          isValid = true;
-        }
-      }
-
-      if (isValid) {
+      if (!error && data === true) {
         setIsSuccess(true);
         setTimeout(() => {
           setPassword('');
           setIsSuccess(false);
           setIsVerifying(false);
-          onSuccess();
+          onSuccess(cleanPass);
         }, 350);
       } else {
         setIsVerifying(false);
-        setErrorMsg('Clé d\'accès incorrecte.');
+        setErrorMsg(error ? 'Connexion impossible. Réessaie dans un instant.' : "Clé d'accès incorrecte.");
       }
-    } catch (e) {
-      const hash = await computeHash(cleanPass);
-      if (hash && hash === MASTER_HASH) {
-        setIsSuccess(true);
-        setTimeout(() => {
-          setPassword('');
-          setIsSuccess(false);
-          setIsVerifying(false);
-          onSuccess();
-        }, 350);
-      } else {
-        setIsVerifying(false);
-        setErrorMsg('Clé d\'accès incorrecte.');
-      }
+    } catch {
+      setIsVerifying(false);
+      setErrorMsg('Connexion impossible. Réessaie dans un instant.');
     }
   };
 

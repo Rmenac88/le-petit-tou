@@ -60,6 +60,7 @@ import {
 } from '../lib/categoryResolver';
 
 import { Brand } from '../constants/brand';
+import AgendaAdminPanel from './admin/AgendaAdminPanel';
 const generateUUID = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -136,12 +137,15 @@ const uploadMediaToSupabase = async (
 
 interface AdminPortalModalProps {
   visible: boolean;
+  /** Code admin vérifié, gardé en mémoire par l'écran d'accueil (jamais stocké). */
+  adminCode?: string;
   onClose: () => void;
   onLogout?: () => void;
 }
 
-export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPortalModalProps) {
-  const [activeTab, setActiveTab] = useState<'spots' | 'editSpot' | 'categories' | 'events' | 'partners'>('spots');
+export default function AdminPortalModal({ visible, adminCode, onClose, onLogout }: AdminPortalModalProps) {
+  const [agendaCount, setAgendaCount] = useState(0);
+  const [activeTab, setActiveTab] = useState<'spots' | 'editSpot' | 'categories' | 'events' | 'partners' | 'agenda'>('spots');
 
   // Spots Data & Filters State
   const [spots, setSpots] = useState<any[]>(dataset.addresses || []);
@@ -1007,6 +1011,10 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
               <Sparkles size={14} color={activeTab === 'partners' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
               <Text style={[styles.tabBtnText, activeTab === 'partners' && styles.tabBtnTextActive]}>Top Partenaires ({partners.length})</Text>
             </Pressable>
+            <Pressable style={[styles.tabBtn, activeTab === 'agenda' && styles.tabBtnActive]} onPress={() => setActiveTab('agenda')}>
+              <Calendar size={14} color={activeTab === 'agenda' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
+              <Text style={[styles.tabBtnText, activeTab === 'agenda' && styles.tabBtnTextActive]}>Agenda ({agendaCount})</Text>
+            </Pressable>
           </ScrollView>
         </View>
 
@@ -1493,6 +1501,10 @@ export default function AdminPortalModal({ visible, onClose, onLogout }: AdminPo
           )}
 
           {/* ── TAB 5: TOP PARTENAIRES (STYLE NETFLIX) ── */}
+          {activeTab === 'agenda' && (
+            <AgendaAdminPanel adminCode={adminCode} spots={spots} onCountChange={setAgendaCount} />
+          )}
+
           {activeTab === 'partners' && (
             <ScrollView ref={partnersScrollRef} style={{ flex: 1, padding: 16 }} contentContainerStyle={{ paddingBottom: 60 }}>
               <View style={styles.formCard}>
