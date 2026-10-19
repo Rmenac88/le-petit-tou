@@ -46,3 +46,9 @@ example
 .home/
 .npm/
 .chrome_profile/
+
+# Secrets de services (Firebase, comptes de service Google)
+google-services.json
+GoogleService-Info.plist
+*service-account*.json
+*-firebase-adminsdk-*.json

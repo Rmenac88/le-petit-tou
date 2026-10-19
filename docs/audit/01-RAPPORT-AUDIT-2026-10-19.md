@@ -5,6 +5,17 @@
 - **Identifiants** : iOS `fr.lepetittou.app`, Android `fr.lepetittou.app`, version 1.0.0.
 - Ce document ne délivre **aucune certification juridique** et ne présume pas de l'approbation d'Apple ou de Google.
 
+
+> ## Addendum du 19/10/2026 (soir) — état après correctifs
+>
+> **Vérifié en production** (script `audit-prod-check.sh`, 19/10) : écriture directe du catalogue refusée (S-01), tables utilisateur illisibles (S-03/S-05/S-07), ancien code admin refusé après rotation (S-02), fonctions `admin_write`, `get_my_discoveries`, `get_my_card_usage`, `delete_my_data` déployées et testées de bout en bout avec un appareil fictif (découverte idempotente, quota des cartes, likes bornés, effacement).
+> **Restent ouverts** : S-10 (inscriptions e-mail/Google à fermer dans Supabase), D-02/D-03 (pages web : créées dans `public/`, champs `[À COMPLÉTER]` à remplir et à héberger), C-01 (jeton Mapbox dans EAS).
+>
+> **Ajouté depuis** : notifications push complètes (migration `007`, module client, écran de réglages, onglet admin) ; garde-fous anti-plantage (`ErrorBoundary` sur chaque onglet et le portail admin) ; verrouillage du portail après 15 min d'inactivité ; `app.config.js` qui **refuse un build de production** sans clé Google Maps, jeton Mapbox ni fichier Firebase ; pages légales web ; purge automatique des données (24 mois d'inactivité, consultations 13 mois, journaux 30 jours) ; correctif de l'accueil sans fichier `.env`.
+> **Tests** : 63 unitaires, 54 SQL (dont 25 pour les notifications), `tsc` propre, 3 bundles de production générés.
+> **Reste non fait / non prouvé** : migration 007 non encore déployée ; **aucune notification réelle reçue sur un téléphone** ; carte native et localisation jamais vues tourner ; Expo Go plante sur l'iPhone de test (cause inconnue) ; accessibilité non testée avec VoiceOver/TalkBack ; clé Google Maps Android et fichier Firebase à créer ; comptes Apple/Google à ouvrir ; performances non mesurées.
+> **Décision inchangée : NON PRÊTE POUR SOUMISSION.** Marche à suivre : `docs/audit/02-PUBLICATION.md`.
+
 ---
 
 ## A. Résumé exécutif
@@ -115,17 +126,19 @@ Gravité : P0 critique, P1 élevée, P2 modérée, P3 faible. « Corrigé » = c
 
 ## E. Rapport notifications
 
-**Constat : aucune notification (push ou locale) n'est implémentée dans l'application.** Aucun import de `expo-notifications` dans `src/`, aucun enregistrement de jeton, aucune table active (`user_push_tokens` est vide et fermée par 006). Le script `src/scripts/send_push_notification.py` lit une table que l'appli ne remplit jamais. Les dépendances `expo-notifications`/`expo-task-manager` inutilisées ont été retirées.
+**Constat initial** : aucune notification n'existait. **Depuis** : chaîne complète implémentée (migration `007`, `src/lib/pushNotifications.ts`, écran « Notifications », onglet admin). **Statut : implémentée et testée côté serveur sur base simulée ; non déployée ; jamais reçue sur un appareil réel.**
 
-| Événement métier | Condition | Destinataire | Canal | Déclencheur | Backend | Statut |
+| Événement | Condition | Destinataire | Canal | Déclencheur | Traitement | Statut |
 |---|---|---|---|---|---|---|
-| Nouvelle adresse créée | Adresse publiée par l'admin | Utilisateurs intéressés (catégorie/zone suivie) | Push | Aucun | Aucun | **Non implémenté** (aucune fonction « suivre » n'existe) |
-| Nouvel événement / date d'agenda | `events` / `partner_events` créé | Abonnés « événements » | Push | Aucun (un ancien trigger cassé a été supprimé via `fix_user_push_tokens.sql`) | Aucun | Non implémenté |
-| Carte privilège : quota presque atteint / expirée | — | Détenteur | Local | Aucun | Aucun | Non implémenté |
-| Alerte de sécurité / suppression de données | — | Utilisateur | In-app | Message affiché à l'écran | Fonction `delete_my_data` | Implémenté (retour visuel, pas de notification) |
-| Rappels, messages, changement d'état de ressources | — | — | — | — | — | Sans objet (aucune fonction correspondante) |
+| Nouvel événement | `INSERT` dans `events` | Appareils inscrits avec « Événements » | Push | trigger SQL non bloquant | file `push_outbox` → distribution → API Expo | Testé (simulé) |
+| Nouvelle date d'agenda | `INSERT` dans `partner_events` actif | « Agenda des partenaires » | Push | trigger | idem | Testé (simulé) |
+| Nouvelle adresse | `INSERT` dans `addresses` avec `is_new` | « Nouvelles adresses » (désactivé par défaut) | Push | trigger ; plusieurs adresses regroupées en un message | idem | Testé (simulé) |
+| Annonce libre | Admin (portail) | Appareils inscrits « Événements » | Push | `admin_send_push` ; hors plafond | idem | Testé (simulé) |
+| Date d'agenda modifiée/annulée, alerte de sécurité, rappels, messages | — | — | — | — | — | **Volontairement non implémenté** (pas de besoin identifié, risque de spam) |
 
-Si la fonction est souhaitée plus tard, prérequis : table de jetons avec RLS via une fonction `register_push_token`, préférences opt-in, Edge Function ou worker avec clé `service_role` côté serveur, identifiants d'idempotence, purge des jetons invalides (réponses `DeviceNotRegistered` d'Expo), APNs/FCM configurés, tests sur appareils réels. **Aucun de ces éléments n'existe ni n'a été testé.**
+Règles de fiabilité testées : anti-doublon (type + référence uniques), plafond 2 push/24 h/appareil, heures calmes 21 h-8 h (Paris), message périmé après 24 h jamais envoyé, 3 tentatives sur erreur serveur ou absence de réponse, jeton `DeviceNotRegistered` invalidé (ticket et reçu), reçus relus après 15 min, déclencheurs qui ne bloquent jamais la création de contenu, purge des journaux à 30 jours, jetons effacés avec « Effacer mes données ».
+
+**Non vérifié** : envoi réel à l'API Expo (réponses simulées), acceptation par APNs/FCM, affichage sur iPhone et Android (app ouverte, en arrière-plan, fermée), ouverture du bon écran au toucher, comportement des permissions propre à chaque système, configuration APNs/FCM, `pg_net` et `pg_cron` actifs sur le projet. Un reçu « ok » prouverait l'acceptation par le fournisseur, pas l'affichage.
 
 ---
 

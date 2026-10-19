@@ -72,6 +72,12 @@
           "isAndroidBackgroundLocationEnabled": false,
           "isAndroidForegroundServiceEnabled": false
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#E84A5F"
+        }
       ]
     ],
     "experiments": {

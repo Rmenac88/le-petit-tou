@@ -43,10 +43,17 @@ fi
 # 4. Fonctions attendues présentes (006 appliquée)
 r=$(curl -s -X POST "${H[@]}" "$URL/rest/v1/rpc/admin_write" -d '{"p_code":"audit-mauvais-code","p_table":"events","p_op":"insert","p_record":{"title":"x"}}')
 check "fonction déployée et refuse un mauvais code : admin_write" 1 $(echo "$r" | grep -q '"forbidden"' && echo 1 || echo 0)
-for f in get_my_discoveries get_my_card_usage delete_my_data; do
+for f in get_my_discoveries get_my_card_usage delete_my_data get_push_preferences; do
   code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${H[@]}" "$URL/rest/v1/rpc/$f" -d '{}')
   present=1; [ "$code" = "404" ] && present=0
   check "fonction déployée : $f (HTTP $code)" 1 $present
+done
+
+# 4b. Notifications (007) : tables fermées
+for t in push_devices push_outbox push_deliveries push_requests; do
+  code=$(curl -s -o /dev/null -w "%{http_code}" "${H[@]}" "$URL/rest/v1/$t?select=*&limit=1")
+  leaked=1; case "$code" in 401|403|404) leaked=0;; esac
+  check "lecture anonyme impossible : $t (HTTP $code)" 0 $leaked
 done
 
 # 5. Inscriptions inutiles : l'appli n'a aucun écran de connexion

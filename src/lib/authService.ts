@@ -5,6 +5,12 @@ import { getOrCreateDeviceId } from './deviceIdentity';
 
 const AUTH_USER_ID_KEY = 'LPT_AUTHENTICATED_USER_ID_V1';
 
+/**
+ * La connexion anonyme Supabase est désactivée sur le projet (réponse 422 à chaque lancement) :
+ * l'appli s'appuie sur l'identifiant d'appareil. À passer à true seulement si elle est activée côté serveur.
+ */
+const USE_SUPABASE_ANONYMOUS_AUTH = false;
+
 type AuthListener = (user: User | null, isAnonymous: boolean) => void;
 
 class AuthService {
@@ -43,8 +49,10 @@ class AuthService {
           return session.user.id;
         }
 
-        // 3. Pas de session active : initialisation Supabase Anonymous Auth
-        const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
+        // 3. Pas de session active : Supabase Anonymous Auth (si activée côté serveur)
+        const { data: authData, error: authError } = USE_SUPABASE_ANONYMOUS_AUTH
+          ? await supabase.auth.signInAnonymously()
+          : { data: null, error: new Error('anonymous auth disabled') };
 
         if (!authError && authData?.user) {
           this.currentSession = authData.session;

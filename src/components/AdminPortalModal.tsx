@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -51,6 +51,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { createAdminDb } from '../lib/adminApi';
+import { ADMIN_IDLE_LOCK_MS } from '../constants/config';
 import dataset from '../constants/dataset.json';
 import { getStoredPartners, saveStoredPartners } from '../lib/partnersStore';
 import { dataStore } from '../lib/dataStore';
@@ -62,6 +63,7 @@ import {
 
 import { Brand } from '../constants/brand';
 import AgendaAdminPanel from './admin/AgendaAdminPanel';
+import PushAdminPanel from './admin/PushAdminPanel';
 const generateUUID = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -147,8 +149,22 @@ interface AdminPortalModalProps {
 export default function AdminPortalModal({ visible, adminCode, onClose, onLogout }: AdminPortalModalProps) {
   // Toutes les écritures du catalogue passent par la fonction serveur admin_write (code vérifié côté base)
   const adminDb = useMemo(() => createAdminDb(adminCode ?? '', supabase), [adminCode]);
+
+  // Verrouillage automatique : le code admin ne reste jamais en mémoire plus de 15 min sans activité
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resetIdleLock = useCallback(() => {
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => (onLogout ?? onClose)(), ADMIN_IDLE_LOCK_MS);
+  }, [onLogout, onClose]);
+  useEffect(() => {
+    if (!visible) return;
+    resetIdleLock();
+    return () => {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+    };
+  }, [visible, resetIdleLock]);
   const [agendaCount, setAgendaCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<'spots' | 'editSpot' | 'categories' | 'events' | 'partners' | 'agenda'>('spots');
+  const [activeTab, setActiveTab] = useState<'spots' | 'editSpot' | 'categories' | 'events' | 'partners' | 'agenda' | 'notifs'>('spots');
 
   // Spots Data & Filters State
   const [spots, setSpots] = useState<any[]>(dataset.addresses || []);
@@ -969,17 +985,17 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
+      <View style={styles.modalOverlay} onTouchStart={resetIdleLock}>
         {/* Header Admin Neo-Brutalist */}
         <SafeAreaView edges={['top']} style={{ backgroundColor: Brand.bg }}>
           <View style={styles.adminHeader}>
-            <Pressable style={({ pressed }) => [styles.iconBtn, pressed && styles.btnPressed]} onPress={onClose}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Retour" style={({ pressed }) => [styles.iconBtn, pressed && styles.btnPressed]} onPress={onClose}>
               <ChevronLeft size={22} color={Brand.ink} strokeWidth={2} />
             </Pressable>
             <Text style={styles.headerTitle}>
               <Text style={{ color: Brand.primaryDeep }}>t </Text>Portail Admin
             </Text>
-            <Pressable style={({ pressed }) => [styles.iconBtn, pressed && styles.btnPressed]} onPress={onLogout}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Se déconnecter" style={({ pressed }) => [styles.iconBtn, pressed && styles.btnPressed]} onPress={onLogout}>
               <LogOut size={18} color={Brand.primaryDeep} strokeWidth={2} />
             </Pressable>
           </View>
@@ -1013,6 +1029,9 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
             <Pressable style={[styles.tabBtn, activeTab === 'partners' && styles.tabBtnActive]} onPress={() => setActiveTab('partners')}>
               <Sparkles size={14} color={activeTab === 'partners' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
               <Text style={[styles.tabBtnText, activeTab === 'partners' && styles.tabBtnTextActive]}>Top Partenaires ({partners.length})</Text>
+            </Pressable>
+            <Pressable style={[styles.tabBtn, activeTab === 'notifs' && styles.tabBtnActive]} onPress={() => setActiveTab('notifs')}>
+              <Text style={[styles.tabBtnText, activeTab === 'notifs' && styles.tabBtnTextActive]}>Notifications</Text>
             </Pressable>
             <Pressable style={[styles.tabBtn, activeTab === 'agenda' && styles.tabBtnActive]} onPress={() => setActiveTab('agenda')}>
               <Calendar size={14} color={activeTab === 'agenda' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
@@ -1110,10 +1129,10 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
 
                       {/* Card Action Buttons */}
                       <View style={styles.spotCardActions}>
-                        <Pressable style={styles.actionBtnEdit} onPress={() => handleOpenEditSpot(spot)}>
+                        <Pressable accessibilityRole="button" accessibilityLabel="Modifier" style={styles.actionBtnEdit} onPress={() => handleOpenEditSpot(spot)}>
                           <Edit3 size={16} color={Brand.ink} strokeWidth={2} />
                         </Pressable>
-                        <Pressable
+                        <Pressable accessibilityRole="button" accessibilityLabel="Supprimer"
                           style={styles.actionBtnDelete}
                           onPress={() => setDeleteConfirmModal({ visible: true, type: 'spot', id: spot.id, name: spot.title || spot.name })}
                         >
@@ -1324,10 +1343,10 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                         </View>
                       </View>
                       <View style={{ flexDirection: 'row', gap: 6 }}>
-                        <Pressable style={styles.editActionBtn} onPress={() => handleOpenEditCategory(cat)}>
+                        <Pressable accessibilityRole="button" accessibilityLabel="Modifier" style={styles.editActionBtn} onPress={() => handleOpenEditCategory(cat)}>
                           <Edit3 size={14} color={Brand.ink} />
                         </Pressable>
-                        <Pressable
+                        <Pressable accessibilityRole="button" accessibilityLabel="Supprimer"
                           style={styles.deleteActionBtn}
                           onPress={() => setDeleteConfirmModal({ visible: true, type: 'category', id: cat.id, name: cat.name })}
                         >
@@ -1484,13 +1503,13 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                       </View>
                     </View>
                     <View style={styles.spotCardActions}>
-                      <Pressable
+                      <Pressable accessibilityRole="button" accessibilityLabel="Modifier"
                         style={styles.actionBtnEdit}
                         onPress={() => handleOpenEditEvent(evt)}
                       >
                         <Edit3 size={16} color="#4F46E5" strokeWidth={2} />
                       </Pressable>
-                      <Pressable
+                      <Pressable accessibilityRole="button" accessibilityLabel="Supprimer"
                         style={styles.actionBtnDelete}
                         onPress={() => setDeleteConfirmModal({ visible: true, type: 'event', id: evt.id, name: evt.title })}
                       >
@@ -1504,6 +1523,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
           )}
 
           {/* ── TAB 5: TOP PARTENAIRES (STYLE NETFLIX) ── */}
+          {activeTab === 'notifs' && <PushAdminPanel adminCode={adminCode} />}
           {activeTab === 'agenda' && (
             <AgendaAdminPanel adminCode={adminCode} spots={spots} onCountChange={setAgendaCount} />
           )}

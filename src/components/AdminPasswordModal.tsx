@@ -116,7 +116,7 @@ export default function AdminPasswordModal({
               autoCorrect={false}
               returnKeyType="done"
             />
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel="Afficher ou masquer le code"
               style={styles.eyeBtn}
               onPress={() => setShowPassword(!showPassword)}
               hitSlop={8}

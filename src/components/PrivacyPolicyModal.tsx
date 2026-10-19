@@ -20,6 +20,7 @@ import { deleteMyData } from '../lib/dataDeletion';
 import { discoveryStore } from '../lib/discoveryStore';
 import { discountCardsStore } from '../lib/discountCardsStore';
 import { clearDeviceLikedSpotIds } from '../lib/likesStore';
+import { clearLocalPushState } from '../lib/pushNotifications';
 interface PrivacyPolicyModalProps {
   visible: boolean;
   onClose: () => void;
@@ -43,6 +44,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
           await discoveryStore.resetLocal();
           await discountCardsStore.resetLocal();
           await clearDeviceLikedSpotIds();
+          await clearLocalPushState();
           await authService.clearSessionAfterDeletion();
         },
       });
@@ -127,8 +129,11 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
                 <Text style={styles.bulletPoint}>
                   • <Text style={styles.boldText}>Statistiques de consultation</Text> : l'adresse consultée, sans identifiant, pour mesurer la fréquentation des fiches.
                 </Text>
+                <Text style={styles.bulletPoint}>
+                  • <Text style={styles.boldText}>Notifications</Text> (si vous les activez) : un jeton d'envoi et vos préférences.
+                </Text>
                 <Text style={styles.paragraph}>
-                  Base légale : exécution du service demandé (progression, cartes) et intérêt légitime de l'association (statistiques agrégées, prévention des abus). Ces données sont conservées jusqu'à ce que vous les effaciez (section 5).
+                  Base légale : exécution du service demandé (progression, cartes), consentement (notifications, suggestions) et intérêt légitime de l'association (statistiques, prévention des abus). Conservation : jusqu'à ce que vous effaciez vos données (section 5), ou 24 mois sans aucune activité ; les consultations de fiches sont gardées 13 mois.
                 </Text>
               </View>
 
@@ -150,13 +155,13 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
                   <ShieldCheck size={18} color="#24242E" />
-                  <Text style={styles.sectionTitle}>3. Capteurs et notifications</Text>
+                  <Text style={styles.sectionTitle}>3. Notifications, capteurs et traceurs</Text>
                 </View>
                 <Text style={styles.paragraph}>
-                  L'application n'utilise ni le microphone, ni le carnet d'adresses, ni les notifications. L'accès aux photos n'est demandé que dans l'espace réservé à l'équipe du Petit Tou.
+                  Les notifications sont désactivées par défaut. Si vous les activez (Accueil, « Notifications »), vous choisissez les types de messages ; nous en envoyons au plus 2 par jour, jamais entre 21 h et 8 h, sans donnée personnelle. Vous pouvez les arrêter à tout moment.
                 </Text>
                 <Text style={styles.paragraph}>
-                  Aucun cookie publicitaire, aucun traceur de mesure d'audience et aucun SDK publicitaire n'est utilisé.
+                  L'application n'utilise ni le microphone, ni le carnet d'adresses. L'accès aux photos n'est demandé que dans l'espace réservé à l'équipe du Petit Tou. Aucun cookie publicitaire, aucun outil de mesure d'audience et aucun SDK publicitaire n'est utilisé.
                 </Text>
               </View>
 
@@ -170,7 +175,10 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
                   • <Text style={styles.boldText}>Supabase Inc. :</Text> hébergement de la base de données (sous-traitant). Échanges chiffrés (HTTPS) ; accès aux données de chaque utilisateur limité par des fonctions serveur.
                 </Text>
                 <Text style={styles.bulletPoint}>
-                  • <Text style={styles.boldText}>Mapbox, Apple, Google :</Text> cartographie et itinéraires (voir section 2). Les photos de certaines fiches sont servies par des hébergeurs d'images qui voient votre adresse IP.
+                  • <Text style={styles.boldText}>Mapbox, Apple, Google :</Text> cartographie et itinéraires (voir section 2) ; Apple et Google acheminent aussi les notifications.
+                </Text>
+                <Text style={styles.bulletPoint}>
+                  • <Text style={styles.boldText}>Expo (États-Unis) :</Text> service d'envoi des notifications, si vous les activez. Les photos de certaines fiches sont servies par des hébergeurs d'images qui voient votre adresse IP.
                 </Text>
                 <Text style={styles.bulletPoint}>
                   • <Text style={styles.boldText}>Aucune revente :</Text> vos données ne sont ni vendues, ni louées, ni utilisées pour de la publicité ciblée.
@@ -187,7 +195,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
                   Vous disposez des droits d'accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité. Vous pouvez aussi introduire une réclamation auprès de la CNIL (cnil.fr).
                 </Text>
                 <Text style={styles.paragraph}>
-                  Le bouton ci-dessous efface immédiatement de nos serveurs et de cet appareil votre progression, vos cartes utilisées, vos suggestions et vos likes. Cette action est définitive.
+                  Le bouton ci-dessous efface immédiatement de nos serveurs et de cet appareil votre progression, vos cartes utilisées, vos suggestions, vos likes et vos réglages de notifications. Cette action est définitive.
                 </Text>
                 <Pressable
                   style={[styles.deleteBtn, isDeleting && { opacity: 0.6 }]}

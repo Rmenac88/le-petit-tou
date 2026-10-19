@@ -14,6 +14,7 @@ import {
 import { applyBrandTypography } from '@/lib/typography';
 import IntroScreen from '@/components/IntroScreen';
 import { appStorage } from '@/lib/storage';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const INTRO_SEEN_KEY = 'pt_intro_seen_v1';
 
@@ -81,7 +82,11 @@ export default function RootLayout() {
         }} />
       )}
       <View style={{ flex: 1, width: '100%', overflow: 'hidden' }}>
-        {fontsLoaded && <Stack screenOptions={{ headerShown: false }} />}
+        {fontsLoaded && (
+          <ErrorBoundary scope="racine">
+            <Stack screenOptions={{ headerShown: false }} />
+          </ErrorBoundary>
+        )}
         {fontsLoaded && introChecked && !introFinished && <IntroScreen onFinish={handleIntroFinish} />}
       </View>
     </ThemeProvider>

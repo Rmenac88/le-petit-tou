@@ -1,4 +1,6 @@
 import { safeWebUrl } from '../../lib/safeLinks';
+import ErrorBoundary from '../ErrorBoundary';
+import NotificationSettingsModal from '../NotificationSettingsModal';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet,
@@ -536,6 +538,7 @@ export default function HomeView({
   const adminCodeRef = useRef('');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
+  const [showNotifSettings, setShowNotifSettings] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
   const adminTapCountRef = React.useRef(0);
   const adminTapTimerRef = React.useRef<any>(null);
@@ -799,7 +802,7 @@ export default function HomeView({
     };
   }, []);
 
-  const isAnyModalOpen = showAllCategories || showFilterModal || !!bookingEvent || !!successEvent || !!infoAlert || !!selectedSpotDetail || showAdminModal || showPasswordModal || showPrivacyPolicy;
+  const isAnyModalOpen = showAllCategories || showFilterModal || !!bookingEvent || !!successEvent || !!infoAlert || !!selectedSpotDetail || showAdminModal || showPasswordModal || showPrivacyPolicy || showNotifSettings;
 
   const orderedModalCategories = useMemo(() => {
     return getOrderedPopularCategories(categories, addresses, true);
@@ -2029,6 +2032,15 @@ export default function HomeView({
             </Text>
             <Pressable
               style={styles.privacyPolicyFooterBtn}
+              onPress={() => setShowNotifSettings(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Réglages des notifications"
+            >
+              <Bell size={14} color={Brand.inkSoft} />
+              <Text style={styles.privacyPolicyFooterText}>Notifications</Text>
+            </Pressable>
+            <Pressable
+              style={styles.privacyPolicyFooterBtn}
               onPress={() => setShowPrivacyPolicy(true)}
             >
               <ShieldCheck size={14} color={Brand.inkSoft} />
@@ -2541,6 +2553,14 @@ export default function HomeView({
 
       {/* Admin Portal Modal */}
       {showAdminModal && (
+        <ErrorBoundary
+          scope="portail admin"
+          compact
+          onReset={() => {
+            adminCodeRef.current = '';
+            setShowAdminModal(false);
+          }}
+        >
         <AdminPortalModal
           visible={showAdminModal}
           adminCode={adminCodeRef.current}
@@ -2555,7 +2575,10 @@ export default function HomeView({
             loadSupabaseData(true);
           }}
         />
+        </ErrorBoundary>
       )}
+
+      <NotificationSettingsModal visible={showNotifSettings} onClose={() => setShowNotifSettings(false)} />
 
       {/* Privacy Policy Modal */}
       <PrivacyPolicyModal

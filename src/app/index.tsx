@@ -8,6 +8,8 @@ import MapView from '@/components/views/MapView';
 import CardsView from '@/components/views/CardsView';
 import AgendaView from '@/components/views/AgendaView';
 
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { configurePush, resyncPushRegistration, useNotificationNavigation } from '@/lib/pushNotifications';
 import { Brand } from '../constants/brand';
 export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('home');
@@ -25,6 +27,18 @@ export default function HomeScreen() {
     if (activeTab === 'cards') setHasVisitedCards(true);
     if (activeTab === 'agenda') setHasVisitedAgenda(true);
   }, [activeTab]);
+
+  // Notifications : canal/affichage au démarrage, rafraîchissement du jeton, ouverture du bon écran au toucher
+  React.useEffect(() => {
+    configurePush().then(resyncPushRegistration);
+  }, []);
+  useNotificationNavigation((target) => {
+    if (target.tab === 'map' && target.spotId) {
+      setFocusedSpotId(target.spotId);
+      setHasVisitedMap(true);
+    }
+    setActiveTab(target.tab);
+  });
 
   const handleSelectSpotForMap = (id: string) => {
     setFocusedSpotId(id);
@@ -45,11 +59,11 @@ export default function HomeScreen() {
           ]}
         >
           <View style={styles.column}>
-            <HomeView
+            <ErrorBoundary scope="HomeView" compact><HomeView
               onChangeTab={setActiveTab}
               onToggleDock={setIsDockVisible}
               onSelectSpot={handleSelectSpotForMap}
-            />
+            /></ErrorBoundary>
           </View>
         </View>
 
@@ -63,7 +77,7 @@ export default function HomeScreen() {
             ]}
           >
             <View style={styles.column}>
-              <SearchView onSelectSpot={handleSelectSpotForMap} onToggleDock={setIsDockVisible} />
+              <ErrorBoundary scope="SearchView" compact><SearchView onSelectSpot={handleSelectSpotForMap} onToggleDock={setIsDockVisible} /></ErrorBoundary>
             </View>
           </View>
         )}
@@ -77,12 +91,12 @@ export default function HomeScreen() {
               activeTab === 'map' ? styles.tabViewActive : styles.tabViewHidden,
             ]}
           >
-            <MapView
+            <ErrorBoundary scope="MapView"><MapView
               focusedSpotId={focusedSpotId}
               clearFocusedSpot={() => setFocusedSpotId(null)}
               onToggleDock={setIsDockVisible}
               onChangeTab={setActiveTab}
-            />
+            /></ErrorBoundary>
           </View>
         )}
 
@@ -96,7 +110,7 @@ export default function HomeScreen() {
             ]}
           >
             <View style={styles.column}>
-              <CardsView />
+              <ErrorBoundary scope="CardsView" compact><CardsView /></ErrorBoundary>
             </View>
           </View>
         )}
@@ -111,7 +125,7 @@ export default function HomeScreen() {
             ]}
           >
             <View style={styles.column}>
-              <AgendaView onToggleDock={setIsDockVisible} onSelectSpot={handleSelectSpotForMap} />
+              <ErrorBoundary scope="AgendaView" compact><AgendaView onToggleDock={setIsDockVisible} onSelectSpot={handleSelectSpotForMap} /></ErrorBoundary>
             </View>
           </View>
         )}
