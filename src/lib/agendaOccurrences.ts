@@ -64,6 +64,17 @@ export function formatDateFr(isoDate: string): string {
   return `${weekdayLabel(isoDate)} ${Number(isoDate.slice(8, 10))} ${month}`;
 }
 
+/** Vrai pour une vraie date « AAAA-MM-JJ » (refuse « 10/11/2026 » et « 2026-02-30 »). */
+export function isValidIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return fromUtcMs(toUtcMs(value)) === value;
+}
+
+/** Si le jour sélectionné est passé (l'appli est restée ouverte), on revient à aujourd'hui. */
+export function clampSelectedDay(selected: string, todayIso: string): string {
+  return selected < todayIso ? todayIso : selected;
+}
+
 export function buildDayStrip(todayIso: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => addDays(todayIso, i));
 }

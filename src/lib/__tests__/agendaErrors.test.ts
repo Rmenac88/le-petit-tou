@@ -48,3 +48,16 @@ test('validateEventDraft refuse une fin de série avant la première date', () =
 test('validateEventDraft refuse une heure mal écrite', () => {
   assert.match(validateEventDraft({ ...good, start_time: '7pm' })!, /HH:MM/);
 });
+
+test('validateEventDraft refuse une date qui n\'est pas AAAA-MM-JJ', () => {
+  assert.match(validateEventDraft({ ...good, start_date: '10/11/2026' })!, /AAAA-MM-JJ/);
+  assert.match(validateEventDraft({ ...good, start_date: '2026-02-30' })!, /AAAA-MM-JJ/);
+});
+
+test('validateEventDraft refuse une fin de série qui n\'est pas AAAA-MM-JJ', () => {
+  assert.match(validateEventDraft({ ...good, repeat_weekly_until: '17/12/2026' })!, /AAAA-MM-JJ/);
+});
+
+test('validateEventDraft accepte une date bissextile valide', () => {
+  assert.equal(validateEventDraft({ ...good, start_date: '2028-02-29' }), null);
+});

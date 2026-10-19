@@ -103,10 +103,12 @@ declare
   v_id uuid := nullif(p_event ->> 'id', '')::uuid;
   v_title text := trim(coalesce(p_event ->> 'title', ''));
   v_spot text := trim(coalesce(p_event ->> 'spot_id', ''));
-  v_start_date date := nullif(p_event ->> 'start_date', '')::date;
+  v_start_date_txt text := nullif(trim(coalesce(p_event ->> 'start_date', '')), '');
+  v_until_txt text := nullif(trim(coalesce(p_event ->> 'repeat_weekly_until', '')), '');
+  v_start_date date;
   v_start_time text := coalesce(nullif(p_event ->> 'start_time', ''), '19:00');
   v_end_time text := nullif(p_event ->> 'end_time', '');
-  v_until date := nullif(p_event ->> 'repeat_weekly_until', '')::date;
+  v_until date;
   v_description text := nullif(trim(coalesce(p_event ->> 'description', '')), '');
   v_location text := nullif(trim(coalesce(p_event ->> 'location_override', '')), '');
   v_link text := nullif(trim(coalesce(p_event ->> 'link_url', '')), '');
@@ -117,9 +119,20 @@ begin
     raise exception 'forbidden' using errcode = '42501';
   end if;
 
-  if v_title = '' or v_spot = '' or v_start_date is null then
+  if v_title = '' or v_spot = '' or v_start_date_txt is null then
     raise exception 'invalid: le titre, l''adresse et la date sont obligatoires' using errcode = '22023';
   end if;
+  -- les dates sont validées AVANT toute conversion (sinon 10/11/2026 serait lu comme le 11 octobre)
+  if v_start_date_txt !~ '^\d{4}-\d{2}-\d{2}$'
+     or (v_until_txt is not null and v_until_txt !~ '^\d{4}-\d{2}-\d{2}$') then
+    raise exception 'invalid: la date doit s''ecrire AAAA-MM-JJ' using errcode = '22023';
+  end if;
+  begin
+    v_start_date := v_start_date_txt::date;
+    v_until := v_until_txt::date;
+  exception when others then
+    raise exception 'invalid: cette date n''existe pas dans le calendrier' using errcode = '22023';
+  end;
   if v_start_time !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
      or (v_end_time is not null and v_end_time !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$') then
     raise exception 'invalid: les heures doivent etre au format HH:MM' using errcode = '22023';

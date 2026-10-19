@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MapPin, Repeat } from 'lucide-react-native';
@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import { getOptimizedImageUrl } from '../../lib/imageOptimizer';
 import {
   buildDayStrip,
+  clampSelectedDay,
   expandOccurrences,
   formatDateFr,
   weekdayLabel,
@@ -40,7 +41,9 @@ interface AgendaViewProps {
 }
 
 export default function AgendaView({ onToggleDock, onSelectSpot }: AgendaViewProps) {
-  const today = useMemo(localTodayIso, []);
+  const [today, setToday] = useState(localTodayIso);
+  const todayRef = useRef(today);
+  todayRef.current = today;
   const days = useMemo(() => buildDayStrip(today, DAYS_SHOWN), [today]);
 
   const [events, setEvents] = useState<PartnerEventRow[]>([]);
@@ -82,6 +85,22 @@ export default function AgendaView({ onToggleDock, onSelectSpot }: AgendaViewPro
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  // Retour au premier plan : nouveau jour => on repart d'aujourd'hui ; même jour => on recharge
+  // pour voir les dates ajoutées entre-temps.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      const now = localTodayIso();
+      if (now !== todayRef.current) {
+        setToday(now); // recharge via load (dépend de today)
+        setSelectedDay((d) => clampSelectedDay(d, now));
+      } else {
+        load();
+      }
+    });
+    return () => sub.remove();
   }, [load]);
 
   // occurrences des 14 jours, uniquement pour les adresses connues

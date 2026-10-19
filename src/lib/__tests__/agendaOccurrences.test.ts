@@ -5,6 +5,8 @@ import {
   buildDayStrip,
   dayChipLabel,
   formatDateFr,
+  clampSelectedDay,
+  isValidIsoDate,
   expandOccurrences,
   isValidTimeRange,
   weekdayLabel,
@@ -138,4 +140,24 @@ test('dayChipLabel donne un jour abrégé et le numéro du jour', () => {
 test('formatDateFr écrit la date en toutes lettres', () => {
   assert.equal(formatDateFr('2026-10-22'), 'jeudi 22 octobre');
   assert.equal(formatDateFr('2027-01-01'), 'vendredi 1 janvier');
+});
+
+test('isValidIsoDate accepte une vraie date AAAA-MM-JJ (année bissextile incluse)', () => {
+  assert.equal(isValidIsoDate('2026-10-22'), true);
+  assert.equal(isValidIsoDate('2028-02-29'), true);
+});
+
+test('isValidIsoDate refuse un mauvais format ou une date qui n\'existe pas', () => {
+  assert.equal(isValidIsoDate('10/11/2026'), false);
+  assert.equal(isValidIsoDate('22/10/2026'), false);
+  assert.equal(isValidIsoDate('2026-02-30'), false);
+  assert.equal(isValidIsoDate('2027-02-29'), false);
+  assert.equal(isValidIsoDate('2026-1-5'), false);
+  assert.equal(isValidIsoDate(''), false);
+});
+
+test('clampSelectedDay ramène un jour passé à aujourd\'hui et garde un jour à venir', () => {
+  assert.equal(clampSelectedDay('2026-10-22', '2026-10-23'), '2026-10-23');
+  assert.equal(clampSelectedDay('2026-10-25', '2026-10-23'), '2026-10-25');
+  assert.equal(clampSelectedDay('2026-10-23', '2026-10-23'), '2026-10-23');
 });

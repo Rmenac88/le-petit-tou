@@ -1,4 +1,4 @@
-import { isValidTimeRange } from './agendaOccurrences.ts';
+import { isValidIsoDate, isValidTimeRange } from './agendaOccurrences.ts';
 
 export type AgendaErrorKind = 'forbidden' | 'network' | 'invalid';
 
@@ -38,6 +38,7 @@ export interface EventDraft {
   repeat_weekly_until?: string | null;
 }
 
+const DATE_FORMAT_MESSAGE = "La date doit s'écrire AAAA-MM-JJ (par exemple 2026-10-22).";
 const TIME_RE = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 
 /** Renvoie le message à afficher si le brouillon est invalide, sinon null. */
@@ -45,6 +46,8 @@ export function validateEventDraft(draft: EventDraft): string | null {
   if (!draft.title.trim()) return 'Le titre est obligatoire.';
   if (!draft.spot_id.trim()) return 'Choisis une adresse.';
   if (!draft.start_date.trim()) return 'La date est obligatoire.';
+  if (!isValidIsoDate(draft.start_date.trim())) return DATE_FORMAT_MESSAGE;
+  if (draft.repeat_weekly_until && !isValidIsoDate(draft.repeat_weekly_until.trim())) return DATE_FORMAT_MESSAGE;
   if (!TIME_RE.test(draft.start_time) || (draft.end_time && !TIME_RE.test(draft.end_time))) {
     return "Les heures s'écrivent au format HH:MM.";
   }
