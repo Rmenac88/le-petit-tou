@@ -1,0 +1,97 @@
+/**
+ * Calcul des dates de l'agenda des partenaires.
+ * Logique pure, sans React ni Supabase. Les dates sont des chaînes calendaires
+ * « YYYY-MM-DD » et les heures des chaînes « HH:MM » : on ne passe jamais par un
+ * fuseau local, pour qu'un changement d'heure ne décale jamais un jour.
+ */
+
+export interface PartnerEventRow {
+  id: string;
+  spot_id: string;
+  title: string;
+  description?: string | null;
+  start_date: string;
+  start_time: string;
+  end_time?: string | null;
+  repeat_weekly_until?: string | null;
+  location_override?: string | null;
+  link_url?: string | null;
+  is_active: boolean;
+}
+
+export interface Occurrence {
+  event: PartnerEventRow;
+  occurrenceDate: string;
+  isRecurring: boolean;
+}
+
+const DAY_MS = 86400000;
+const WEEKDAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+
+function toUtcMs(isoDate: string): number {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+
+function fromUtcMs(ms: number): string {
+  const date = new Date(ms);
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(date.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function addDays(isoDate: string, days: number): string {
+  return fromUtcMs(toUtcMs(isoDate) + days * DAY_MS);
+}
+
+export function weekdayLabel(isoDate: string): string {
+  return WEEKDAYS[new Date(toUtcMs(isoDate)).getUTCDay()];
+}
+
+export function buildDayStrip(todayIso: string, count: number): string[] {
+  return Array.from({ length: count }, (_, i) => addDays(todayIso, i));
+}
+
+export function isValidTimeRange(start: string, end?: string | null): boolean {
+  if (!end) return true;
+  return end > start;
+}
+
+export function expandOccurrences(
+  events: PartnerEventRow[],
+  rangeStart: string,
+  rangeEnd: string
+): Occurrence[] {
+  const out: Occurrence[] = [];
+
+  for (const event of events) {
+    if (!event.is_active) continue;
+    const until = event.repeat_weekly_until;
+
+    if (!until) {
+      if (event.start_date >= rangeStart && event.start_date <= rangeEnd) {
+        out.push({ event, occurrenceDate: event.start_date, isRecurring: false });
+      }
+      continue;
+    }
+
+    const isRecurring = until > event.start_date;
+    const last = until < rangeEnd ? until : rangeEnd;
+    // saute directement à la première semaine qui touche l'intervalle
+    let date = event.start_date;
+    if (date < rangeStart) {
+      const gapDays = Math.round((toUtcMs(rangeStart) - toUtcMs(date)) / DAY_MS);
+      date = addDays(date, Math.ceil(gapDays / 7) * 7);
+    }
+    for (; date <= last; date = addDays(date, 7)) {
+      out.push({ event, occurrenceDate: date, isRecurring });
+    }
+  }
+
+  return out.sort((a, b) =>
+    a.occurrenceDate === b.occurrenceDate
+      ? a.event.start_time.localeCompare(b.event.start_time)
+      : a.occurrenceDate.localeCompare(b.occurrenceDate)
+  );
+}
