@@ -108,7 +108,7 @@ Entrées et conditions non couvertes par la spec, les plus susceptibles de gêne
 **Files:**
 - Create: `src/components/views/AgendaView.tsx`
 - Create: `src/components/views/agenda/DayStrip.tsx`
-- Modify: `src/components/FloatingDock.tsx` (`TabType` + onglet `{ type: 'agenda', icon: CalendarDays }`, ordre : home, search, **agenda**, map, cards), `src/app/index.tsx` (état `hasVisitedAgenda`, montage différé identique à `search`/`cards`, colonne `styles.column`, `onToggleDock={setIsDockVisible}`)
+- Modify: `src/components/FloatingDock.tsx` (`TabType` + onglet `{ type: 'agenda', icon: CalendarDays }`, 5e et dernier onglet : home, search, map, cards, **agenda**), `src/app/index.tsx` (état `hasVisitedAgenda`, montage différé identique à `search`/`cards`, colonne `styles.column`, `onToggleDock={setIsDockVisible}`)
 
 **Interfaces:**
 - Consumes: `fetchPublicPartnerEvents`, `AgendaError` (Task 3) ; `expandOccurrences`, `buildDayStrip`, `weekdayLabel`, `Occurrence` (Task 1) ; `AddressDetailModal`, `SpotDetail` ; `dataset.addresses` / `dataset.categories` ; `supabase.from('addresses')`.
