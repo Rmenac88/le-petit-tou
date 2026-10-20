@@ -109,7 +109,21 @@ revoke all on function public.increment_spot_like(text, integer) from public;
 grant execute on function public.increment_spot_like(text, integer) to anon, authenticated;
 
 -- 6. Écritures admin : une seule porte, protégée par le code admin
-create or replace function public.admin_write(
+-- (supprime d'abord toute ancienne version, quels que soient ses paramètres)
+do $$
+declare f record;
+begin
+  for f in
+    select p.oid::regprocedure as sig
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname in ('admin_write', 'admin_read')
+  loop
+    execute 'drop function ' || f.sig;
+  end loop;
+end
+$$;
+
+create function public.admin_write(
   p_code text, p_table text, p_op text, p_id text, p_payload jsonb
 ) returns jsonb
 language plpgsql
@@ -167,7 +181,7 @@ begin
 end;
 $$;
 
-create or replace function public.admin_read(p_code text, p_table text)
+create function public.admin_read(p_code text, p_table text)
 returns jsonb
 language plpgsql
 security definer
