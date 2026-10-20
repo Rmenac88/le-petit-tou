@@ -13,13 +13,14 @@
       "supportsTablet": true,
       "infoPlist": {
         "CFBundleDisplayName": "Le Petit Tou",
-        "NSLocationWhenInUseUsageDescription": "Le Petit Tou utilise votre position lorsque l'application est ouverte pour afficher les établissements toulousains recommandés les plus proches de vous."
+        "NSLocationWhenInUseUsageDescription": "Le Petit Tou utilise votre position lorsque l'application est ouverte pour afficher les établissements toulousains recommandés les plus proches de vous.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "fr.lepetittou.app",
       "adaptiveIcon": {
-        "backgroundColor": "#FAF5EF",
+        "backgroundColor": "#2B1D46",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -39,15 +40,22 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FAF5EF",
-          "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
-          }
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "backgroundColor": "#2B1D46",
+          "resizeMode": "contain"
         }
       ],
       "expo-secure-store",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#E84A5F",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
