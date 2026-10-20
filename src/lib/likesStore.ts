@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { supabase } from './supabase';
+import { emitAppEvent } from './appEvents';
 import { getOrCreateDeviceId } from './deviceIdentity';
 
 const LIKES_STORAGE_KEY = 'LPT_DEVICE_LIKED_SPOTS';
@@ -119,16 +120,8 @@ export const toggleSpotLike = async (
   // Persiste les likes de cet appareil en local
   saveDeviceLikedSpotIds(updatedLikedIds);
 
-  // Émet un événement pour synchroniser les vues si sur web
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    try {
-      window.dispatchEvent(
-        new CustomEvent('pt_likes_updated', {
-          detail: { spotId: idStr, newCount, wasLiked: !wasLiked },
-        })
-      );
-    } catch (e) {}
-  }
+  // Synchronise les vues ouvertes (accueil, carte)
+  emitAppEvent('pt_likes_updated', { spotId: idStr, newCount, wasLiked: !wasLiked });
 
   // Synchronisation distante via fonction serveur (un like par appareil, delta contrôlé côté base)
   (async () => {

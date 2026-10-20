@@ -53,6 +53,7 @@ import {
 import { discoveryStore } from '../../lib/discoveryStore';
 
 import { formatRating } from '../../lib/formatRating';
+import { onAppEvent } from '../../lib/appEvents';
 import { Brand } from '../../constants/brand';
 // Conditional dynamic imports to prevent native modules breaking the web bundle
 let NativeMapView: any = null;
@@ -210,12 +211,7 @@ export default function MapView({
         });
       }
     };
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.addEventListener('pt_likes_updated', onLikesUpdated);
-      return () => {
-        window.removeEventListener('pt_likes_updated', onLikesUpdated);
-      };
-    }
+    return onAppEvent('pt_likes_updated', onLikesUpdated);
   }, []);
 
   // Real-time Database loaded/filtered spots list
@@ -393,14 +389,7 @@ export default function MapView({
       }
     };
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('pt_addresses_changed', onAddressesChanged);
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('pt_addresses_changed', onAddressesChanged);
-      }
-    };
+    return onAppEvent('pt_addresses_changed', onAddressesChanged);
   }, []);
 
   const formatRawSpots = (rawSpots: any[]) => {

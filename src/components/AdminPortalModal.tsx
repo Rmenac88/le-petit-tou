@@ -51,6 +51,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { createAdminDb } from '../lib/adminApi';
+import { emitAppEvent } from '../lib/appEvents';
 import { ADMIN_IDLE_LOCK_MS } from '../constants/config';
 import dataset from '../constants/dataset.json';
 import { getStoredPartners, saveStoredPartners } from '../lib/partnersStore';
@@ -739,9 +740,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
       }
 
       await fetchEvents();
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('eventsChanged'));
-      }
+      emitAppEvent('eventsChanged');
       setEditingEventId(null);
       setEventFormTitle('');
       setEventFormDesc('');

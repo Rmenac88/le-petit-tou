@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { appCache } from "./dataCache";
+import { emitAppEvent } from "./appEvents";
 
 export interface SponsoredPartner {
   id: string;
@@ -89,11 +90,11 @@ export function saveStoredPartners(partners: SponsoredPartner[]): void {
   if (typeof window !== "undefined" && window.localStorage) {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(partners));
-      window.dispatchEvent(new CustomEvent("pt_partners_changed", { detail: partners }));
     } catch (e) {
       console.warn("Error saving stored partners:", e);
     }
   }
+  emitAppEvent("pt_partners_changed", partners);
 }
 
 /**

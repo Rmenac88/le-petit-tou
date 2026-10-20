@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { emitAppEvent } from './appEvents';
 import { appCache } from './dataCache';
 import { searchIndex } from './searchIndex';
 import dataset from '../constants/dataset.json';
@@ -66,11 +67,7 @@ class GlobalDataStore {
     appCache.invalidate('addresses');
     searchIndex.updateSpots(spots);
 
-    if (typeof window !== 'undefined') {
-      try {
-        window.dispatchEvent(new CustomEvent('pt_addresses_changed', { detail: spots }));
-      } catch (e) {}
-    }
+    emitAppEvent('pt_addresses_changed', spots);
     this.addressListeners.forEach(listener => {
       try { listener(spots); } catch (e) {}
     });
@@ -79,11 +76,7 @@ class GlobalDataStore {
   public notifyCategoriesChanged(categories: CategoryRecord[]) {
     appCache.invalidate('categories');
 
-    if (typeof window !== 'undefined') {
-      try {
-        window.dispatchEvent(new CustomEvent('pt_categories_changed', { detail: categories }));
-      } catch (e) {}
-    }
+    emitAppEvent('pt_categories_changed', categories);
     this.categoryListeners.forEach(listener => {
       try { listener(categories); } catch (e) {}
     });
@@ -92,11 +85,7 @@ class GlobalDataStore {
   public notifyEventsChanged(events: EventRecord[]) {
     appCache.invalidate('events');
 
-    if (typeof window !== 'undefined') {
-      try {
-        window.dispatchEvent(new CustomEvent('pt_events_changed', { detail: events }));
-      } catch (e) {}
-    }
+    emitAppEvent('pt_events_changed', events);
     this.eventListeners.forEach(listener => {
       try { listener(events); } catch (e) {}
     });

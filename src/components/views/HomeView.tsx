@@ -1,4 +1,5 @@
 import { safeWebUrl } from '../../lib/safeLinks';
+import { onAppEvent } from '../../lib/appEvents';
 import ErrorBoundary from '../ErrorBoundary';
 import NotificationSettingsModal from '../NotificationSettingsModal';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -782,23 +783,16 @@ export default function HomeView({
       }
     };
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('pt_partners_changed', onPartnersChanged);
-      window.addEventListener('pt_addresses_changed', onAddressesChanged);
-      window.addEventListener('pt_categories_changed', onCategoriesChanged);
-      window.addEventListener('pt_events_changed', onEventsChanged);
-      window.addEventListener('pt_likes_updated', onLikesUpdated);
-    }
-
+    const offs = [
+      onAppEvent('pt_partners_changed', onPartnersChanged),
+      onAppEvent('pt_addresses_changed', onAddressesChanged),
+      onAppEvent('pt_categories_changed', onCategoriesChanged),
+      onAppEvent('pt_events_changed', onEventsChanged),
+      onAppEvent('pt_likes_updated', onLikesUpdated),
+    ];
 
     return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('pt_partners_changed', onPartnersChanged);
-        window.removeEventListener('pt_addresses_changed', onAddressesChanged);
-        window.removeEventListener('pt_categories_changed', onCategoriesChanged);
-        window.removeEventListener('pt_events_changed', onEventsChanged);
-        window.removeEventListener('pt_likes_updated', onLikesUpdated);
-      }
+      offs.forEach((off) => off());
     };
   }, []);
 

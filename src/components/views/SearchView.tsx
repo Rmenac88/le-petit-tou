@@ -15,6 +15,7 @@ import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
 import { formatRating } from '../../lib/formatRating';
 import dataset from '../../constants/dataset.json';
 import { supabase } from '../../lib/supabase';
+import { onAppEvent } from '../../lib/appEvents';
 import { searchIndex } from '../../lib/searchIndex';
 import { getOptimizedImageUrl } from '../../lib/imageOptimizer';
 
@@ -84,14 +85,7 @@ export default function SearchView({
       }
     };
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('pt_addresses_changed', onAddressesChanged);
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('pt_addresses_changed', onAddressesChanged);
-      }
-    };
+    return onAppEvent('pt_addresses_changed', onAddressesChanged);
   }, []);
 
   useEffect(() => {
