@@ -132,21 +132,7 @@ export const toggleSpotLike = async (
         p_delta: delta,
       });
 
-      if (error) {
-        // Si la RPC n'est pas encore déployée, tentative d'upsert direct
-        const { data: existing } = await supabase
-          .from('spot_likes')
-          .select('likes_count')
-          .eq('spot_id', idStr)
-          .single();
-
-        const baseVal = existing ? (existing.likes_count || 0) : 0;
-        await supabase.from('spot_likes').upsert({
-          spot_id: idStr,
-          likes_count: Math.max(0, baseVal + delta),
-          updated_at: new Date().toISOString(),
-        });
-      }
+      if (error) console.warn('increment_spot_like:', error.message);
     } catch (rpcErr) {
       console.warn('RPC increment_spot_like error:', rpcErr);
     }

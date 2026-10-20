@@ -6,7 +6,8 @@ Reste ce qui demande un compte, une base de données ou un appareil réel.
 ## 1. Base de données (Supabase → SQL Editor)
 - [ ] Lancer `src/scripts/006_push_tokens_secure.sql` (ferme `user_push_tokens`, crée les fonctions des notifications).
 - [ ] Vérifier que la sauvegarde automatique est active (offre payante : le projet gratuit se met en pause).
-- [ ] Encore ouvert : les autres tables (`spot_likes`, `address_views`, `place_suggestions`, …) et les écritures directes de `AdminPortalModal` (adresses, catégories, événements, partenaires) n'ont pas encore de fonctions sécurisées. À traiter avant la publication (brief §3).
+- [ ] Lancer `src/scripts/007_lock_tables_admin_rpc.sql` (verrouille les tables, cache le prix des partenaires, écritures admin via fonctions).
+- [ ] Encore ouvert : l'envoi de photos du portail admin (stockage `etablissements`) reste autorisé à la clé publique ; à sécuriser avec une fonction serveur (Edge Function).
 
 ## 2. Comptes et identifiants
 - [ ] Apple Developer (compte Organisation → numéro D-U-N-S) et Google Play (idem, vérification).

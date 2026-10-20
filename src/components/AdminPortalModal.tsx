@@ -49,6 +49,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { adminWrite, adminRead } from '../lib/adminApi';
 import { supabase } from '../lib/supabase';
 import dataset from '../constants/dataset.json';
 import { getStoredPartners, saveStoredPartners } from '../lib/partnersStore';
@@ -416,15 +417,15 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
 
       if (editingSpotId) {
         // Update existing record
-        let { error } = await supabase.from('addresses').update(record).eq('id', editingSpotId);
+        let { error } = await adminWrite(adminCode, 'addresses', 'update', editingSpotId, record);
         if (error && error.message?.includes('full_description')) {
           delete record.full_description;
-          const retry = await supabase.from('addresses').update(record).eq('id', editingSpotId);
+          const retry = await adminWrite(adminCode, 'addresses', 'update', editingSpotId, record);
           error = retry.error;
         }
         if (error && (error.message?.includes('category_id') || error.message?.includes('uuid'))) {
           record.category_id = categories[0]?.id || 'e6134429-8d6e-5d84-bf4e-884e016df958';
-          const retry = await supabase.from('addresses').update(record).eq('id', editingSpotId);
+          const retry = await adminWrite(adminCode, 'addresses', 'update', editingSpotId, record);
           error = retry.error;
         }
         if (error) throw error;
@@ -436,15 +437,15 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
         record.slug = cleanSlug;
         record.is_recommended = true;
         record.is_new = true;
-        let { error } = await supabase.from('addresses').insert(record);
+        let { error } = await adminWrite(adminCode, 'addresses', 'insert', null, record);
         if (error && error.message?.includes('full_description')) {
           delete record.full_description;
-          const retry = await supabase.from('addresses').insert(record);
+          const retry = await adminWrite(adminCode, 'addresses', 'insert', null, record);
           error = retry.error;
         }
         if (error && (error.message?.includes('category_id') || error.message?.includes('uuid'))) {
           record.category_id = categories[0]?.id || 'e6134429-8d6e-5d84-bf4e-884e016df958';
-          const retry = await supabase.from('addresses').insert(record);
+          const retry = await adminWrite(adminCode, 'addresses', 'insert', null, record);
           error = retry.error;
         }
         if (error) throw error;
@@ -548,12 +549,12 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
       };
 
       if (editingCatId) {
-        const { error } = await supabase.from('categories').update(catObj).eq('id', editingCatId);
+        const { error } = await adminWrite(adminCode, 'categories', 'update', editingCatId, catObj);
         if (error) throw error;
         showAlert('Catégorie mise à jour', `La catégorie "${catFormName}" a été modifiée.`);
       } else {
         (catObj as any).id = generateUUID();
-        const { error } = await supabase.from('categories').insert(catObj);
+        const { error } = await adminWrite(adminCode, 'categories', 'insert', null, catObj);
         if (error) throw error;
         showAlert('Catégorie créée', `La catégorie "${catFormName}" a été ajoutée avec succès.`);
       }
@@ -577,12 +578,12 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
       if (type === 'spot') {
         // Optimistic UI update: remove from local state immediately
         setSpots(prev => prev.filter(s => s.id !== id));
-        const { data, error } = await supabase.from('addresses').delete().eq('id', id).select();
+        const { data, error } = await adminWrite(adminCode, 'addresses', 'delete', id);
         if (error) throw error;
         if (!data || data.length === 0) {
           showAlert(
             'Suppression locale',
-            `L'adresse "${name}" a été retirée de la liste locale.\n\nNote : Supabase n'a pas pu la supprimer dans le cloud car les règles RLS restreignent la suppression directe. Exécutez le script SQL fourni dans le SQL Editor Supabase pour autoriser la suppression distante.`
+            `L'adresse "${name}" n'existait plus dans la base : elle a été retirée de la liste.`
           );
         } else {
           showAlert('Suppression réussie', `L'adresse "${name}" a été définitivement supprimée.`);
@@ -590,27 +591,27 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
         await fetchSpots();
       } else if (type === 'event') {
         setEvents(prev => prev.filter(e => e.id !== id));
-        const { error } = await supabase.from('events').delete().eq('id', id).select();
+        const { error } = await adminWrite(adminCode, 'events', 'delete', id);
         if (error) throw error;
         showAlert('Suppression réussie', `L'événement "${name}" a été supprimé.`);
         await fetchEvents();
       } else if (type === 'category') {
         setCategories(prev => prev.filter(c => c.id !== id));
-        const { error } = await supabase.from('categories').delete().eq('id', id).select();
+        const { error } = await adminWrite(adminCode, 'categories', 'delete', id);
         if (error) throw error;
         showAlert('Suppression réussie', `La catégorie "${name}" a été supprimée.`);
         await fetchCategories();
       } else if (type === 'partner') {
-        const { data, error } = await supabase.from('sponsored_partners').delete().eq('id', id).select();
+        const { data, error } = await adminWrite(adminCode, 'sponsored_partners', 'delete', id);
         if (error) throw error;
         let removedRemotely = !!(data && data.length > 0);
         if (!removedRemotely) {
           // 0 ligne supprimée : soit il n'existait qu'en local, soit la base a refusé (RLS)
-          const { data: stillThere } = await supabase.from('sponsored_partners').select('id').eq('id', id);
-          if (stillThere && stillThere.length > 0) {
+          const { data: stillThere } = await adminRead(adminCode, 'sponsored_partners');
+          if (stillThere && stillThere.some((r: any) => String(r.id) === String(id))) {
             showAlert(
               'Suppression refusée par Supabase',
-              `"${name}" n'a pas pu être retiré : les règles d'accès (RLS) de sponsored_partners n'autorisent pas la suppression avec ce compte. Rien n'a été modifié.`
+              `"${name}" n'a pas pu être retiré. Rien n'a été modifié.`
             );
             return;
           }
@@ -699,20 +700,20 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
       }
 
       if (editingEventId) {
-        let { error } = await supabase.from('events').update(record).eq('id', editingEventId);
+        let { error } = await adminWrite(adminCode, 'events', 'update', editingEventId, record);
         if (error && error.message?.includes('address_id')) {
           delete record.address_id;
-          const retry = await supabase.from('events').update(record).eq('id', editingEventId);
+          const retry = await adminWrite(adminCode, 'events', 'update', editingEventId, record);
           error = retry.error;
         }
         if (error) throw error;
         showAlert('Succès', `L'événement "${eventFormTitle}" a été mis à jour.`);
       } else {
         record.id = generateUUID();
-        let { error } = await supabase.from('events').insert(record);
+        let { error } = await adminWrite(adminCode, 'events', 'insert', null, record);
         if (error && error.message?.includes('address_id')) {
           delete record.address_id;
-          const retry = await supabase.from('events').insert(record);
+          const retry = await adminWrite(adminCode, 'events', 'insert', null, record);
           error = retry.error;
         }
         if (error) throw error;
@@ -752,10 +753,8 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
   const fetchPartners = async (): Promise<any[]> => {
     try {
       setLoadingPartners(true);
-      const { data, error } = await supabase
-        .from('sponsored_partners')
-        .select('*')
-        .order('rank_position', { ascending: true });
+      const { data: rawPartners, error } = await adminRead(adminCode, 'sponsored_partners');
+      const data = rawPartners ? [...rawPartners].sort((a, b) => (a.rank_position ?? 0) - (b.rank_position ?? 0)) : null;
       if (!error && data) {
         setPartners(data);
         saveStoredPartners(data);
@@ -791,11 +790,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
     const failed: string[] = [];
     for (const p of renumbered) {
       if (previousRank.get(p.id) === p.rank_position) continue;
-      const { data, error } = await supabase
-        .from('sponsored_partners')
-        .update({ rank_position: p.rank_position, badge_text: p.badge_text, sponsorship_tier: p.sponsorship_tier })
-        .eq('id', p.id)
-        .select();
+      const { data, error } = await adminWrite(adminCode, 'sponsored_partners', 'update', p.id, { rank_position: p.rank_position, badge_text: p.badge_text, sponsorship_tier: p.sponsorship_tier });
       if (error || !data || data.length === 0) failed.push(p.title);
     }
     return failed;
@@ -877,11 +872,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
         const startsAt = existing?.starts_at ? new Date(existing.starts_at) : new Date();
         const fields = { ...base, ends_at: new Date(startsAt.getTime() + days * 86400000).toISOString() };
         record = { ...existing, ...fields };
-        const { data, error } = await supabase
-          .from('sponsored_partners')
-          .update(fields)
-          .eq('id', editingPartnerId)
-          .select();
+        const { data, error } = await adminWrite(adminCode, 'sponsored_partners', 'update', editingPartnerId, fields);
         if (error || !data || data.length === 0) failed.push(base.title);
       } else {
         const startsAt = new Date();
@@ -894,7 +885,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
           is_active: true,
           id: generateUUID(),
         };
-        const { data, error } = await supabase.from('sponsored_partners').insert(record).select();
+        const { data, error } = await adminWrite(adminCode, 'sponsored_partners', 'insert', null, record);
         if (error || !data || data.length === 0) failed.push(base.title);
       }
 
@@ -925,7 +916,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
       const updated = partners.map(p => p.id === partner.id ? { ...p, is_active: nextVal } : p);
       setPartners(updated);
       saveStoredPartners(updated);
-      const { data, error } = await supabase.from('sponsored_partners').update({ is_active: nextVal }).eq('id', partner.id).select();
+      const { data, error } = await adminWrite(adminCode, 'sponsored_partners', 'update', partner.id, { is_active: nextVal });
       if (error || !data || data.length === 0) reportPartnerSyncFailures([partner.title]);
     } catch (e) {
       console.warn(e);

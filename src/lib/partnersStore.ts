@@ -102,9 +102,8 @@ export function saveStoredPartners(partners: SponsoredPartner[]): void {
 export async function syncPartnersWithSupabase(): Promise<SponsoredPartner[]> {
   try {
     const { data, error } = await supabase
-      .from("sponsored_partners")
+      .from("sponsored_partners_public")
       .select("*")
-      .eq("is_active", true)
       .order("rank_position", { ascending: true });
 
     if (!error && data) {
