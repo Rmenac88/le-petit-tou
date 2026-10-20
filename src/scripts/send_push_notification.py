@@ -17,7 +17,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SUPABASE_URL = os.environ.get("EXPO_PUBLIC_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("EXPO_PUBLIC_SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+# Clé service_role obligatoire (la table est fermée à la clé publique). Ne jamais la mettre dans l'appli ni dans EXPO_PUBLIC_*.
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 
 EXPO_PUSH_ENDPOINT = "https://exp.host/--/api/v2/push/send"
 
@@ -25,7 +26,7 @@ EXPO_PUSH_ENDPOINT = "https://exp.host/--/api/v2/push/send"
 def fetch_push_tokens(notification_type="all"):
     """Récupère les tokens Expo valides depuis la table Supabase user_push_tokens."""
     if not SUPABASE_URL or not SUPABASE_KEY:
-        print("❌ Erreur : Variables SUPABASE_URL ou SUPABASE_KEY manquantes dans le fichier .env")
+        print("❌ Erreur : Variables SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY manquantes dans le fichier .env (hors dépôt)")
         return []
 
     headers = {
@@ -45,7 +46,7 @@ def fetch_push_tokens(notification_type="all"):
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
             records = response.json()
-            tokens = list(set([r["push_token"] for r in records if r.get("push_token") and "ExponentPushToken" in r["push_token"]]))
+            tokens = list(set([r["push_token"] for r in records if r.get("push_token") and "PushToken[" in r["push_token"]]))
             return tokens
         else:
             print(f"⚠️ Erreur Supabase ({response.status_code}) : {response.text}")
