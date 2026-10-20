@@ -39,7 +39,8 @@ module.exports = ({ config }) => {
       ...(googleServicesFile ? { googleServicesFile } : {}),
       config: {
         ...(config.android && config.android.config),
-        ...(googleMapsKey ? { googleMaps: { apiKey: googleMapsKey } } : {}),
+        // Hors production sans clé : valeur factice pour que la carte reste vide au lieu de faire planter l'appli
+        googleMaps: { apiKey: googleMapsKey || 'CLE_GOOGLE_MAPS_MANQUANTE' },
       },
     },
   };
