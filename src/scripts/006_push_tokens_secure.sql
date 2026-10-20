@@ -40,6 +40,10 @@ alter table public.user_push_tokens enable row level security;
 drop policy if exists "user_push_tokens_all" on public.user_push_tokens;
 revoke all on public.user_push_tokens from anon, authenticated;
 
+-- Anciennes versions éventuelles (types de retour différents) : on les remplace.
+drop function if exists public.register_push_token(text, text, text, boolean, boolean);
+drop function if exists public.unregister_push_token(text);
+
 create or replace function public.register_push_token(
   p_device_id text,
   p_token text,
