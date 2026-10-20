@@ -30,7 +30,7 @@ import { discoveryStore } from '../lib/discoveryStore';
 import { Brand } from '../constants/brand';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = Math.min(SCREEN_WIDTH - 40, 360);
-// Format Apple Wallet / Carte bancaire ISO/IEC 7810 (ratio ~ 1.586 : 1)
+// Format carte bancaire ISO/IEC 7810 (ratio ~ 1.586 : 1)
 const CARD_HEIGHT = Math.round(CARD_WIDTH / 1.586);
 
 const triggerHaptic = () => {
@@ -51,7 +51,7 @@ interface Props {
   onFlipChange?: (isFlipped: boolean) => void;
 }
 
-export default function AppleWalletCard({
+export default function MemberCard({
   activeSkin,
   customImageUrl,
   onFlipChange,
@@ -140,7 +140,7 @@ export default function AppleWalletCard({
     if (activeSkin === 'titanium') {
       return (
         <Image
-          source={require('../../assets/images/wallet/card_titanium.jpg')}
+          source={require('../../assets/images/member-card/card_titanium.jpg')}
           style={styles.cardCover}
           contentFit="cover"
           transition={300}
@@ -151,7 +151,7 @@ export default function AppleWalletCard({
     if (activeSkin === 'crimson') {
       return (
         <Image
-          source={require('../../assets/images/wallet/card_crimson.jpg')}
+          source={require('../../assets/images/member-card/card_crimson.jpg')}
           style={styles.cardCover}
           contentFit="cover"
           transition={300}
@@ -172,10 +172,10 @@ export default function AppleWalletCard({
     <Pressable
       style={styles.cardContainer}
       onPress={handleFlip}
-      accessibilityLabel="Retourner la carte Le Petit Tou Wallet"
+      accessibilityLabel="Retourner la carte Le Petit Tou"
     >
       {/* ══════════════════════════════════════════════════════════ */}
-      {/* ─── RECTO FACE (Face Avant Apple Wallet) ─────────────── */}
+      {/* ─── RECTO FACE (face avant) ─────────────── */}
       {/* ══════════════════════════════════════════════════════════ */}
       <Animated.View style={[styles.cardFace, styles.frontFace, frontAnimatedStyle]}>
         {/* Full-bleed Texture Background */}
@@ -231,7 +231,7 @@ export default function AppleWalletCard({
       </Animated.View>
 
       {/* ══════════════════════════════════════════════════════════ */}
-      {/* ─── VERSO FACE (Face Arrière Apple Wallet) ────────────── */}
+      {/* ─── VERSO FACE (face arrière) ────────────── */}
       {/* ══════════════════════════════════════════════════════════ */}
       <Animated.View style={[styles.cardFace, styles.backFace, backAnimatedStyle]}>
         {/* Full-bleed Texture Background */}

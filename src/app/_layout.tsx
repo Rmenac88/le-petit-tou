@@ -12,12 +12,14 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { applyBrandTypography } from '@/lib/typography';
+import { configureNotificationHandler } from '@/lib/pushRegistration';
 import IntroScreen from '@/components/IntroScreen';
 import { appStorage } from '@/lib/storage';
 
 const INTRO_SEEN_KEY = 'pt_intro_seen_v1';
 
 applyBrandTypography();
+configureNotificationHandler();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

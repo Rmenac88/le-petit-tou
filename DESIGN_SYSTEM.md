@@ -31,5 +31,5 @@ Source de vérité : `src/constants/brand.ts`. Aucune couleur, taille de texte o
 - Cible tactile minimale 44 × 44 pt (`Touch.min`).
 - Colonne de lecture centrée, 720 px maximum (`Layout.maxWidth`) ; la carte reste pleine largeur.
 - Un seul bouton principal par écran ; max. 2 badges par carte.
-- Dock : 5 onglets au maximum (Accueil, Recherche, Carte, Wallet, Agenda). L'onglet Agenda liste les dates des adresses partenaires, jour par jour (bandeau de 14 jours).
+- Dock : 5 onglets au maximum (Accueil, Recherche, Carte, Ma carte, Agenda). L'onglet Agenda liste les dates des adresses partenaires, jour par jour (bandeau de 14 jours).
 - La fiche d'une adresse a sa propre barre d'actions : le dock se cache quand elle est ouverte.

@@ -35,6 +35,7 @@ import { discoveryStore } from '../lib/discoveryStore';
 
 import { formatRating } from '../lib/formatRating';
 import { Brand } from '../constants/brand';
+import { Features } from '../constants/features';
 const { width, height } = Dimensions.get('window');
 
 export interface SpotDetail {
@@ -247,11 +248,15 @@ export default function AddressDetailModal({
 
             {/* Location & Rating */}
             <View style={styles.metaRow}>
-              <View style={styles.ratingBox}>
-                <Star size={16} color={Brand.chouchou} fill={Brand.chouchou} />
-                <Text style={styles.ratingText}>{formatRating(spot.rating)}</Text>
-              </View>
-              <Text style={styles.dotSeparator}>•</Text>
+              {Features.externalRatings && (
+                <>
+                  <View style={styles.ratingBox}>
+                    <Star size={16} color={Brand.chouchou} fill={Brand.chouchou} />
+                    <Text style={styles.ratingText}>{formatRating(spot.rating)}</Text>
+                  </View>
+                  <Text style={styles.dotSeparator}>•</Text>
+                </>
+              )}
               <Text style={styles.locationSub}>{spot.location || 'Toulouse Centre'}</Text>
             </View>
 
@@ -416,7 +421,8 @@ export default function AddressDetailModal({
               )}
             </View>
 
-            {/* Reviews / Avis */}
+            {Features.externalRatings && (
+            <>
             <View style={styles.sectionBox}>
               <View style={styles.reviewsHeaderRow}>
                 <Text style={styles.sectionHeaderTitle}>Avis & Retours</Text>
@@ -446,6 +452,8 @@ export default function AddressDetailModal({
                 </View>
               )}
             </View>
+            </>
+            )}
 
           </View>
         </ScrollView>

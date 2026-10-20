@@ -54,6 +54,7 @@ import { discoveryStore } from '../../lib/discoveryStore';
 
 import { formatRating } from '../../lib/formatRating';
 import { Brand } from '../../constants/brand';
+import { Features } from '../../constants/features';
 // Conditional dynamic imports to prevent native modules breaking the web bundle
 let NativeMapView: any = null;
 let NativeMarker: any = null;
@@ -1278,9 +1279,11 @@ export default function MapView({
                     {spot.address || spot.location || 'Toulouse'}
                   </Text>
                 </View>
-                <View style={styles.suggestionRating}>
-                  <Text style={styles.suggestionRatingText}>{formatRating(spot.rating)}</Text>
-                </View>
+                {Features.externalRatings && (
+                  <View style={styles.suggestionRating}>
+                    <Text style={styles.suggestionRatingText}>{formatRating(spot.rating)}</Text>
+                  </View>
+                )}
               </Pressable>
             ))}
 

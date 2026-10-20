@@ -19,6 +19,7 @@ import { searchIndex } from '../../lib/searchIndex';
 import { getOptimizedImageUrl } from '../../lib/imageOptimizer';
 
 import { Brand } from '../../constants/brand';
+import { Features } from '../../constants/features';
 const QUICK_TAGS = [
   { id: '1', name: 'Restaurants', tag: 'Restaurants', icon: Utensils },
   { id: '2', name: 'Bars & Cocktails', tag: 'Bars', icon: Wine },
@@ -203,10 +204,12 @@ export default function SearchView({
                     <View style={styles.resultInfo}>
                       <View style={styles.resultBadgeRow}>
                         <Text style={styles.resultCategory}>{spot.tags ? spot.tags[0] : 'Adresse'}</Text>
-                        <View style={styles.ratingBadge}>
+                        {Features.externalRatings && (
+                          <View style={styles.ratingBadge}>
                           <Star size={12} color={Brand.chouchou} fill={Brand.chouchou} />
                           <Text style={styles.ratingText}>{formatRating(spot.rating)}</Text>
                         </View>
+                        )}
                       </View>
                       <Text style={styles.resultTitle}>{spot.title}</Text>
                       <Text style={styles.resultDesc} numberOfLines={1}>{spot.description}</Text>
