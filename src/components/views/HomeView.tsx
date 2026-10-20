@@ -543,6 +543,7 @@ export default function HomeView({
   const adminTapTimerRef = React.useRef<any>(null);
 
   const handleTitlePress = () => {
+    if (!Features.adminPortal) return;
     triggerHaptic();
     adminTapCountRef.current += 1;
     if (adminTapTimerRef.current) {

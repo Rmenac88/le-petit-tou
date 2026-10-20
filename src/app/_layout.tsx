@@ -2,7 +2,8 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { useColorScheme, View, Platform } from 'react-native';
+import { useColorScheme, View, Platform, Text, Pressable } from 'react-native';
+import { Brand, Radius, Touch, Type } from '@/constants/brand';
 import { useFonts, BricolageGrotesque_700Bold, BricolageGrotesque_800ExtraBold } from '@expo-google-fonts/bricolage-grotesque';
 import {
   PlusJakartaSans_400Regular,
@@ -20,6 +21,28 @@ const INTRO_SEEN_KEY = 'pt_intro_seen_v1';
 
 applyBrandTypography();
 configureNotificationHandler();
+
+/** Écran de secours : une erreur inattendue n'affiche plus un écran blanc. */
+export function ErrorBoundary({ retry }: { error: Error; retry: () => Promise<void> }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12, backgroundColor: Brand.bg }}>
+      <Text style={{ fontSize: Type.title2, fontWeight: '800', color: Brand.ink, textAlign: 'center' }}>
+        Oups, quelque chose s'est mal passé
+      </Text>
+      <Text style={{ fontSize: Type.body, color: Brand.inkSoft, textAlign: 'center' }}>
+        Ce n'est pas de ton fait. Réessaie, et si ça recommence, ferme puis rouvre l'appli.
+      </Text>
+      <Pressable
+        onPress={() => retry()}
+        accessibilityRole="button"
+        accessibilityLabel="Réessayer"
+        style={{ minHeight: Touch.min, paddingHorizontal: 28, borderRadius: Radius.pill, backgroundColor: Brand.primaryDeep, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Text style={{ fontSize: Type.bodyLg, fontWeight: '700', color: Brand.white }}>Réessayer</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

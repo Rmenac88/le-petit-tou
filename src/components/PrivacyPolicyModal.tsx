@@ -50,7 +50,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
               contentContainerStyle={styles.bodyContent}
               showsVerticalScrollIndicator={true}
             >
-              <Text style={styles.lastUpdate}>Dernière mise à jour : 14 septembre 2026</Text>
+              <Text style={styles.lastUpdate}>Dernière mise à jour : 20 octobre 2026</Text>
 
               <Text style={styles.introText}>
                 L'association <Text style={styles.boldText}>Le Petit Tou</Text> (association loi 1901, domiciliée au 1 Place Alphonse Jourdain, 31000 Toulouse, France) s'engage à protéger la vie privée et les données personnelles des utilisateurs de son application mobile, conformément au Règlement Général sur la Protection des Données (RGPD) et aux réglementations Apple App Store et Google Play.
@@ -60,16 +60,22 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
                   <Lock size={18} color="#24242E" />
-                  <Text style={styles.sectionTitle}>1. Respect total de votre anonymat</Text>
+                  <Text style={styles.sectionTitle}>1. Pas de compte, peu de données</Text>
                 </View>
                 <Text style={styles.paragraph}>
-                  L'application Le Petit Tou est un guide urbain accessible à tous, sans aucune obligation d'inscription ni création de compte :
+                  L'application est utilisable sans inscription : nous ne te demandons ni nom, ni email, ni mot de passe. Pour fonctionner, elle utilise tout de même :
                 </Text>
                 <Text style={styles.bulletPoint}>
-                  • <Text style={styles.boldText}>Aucun compte requis :</Text> Nous ne collectons et ne stockons aucune information nominative (ni nom, prénom, adresse email, mot de passe ou profil).
+                  • <Text style={styles.boldText}>Une session anonyme et un identifiant d'appareil aléatoire</Text> (non lié à ton identité), qui servent à compter les likes, les adresses découvertes et à empêcher les abus.
                 </Text>
                 <Text style={styles.bulletPoint}>
-                  • <Text style={styles.boldText}>Favoris et Likes sur l'appareil :</Text> Vos coups de cœur et adresses favorites sont conservés exclusivement sur votre appareil dans un espace de stockage sécurisé (SecureStore). Aucun profil individuel ni historique personnel n'est transmis à nos serveurs.
+                  • <Text style={styles.boldText}>Tes favoris et ta progression</Text>, conservés sur ton appareil. Les likes et adresses découvertes sont aussi enregistrés sur nos serveurs, rattachés à l'identifiant anonyme.
+                </Text>
+                <Text style={styles.bulletPoint}>
+                  • <Text style={styles.boldText}>Les adresses que tu suggères</Text>, avec le texte que tu écris (ne mets pas de données personnelles dedans).
+                </Text>
+                <Text style={styles.bulletPoint}>
+                  • <Text style={styles.boldText}>Des statistiques de consultation</Text> des fiches (nombre de vues par adresse), sans lien avec ta personne.
                 </Text>
               </View>
 
@@ -102,34 +108,34 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
                   <Lock size={18} color="#24242E" />
-                  <Text style={styles.sectionTitle}>4. Hébergement & Sécurité des flux</Text>
+                  <Text style={styles.sectionTitle}>4. Notifications (facultatif)</Text>
                 </View>
                 <Text style={styles.paragraph}>
-                  Les informations publiques du guide (adresses des commerces, descriptions, horaires) sont hébergées sur des infrastructures chiffrées :
-                </Text>
-                <Text style={styles.bulletPoint}>
-                  • <Text style={styles.boldText}>Supabase Inc. :</Text> Base de données avec communications chiffrées en transit (TLS 1.3) et au repos (AES-256).
-                </Text>
-                <Text style={styles.bulletPoint}>
-                  • <Text style={styles.boldText}>Zéro revente de données :</Text> Aucune donnée personnelle n'est vendue, louée, partagée ou exploitée à des fins publicitaires ou de ciblage commercial.
+                  Si tu les actives dans l'appli, nous enregistrons le jeton de notification de ton téléphone, ton système (iOS ou Android) et tes choix (événements, nouvelles adresses). Rien n'est demandé tant que tu n'appuies pas sur « Activer ». Tu peux tout arrêter à tout moment : le jeton est alors supprimé. Aucune notification publicitaire de partenaire n'est envoyée.
                 </Text>
               </View>
 
               {/* Section 5 */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeaderRow}>
+                  <ShieldCheck size={18} color="#24242E" />
+                  <Text style={styles.sectionTitle}>5. Hébergement et partage</Text>
+                </View>
+                <Text style={styles.paragraph}>
+                  Les données sont hébergées chez Supabase (base de données et stockage des photos), les communications sont chiffrées en transit. Les notifications transitent par le service de notifications d'Expo. Les cartes sont fournies par Apple, Google ou Mapbox selon ton appareil, qui peuvent traiter ton adresse IP et ta position si tu l'as autorisée. Nous ne vendons aucune donnée et n'en faisons pas de publicité ciblée.
+                </Text>
+              </View>
+
+              {/* Section 6 */}
               <View style={[styles.section, { marginBottom: 30 }]}>
                 <View style={styles.sectionHeaderRow}>
                   <Trash2 size={18} color="#24242E" />
-                  <Text style={styles.sectionTitle}>5. Droits RGPD & Réinitialisation</Text>
+                  <Text style={styles.sectionTitle}>6. Tes droits</Text>
                 </View>
                 <Text style={styles.paragraph}>
-                  Dans la mesure où l'application ne recueille aucune donnée personnelle nominative sur ses serveurs, aucun identifiant ni profil n'est conservé.
+                  Tu peux demander l'accès, la rectification ou la suppression des données rattachées à ton appareil, ou t'opposer à leur traitement. Désinstaller l'appli supprime les données locales ; pour effacer celles stockées sur nos serveurs, écris-nous en indiquant que tu veux effacer tes données et, si possible, ton identifiant d'appareil. Tu peux aussi saisir la CNIL (cnil.fr).
                 </Text>
-                <Text style={styles.bulletPoint}>
-                  • Vous pouvez à tout moment réinitialiser vos favoris locaux en réinitialisant les données de l'application ou en la désinstallant.
-                </Text>
-                <Text style={styles.paragraph}>
-                  Pour toute question concernant notre politique de confidentialité, vous pouvez contacter notre équipe à :
-                </Text>
+                <Text style={styles.paragraph}>Contact de l'association :</Text>
                 <Text style={styles.contactEmail}>contact@lepetittou.net</Text>
                 <Text style={styles.paragraph}>
                   Association Le Petit Tou — TBS Education, 1 Place Alphonse Jourdain, 31000 Toulouse.
