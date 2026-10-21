@@ -116,6 +116,7 @@ import {
 } from '../../lib/likesStore';
 import { discoveryStore, DiscoveryStats } from '../../lib/discoveryStore';
 import { formatRating } from '../../lib/formatRating';
+import { todayIso, upcomingEvents } from '../../lib/upcomingEvents';
 import {
   isAddressInCategory,
   getCategorySpotCount,
@@ -343,10 +344,6 @@ export const redirectToBookingUrl = (url: string) => {
   }
 };
 
-const MOCK_EVENTS = [
-  { id: 'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d', title: "Soirée de lancement du guide 2026", description: "Soirée exclusive pour découvrir les nouvelles adresses sélectionnées par l'association.", event_date: '2026-05-24', event_time: '19:00', location: 'Quai de la Daurade, Toulouse', price: 25.00, booking_url: DEFAULT_BOOKING_URL, max_places: 150 },
-  { id: 'f6e5d4c3-b2a1-0f9e-8d7c-6b5a4f3e2d1c', title: "Toulouse à Table !", description: "Grand banquet toulousain partagé en plein cœur de la ville rose.", event_date: '2026-06-15', event_time: '12:00', location: 'Divers lieux, Toulouse', price: 15.00, booking_url: DEFAULT_BOOKING_URL, max_places: 80 }
-];
 
 const ICON_MAP: Record<string, React.ComponentType<any>> = {
   Menu,
@@ -681,7 +678,8 @@ export default function HomeView({
       setAddresses(mergedAddresses as any);
 
       // Fetch Events with explicit projection
-      let finalEvents = MOCK_EVENTS;
+      // Jamais d'événement fictif : sans données (ou en cas d'erreur) la liste est vide.
+      let finalEvents: any[] = [];
       try {
         const { data: eventsData, error: eventsError } = await supabase
           .from('events')
@@ -693,12 +691,10 @@ export default function HomeView({
             ...ev,
             booking_url: getEventBookingUrl(ev),
           }));
-        } else {
-          finalEvents = MOCK_EVENTS;
         }
         setEvents(finalEvents);
       } catch (e) {
-        setEvents(MOCK_EVENTS);
+        setEvents([]);
       }
 
       // Fetch & Sync Sponsored Partners (Top Netflix) in background
@@ -722,7 +718,7 @@ export default function HomeView({
       // Fallback
       setCategories(dataset.categories as any);
       setAddresses(dataset.addresses as any);
-      setEvents(MOCK_EVENTS);
+      setEvents([]);
       setIsConfigured(false);
       setLoading(false);
     }
@@ -1954,11 +1950,11 @@ export default function HomeView({
 
               {loading ? (
                 <ActivityIndicator size="small" color={Brand.primaryDeep} style={{ marginVertical: 20 }} />
-              ) : events.length === 0 ? (
+              ) : upcomingEvents(events, todayIso()).length === 0 ? (
                 <Text style={styles.emptyText}>Aucun événement pour l'instant</Text>
               ) : (
                 <View style={styles.eventsContainer}>
-                  {events.map((event) => {
+                  {upcomingEvents(events, todayIso()).map((event) => {
                     const months = ['JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC'];
                     let day: number | string = 1;
                     let monthStr = 'JAN';

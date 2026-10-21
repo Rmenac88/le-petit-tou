@@ -38,6 +38,25 @@ begin
 end
 $$;
 
+-- Anciennes versions des fonctions de ce script : « create or replace » échoue si le type de retour ou les
+-- noms de paramètres ont changé (ex. unregister_push_token). On les retire d'abord ; les déclencheurs qui
+-- en dépendent sont recréés plus bas (section 3).
+do $$
+declare r record;
+begin
+  for r in select oid::regprocedure as sig from pg_proc
+            where pronamespace = 'public'::regnamespace
+              and proname in ('register_push_token', 'update_push_preferences', 'get_push_preferences',
+                              'unregister_push_token', '_push_enqueue', '_push_retry', 'trg_push_event',
+                              'trg_push_agenda', 'trg_push_new_spot', 'push_fanout', 'push_send',
+                              'push_collect', 'push_receipts', 'push_tick', 'admin_send_push',
+                              'admin_push_stats', 'purge_old_data')
+  loop
+    execute 'drop function if exists ' || r.sig || ' cascade';
+  end loop;
+end
+$$;
+
 -- ------------------------------------------------------------------------------
 -- 1. Tables (aucun accès direct depuis l'appli : tout passe par des fonctions)
 -- ------------------------------------------------------------------------------

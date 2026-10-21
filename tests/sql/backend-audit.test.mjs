@@ -90,6 +90,115 @@ describe('mise à jour de la production : ancienne version d’admin_write', () 
   });
 });
 
+describe('mise à jour de la production : anciennes fonctions de notifications', () => {
+  test('007 s’applique même si des fonctions push existent avec un autre type de retour ou d’autres paramètres', async () => {
+    const db = new PGlite({ extensions: { pgcrypto } });
+    await db.exec(baseline);
+    await db.exec(`alter table public.addresses add column if not exists is_new boolean default false;`);
+    await db.exec(m006);
+    await db.exec(NET_STUB);
+    await db.exec(`
+      create function public.unregister_push_token(p_device_id text) returns boolean language sql as $$ select true $$;
+      create function public.register_push_token(p_device_id text, p_token text) returns void language sql as $$ select $$;
+      create function public.admin_push_stats(p_code text) returns integer language sql as $$ select 1 $$;
+      create function public.push_tick() returns void language sql as $$ select $$;`);
+    await db.exec(m007);
+
+    const r = await register(db, DEV_A, TOK_A, 'ios', true, true, false);
+    assert.equal(r.success, true);
+    assert.equal((await as(db, 'anon', `select public.unregister_push_token($1) r`, [DEV_A])).rows[0].r.success, true);
+    assert.equal((await stats(db)).ok, true);
+    await db.query(`insert into public.events (title, event_date) values ('Concert', '2026-08-01')`);
+    assert.equal((await one(db, `select count(*)::int n from public.push_outbox`)).n, 1, 'les déclencheurs sont recréés');
+    await db.exec(m007); // rejouable
+  });
+});
+
+describe('surface d’attaque : fonctions appelables avec la clé publique', () => {
+  // Liste blanche : tout ajout de fonction exposée doit être décidé ici, consciemment.
+  const ALLOWED_ANON = [
+    'admin_delete_partner_event', 'admin_list_partner_events', 'admin_push_stats', 'admin_save_partner_event',
+    'admin_send_push', 'admin_write', 'delete_my_data', 'discover_place', 'get_my_card_usage', 'get_my_discoveries',
+    'get_push_preferences', 'increment_spot_like', 'register_push_token', 'unregister_push_token',
+    'update_push_preferences', 'use_discount_card', 'verify_admin_access',
+  ];
+  test('anon et authenticated ne peuvent exécuter que la liste blanche ; aucune fonction interne exposée', async () => {
+    const db = await newDb();
+    for (const role of ['anon', 'authenticated']) {
+      const exposed = (await rows(db, `
+        select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public' and has_function_privilege($1, p.oid, 'execute')
+         order by 1`, [role])).map((r) => r.proname);
+      const unexpected = [...new Set(exposed)].filter((f) => !ALLOWED_ANON.includes(f));
+      assert.deepEqual(unexpected, [], `${role} peut exécuter des fonctions non prévues : ${unexpected.join(', ')}`);
+    }
+  });
+  test('toutes les tables sensibles ont la RLS activée', async () => {
+    const db = await newDb();
+    const off = (await rows(db, `
+      select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity order by 1`)).map((r) => r.relname);
+    assert.deepEqual(off, [], `tables sans RLS : ${off.join(', ')}`);
+  });
+});
+
+describe('comptes authentifiés et administrateurs', () => {
+  const asUser = async (db, role, uid, sql, params = []) => {
+    await db.query(`select set_config('request.jwt.claim.sub', $1, false)`, [uid]);
+    await db.exec(`set role ${role}`);
+    try { return await db.query(sql, params); } finally { await db.exec('reset role'); await db.query(`select set_config('request.jwt.claim.sub', '', false)`); }
+  };
+  const ADMIN = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const USER_A = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const USER_B = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  async function setup() {
+    const db = await newDb();
+    await db.query(`insert into auth.users (id) values ($1), ($2), ($3)`, [ADMIN, USER_A, USER_B]);
+    await db.query(`insert into public.admin_users (id, email) values ($1, 'admin@test.invalid')`, [ADMIN]);
+    return db;
+  }
+
+  test('un compte admin passe avec n’importe quel code non vide ; un compte non admin ne passe jamais sans le bon code', async () => {
+    const db = await setup();
+    const call = (uid, code) => asUser(db, 'authenticated', uid, `select public.admin_push_stats($1) r`, [code]).then((r) => r.rows[0].r.ok);
+    assert.equal(await call(ADMIN, 'x'), true, 'admin authentifié');
+    assert.equal(await call(ADMIN, ''), false, 'code vide refusé même pour un admin');
+    assert.equal(await call(USER_A, 'x'), false, 'utilisateur simple, mauvais code');
+    assert.equal(await call(USER_A, GOOD_CODE), true, 'le bon code reste valable (mécanisme du portail actuel)');
+  });
+
+  test('l’admin authentifié écrit dans le catalogue ; un utilisateur simple écrit seulement avec le bon code', async () => {
+    const db = await setup();
+    const w = (uid, code) => asUser(db, 'authenticated', uid, `select public.admin_write($1,'events','insert',null,'{"title":"t"}'::jsonb) r`, [code]).then((r) => r.rows[0].r.ok);
+    assert.equal(await w(ADMIN, 'x'), true);
+    assert.equal(await w(USER_B, BAD_CODE), false);
+    assert.equal((await one(db, `select count(*)::int n from public.events`)).n, 1);
+  });
+
+  test('utilisateur A et utilisateur B : aucune lecture, écriture ou suppression croisée de leurs données', async () => {
+    const db = await setup();
+    const spot = (await one(db, `insert into public.addresses (title) values ('Adresse de test') returning id`)).id;
+    const found = (await asUser(db, 'authenticated', USER_A, `select public.discover_place($1, $2, 'manual_checkin') r`, [DEV_A, spot])).rows[0].r;
+    assert.equal(found.success ?? found.ok ?? true, true);
+    const list = (uid) => asUser(db, 'authenticated', uid, `select place_id from public.get_my_discoveries($1)`, [DEV_A]).then((r) => r.rows.map((x) => x.place_id));
+    assert.deepEqual(await list(USER_A), [spot], 'A voit sa découverte');
+    assert.deepEqual(await list(USER_B), [], 'B authentifié ne voit pas celle de A, même en passant l’identifiant d’appareil de A');
+    await asUser(db, 'authenticated', USER_B, `select public.delete_my_data($1) r`, [DEV_A]);
+    assert.equal((await one(db, `select count(*)::int n from public.user_place_discoveries where place_id = $1`, [spot])).n, 1,
+      'B ne peut pas effacer les données de A');
+  });
+
+  test('suppression du compte : plus de ligne admin, de jeton, ni d’utilisateur', async () => {
+    const db = await setup();
+    await asUser(db, 'authenticated', ADMIN, `select public.register_push_token($1,$2,'android',true,true,false) r`, [DEV_A, TOK_A]);
+    const r = await asUser(db, 'authenticated', ADMIN, `select public.delete_my_data(null) r`);
+    assert.equal(r.rows[0].r.success, true);
+    assert.equal((await one(db, `select count(*)::int n from public.admin_users`)).n, 0);
+    assert.equal((await one(db, `select count(*)::int n from auth.users where id = $1`, [ADMIN])).n, 0);
+    assert.equal((await one(db, `select count(*)::int n from public.push_devices`)).n, 0);
+  });
+});
+
 describe('lecture publique du catalogue', () => {
   test('006 garantit la lecture publique des 4 tables, même si le droit SELECT manquait (cas observé en production)', async () => {
     const db = new PGlite({ extensions: { pgcrypto } });

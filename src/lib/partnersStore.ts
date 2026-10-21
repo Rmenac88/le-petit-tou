@@ -18,41 +18,11 @@ export interface SponsoredPartner {
   spot_id?: string;
 }
 
-export const DEFAULT_PARTNERS: SponsoredPartner[] = [
-  {
-    id: "sp-1",
-    rank_position: 1,
-    title: "Le Bibent",
-    subtitle: "1 Coupe de champagne offerte pour tout repas membre Le Petit Tou",
-    image_url: "https://images.unsplash.com/photo-1550966871-3ed3cdb5ed0c?w=800",
-    badge_text: "TOP #1 PARTENAIRE",
-    price_paid: 300,
-    notify_interval_hours: 2,
-    is_active: true,
-  },
-  {
-    id: "sp-2",
-    rank_position: 2,
-    title: "La Belle Brune",
-    subtitle: "-15% sur toute la carte sur présentation du guide",
-    image_url: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800",
-    badge_text: "TOP #2 COUP DE COEUR",
-    price_paid: 200,
-    notify_interval_hours: 12,
-    is_active: true,
-  },
-  {
-    id: "sp-3",
-    rank_position: 3,
-    title: "Chez Magda",
-    subtitle: "Pâtisseries artisanales & Café de spécialité à prix d'ami",
-    image_url: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=800",
-    badge_text: "TOP #3 COEUR DE VILLE",
-    price_paid: 180,
-    notify_interval_hours: 24,
-    is_active: true,
-  },
-];
+/**
+ * Aucun partenaire fictif : tant que la base n'a pas répondu, ou si elle n'en a aucun, la section
+ * « Top Partenaires » reste masquée (une offre affichée doit être une vraie offre).
+ */
+export const DEFAULT_PARTNERS: SponsoredPartner[] = [];
 
 const STORAGE_KEY = "pt_sponsored_partners_v1";
 
