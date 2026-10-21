@@ -115,12 +115,27 @@ begin
     execute format(
       'create policy "Lecture publique" on public.%I for select to anon, authenticated using (true)', t);
     execute format('revoke insert, update, delete, truncate on public.%I from anon, authenticated', t);
+    -- la politique ne sert à rien sans le droit SELECT (absent de certaines tables en production)
+    execute format('grant select on public.%I to anon, authenticated', t);
   end loop;
 end
 $$;
 
 -- Écriture admin : une seule fonction, tables et colonnes limitées, code vérifié côté serveur.
 -- Renvoie toujours un jsonb : {"ok":true,"rows":[...]} ou {"ok":false,"error":"..."}.
+-- Toute version précédente est retirée d'abord : « create or replace » échoue si les NOMS de paramètres
+-- ont changé (ex. ancien p_payload => p_record), ce qui annulerait toute la migration.
+do $$
+declare r record;
+begin
+  for r in select oid::regprocedure as sig from pg_proc
+            where pronamespace = 'public'::regnamespace and proname = 'admin_write'
+  loop
+    execute 'drop function if exists ' || r.sig || ' cascade';
+  end loop;
+end
+$$;
+
 create or replace function public.admin_write(
   p_code text,
   p_table text,

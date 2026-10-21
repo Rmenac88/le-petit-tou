@@ -23,8 +23,8 @@ done
 
 # 2. Catalogue : écriture directe refusée (nombre de lignes touchées = 0)
 for t in addresses categories events sponsored_partners; do
-  id=$(curl -s "${H[@]}" "$URL/rest/v1/$t?select=id&limit=1" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id'] if d else '')")
-  [ -z "$id" ] && { echo "SKIP  $t vide"; continue; }
+  id=$(curl -s "${H[@]}" "$URL/rest/v1/$t?select=id&limit=1" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id'] if isinstance(d, list) and d else '')")
+  [ -z "$id" ] && { echo "SKIP  $t vide ou illisible"; continue; }
   curl -s -o /dev/null -D /tmp/lpt_h.txt -X PATCH "${H[@]}" -H "Prefer: return=minimal,count=exact" "$URL/rest/v1/$t?id=eq.$id" -d "{\"id\":\"$id\"}"
   rng=$(grep -i content-range /tmp/lpt_h.txt | tr -d '\r' | sed 's/.*\///')
   status=$(head -1 /tmp/lpt_h.txt | tr -d '\r')

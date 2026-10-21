@@ -26,8 +26,8 @@ def normalize(s):
     return s.lower()
 
 def classify_spot(a):
-    crumbs = ' '.join(a.get('breadcrumbs', [])).lower()
-    tags = ' '.join(a.get('tags', [])).lower()
+    crumbs = ' '.join(a.get('breadcrumbs') or []).lower()
+    tags = ' '.join(a.get('tags') or []).lower()
     title = (a.get('title') or '').lower()
     desc = (a.get('description') or '').lower()
     

@@ -79,13 +79,22 @@ def run_tests():
     print("  ✅ Configuration Mobile prête pour EAS Build App Store / Play Store")
 
     print(f"\n[6/6] 🛡️ Audit de Sécurité & Variables d'Environnement :")
-    print("  • Supabase URL  : Configurée via EXPO_PUBLIC_SUPABASE_URL")
-    print("  • Supabase Key  : Configurée via EXPO_PUBLIC_SUPABASE_ANON_KEY (Clé publique anonyme)")
-    print("  • Row Level Security : Activé sur toutes les tables sensibles")
-    print("  ✅ Aucune clé secrète service_role exposée dans le frontend")
+    leaks = []
+    for root, _dirs, files in os.walk("src"):
+        for name in files:
+            if not name.endswith((".ts", ".tsx", ".js")):
+                continue
+            path = os.path.join(root, name)
+            with open(path, "r", encoding="utf-8", errors="ignore") as src:
+                if "service_role" in src.read():
+                    leaks.append(path)
+    assert not leaks, f"Mention de service_role dans le code de l'appli : {leaks}"
+    print("  ✅ Aucune mention de service_role dans le code de l'appli")
+    print("  ℹ️  La protection de la base (RLS, droits) n'est PAS vérifiée ici : voir `npm run test:sql`")
+    print("     (logique, sur PostgreSQL local) et scripts/audit-prod-check.sh (base de production).")
 
     print("\n" + "=" * 70)
-    print("🎉 TOUS LES TESTS AUTOMATISÉS SONT AU VERT — APPLICATION 100% OPÉRATIONNELLE !")
+    print("Contrôles de données et de configuration réussis (ils ne prouvent pas le fonctionnement sur téléphone).")
     print("=" * 70)
 
 if __name__ == "__main__":
