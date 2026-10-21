@@ -2,6 +2,10 @@ import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { withTimeout } from './fetchWithTimeout';
+
+/** Délai maximal d'une requête vers la base : au-delà, l'appli bascule sur ses données locales. */
+const REQUEST_TIMEOUT_MS = 10_000;
 
 const SUPABASE_URL = 
   process.env.EXPO_PUBLIC_SUPABASE_URL || 
@@ -46,6 +50,7 @@ const ExpoSecureStoreAdapter = {
 };
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  global: { fetch: withTimeout((...args) => fetch(...args), REQUEST_TIMEOUT_MS) },
   auth: {
     storage: ExpoSecureStoreAdapter as any,
     autoRefreshToken: true,
