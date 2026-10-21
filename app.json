@@ -19,6 +19,7 @@
     },
     "android": {
       "package": "fr.lepetittou.app",
+      "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#FAF5EF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
