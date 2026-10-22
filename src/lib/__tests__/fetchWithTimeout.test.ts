@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { withTimeout } from '../fetchWithTimeout.ts';
+import { withTimeout, withDeadline } from '../fetchWithTimeout.ts';
 
 // Faux fetch : ne répond jamais, mais respecte l'annulation comme le vrai.
 const hanging = ((_input: unknown, init?: { signal?: AbortSignal }) =>
@@ -34,4 +34,13 @@ test('un signal déjà annulé annule aussitôt', async () => {
   const caller = new AbortController();
   caller.abort();
   await assert.rejects(withTimeout(hanging, 10_000)('https://exemple.test/', { signal: caller.signal }), /annulée/);
+});
+
+test('withDeadline échoue après le délai si l’opération ne répond jamais', async () => {
+  await assert.rejects(withDeadline(new Promise(() => {}), 30, 'GPS muet'), /GPS muet/);
+});
+
+test('withDeadline laisse passer une réponse rapide et propage ses erreurs', async () => {
+  assert.equal(await withDeadline(Promise.resolve(42), 1000), 42);
+  await assert.rejects(withDeadline(Promise.reject(new Error('refusé')), 1000), /refusé/);
 });

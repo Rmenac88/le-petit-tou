@@ -15,6 +15,7 @@ import {
   PanResponder,
 } from 'react-native';
 import * as Location from 'expo-location';
+import { withDeadline, withTimeout } from '../../lib/fetchWithTimeout';
 import {
   Compass,
   Navigation,
@@ -244,10 +245,14 @@ export default function MapView({
   const mapRef = useRef<any>(null);
   const iframeRef = useRef<any>(null);
 
+  // Une seule vérification de la permission de localisation (et non à chaque changement de `spots`)
   useEffect(() => {
     checkPermission();
+  }, []);
 
-    // Listen to Leaflet marker clicks on Web
+  // Messages de l'iframe Mapbox : web uniquement (`window.addEventListener` n'existe pas sur téléphone)
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
       const handleWebMessage = (event: MessageEvent) => {
         try {
           const data = JSON.parse(event.data);
@@ -671,9 +676,12 @@ export default function MapView({
 
       if (status === 'granted') {
         setLocationPermission('granted');
-        const pos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
+        // expo-location n'a pas de délai propre : sans GPS (intérieur, mode économie) la promesse resterait suspendue
+        const pos = await withDeadline(
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+          timeoutMs,
+          'Position indisponible'
+        );
         const coords = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
@@ -916,7 +924,7 @@ export default function MapView({
     } else {
       // Sur mobile natif (iOS / Android), fetch Mapbox direct
       try {
-        const res = await fetch(
+        const res = await withTimeout(fetch, 10_000)(
           `https://api.mapbox.com/directions/v5/mapbox/walking/${startCoord.lng},${startCoord.lat};${endCoord.lng},${endCoord.lat}?geometries=geojson&overview=full&access_token=${MAPBOX_ACCESS_TOKEN}`
         );
         if (!res.ok) throw new Error('Route request failed');

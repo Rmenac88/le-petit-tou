@@ -99,7 +99,8 @@ export default function SearchView({
   // Sub-millisecond pre-indexed search across all venues
   const filteredSpots = React.useMemo(() => {
     if (!debouncedQuery.trim() && !selectedTag) return [];
-    return searchIndex.search(debouncedQuery, selectedTag, searchLimit);
+    // +1 : permet de savoir qu'il reste des résultats (bouton « Afficher plus »), l'affichage est borné plus bas
+    return searchIndex.search(debouncedQuery, selectedTag, searchLimit + 1);
   }, [debouncedQuery, selectedTag, searchLimit, allSpots]);
 
   return (

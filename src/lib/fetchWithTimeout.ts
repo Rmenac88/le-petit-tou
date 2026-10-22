@@ -15,3 +15,15 @@ export function withTimeout(fetchImpl: typeof fetch, ms: number): typeof fetch {
     return fetchImpl(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
   };
 }
+
+/**
+ * Limite le temps d'attente d'une opération sans annulation possible (ex. position GPS) :
+ * passé le délai, la promesse échoue au lieu de rester suspendue indéfiniment.
+ */
+export function withDeadline<T>(promise: Promise<T>, ms: number, message = 'Délai dépassé'): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
+}
