@@ -11,7 +11,9 @@ import AgendaView from '@/components/views/AgendaView';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { configurePush, resyncPushRegistration, useNotificationNavigation } from '@/lib/pushNotifications';
 import { Brand } from '../constants/brand';
+import { mark } from '@/lib/startupTrace';
 export default function HomeScreen() {
+  mark('home-screen-render');
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [focusedSpotId, setFocusedSpotId] = useState<string | null>(null);
   const [isDockVisible, setIsDockVisible] = useState(true);

@@ -117,6 +117,7 @@ import {
 import { discoveryStore, DiscoveryStats } from '../../lib/discoveryStore';
 import { formatRating } from '../../lib/formatRating';
 import { todayIso, upcomingEvents } from '../../lib/upcomingEvents';
+import { mark, startupReport } from '../../lib/startupTrace';
 import {
   isAddressInCategory,
   getCategorySpotCount,
@@ -402,6 +403,7 @@ export default function HomeView({
   onToggleDock?: (visible: boolean) => void;
   onSelectSpot?: (spotId: string) => void;
 }) {
+  mark('home-view-render');
   const [selectedSpotDetail, setSelectedSpotDetail] = useState<SpotDetail | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAllCategories, setShowAllCategories] = useState(false);
@@ -618,6 +620,7 @@ export default function HomeView({
 
   // Load Categories & Addresses dynamically from Supabase
   const loadSupabaseData = async (forceRefresh: boolean = false) => {
+    mark('home-load-start');
     try {
       // Sync stored partners immediately (0ms instant response)
       const currentStoredPartners = getStoredPartners();
@@ -646,6 +649,7 @@ export default function HomeView({
         setCategories(dataset.categories as any);
         setAddresses(dataset.addresses as any);
         setLoading(false);
+        mark('home-local-data-shown');
       }
       
       // Check if keys are set
@@ -663,6 +667,7 @@ export default function HomeView({
         .from('categories')
         .select('*')
         .order('name', { ascending: true });
+      mark('net-categories');
       if (catError) throw catError;
 
       // Fetch Addresses with explicit projection (Lean DTO)
@@ -670,6 +675,7 @@ export default function HomeView({
         .from('addresses')
         .select('id, title, category_id, location, address, image_url, rating, price_level, is_recommended, is_new, lat, lng, tags, telephone, site_web, horaires, description')
         .order('created_at', { ascending: false });
+      mark('net-addresses');
       if (addrError) throw addrError;
 
       const finalCategories = catData && catData.length > 0 ? catData : (dataset.categories as any);
@@ -709,6 +715,7 @@ export default function HomeView({
         // panne isolée des événements : on conserve la liste déjà affichée
       }
       setEventsReady(true);
+      mark('net-events');
 
       // Fetch & Sync Sponsored Partners (Top Netflix) in background
       try {
@@ -726,6 +733,7 @@ export default function HomeView({
       appCache.set('events', finalEvents);
 
       setLoading(false);
+      mark('home-remote-done');
     } catch (err: any) {
       console.warn('loadSupabaseData failed:', err);
       // Fallback
@@ -2031,7 +2039,12 @@ export default function HomeView({
 
           {/* Brand & RGPD Footer */}
           <View style={styles.homeFooterContainer}>
-            <Text style={styles.homeFooterBrand}>LE PETIT TOU</Text>
+            <Pressable
+              delayLongPress={1500}
+              onLongPress={() => Alert.alert('Chronométrage du démarrage', startupReport())}
+            >
+              <Text style={styles.homeFooterBrand}>LE PETIT TOU</Text>
+            </Pressable>
             <Text style={styles.homeFooterDesc}>
               Le guide des meilleures adresses de Toulouse
             </Text>

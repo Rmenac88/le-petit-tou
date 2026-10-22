@@ -15,12 +15,15 @@ import { applyBrandTypography } from '@/lib/typography';
 import IntroScreen from '@/components/IntroScreen';
 import { appStorage } from '@/lib/storage';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { mark } from '@/lib/startupTrace';
 
 const INTRO_SEEN_KEY = 'pt_intro_seen_v1';
 
+mark('layout-module');
 applyBrandTypography();
 
 export default function RootLayout() {
+  mark('layout-render');
   const colorScheme = useColorScheme();
   const [introFinished, setIntroFinished] = useState(false);
   const [introChecked, setIntroChecked] = useState(false);
@@ -34,6 +37,7 @@ export default function RootLayout() {
   }, []);
 
   const handleIntroFinish = () => {
+    mark('intro-finished');
     setIntroFinished(true);
     appStorage.setItem(INTRO_SEEN_KEY, '1');
   };
@@ -55,6 +59,7 @@ export default function RootLayout() {
     return () => clearTimeout(t);
   }, []);
   const ready = fontsLoaded || !!fontError || fontWaitOver;
+  if (ready) mark(fontsLoaded ? 'fonts-ready' : 'fonts-ready-(secours)');
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
