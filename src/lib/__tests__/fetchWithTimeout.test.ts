@@ -9,11 +9,28 @@ const hanging = ((_input: unknown, init?: { signal?: AbortSignal }) =>
     init?.signal?.addEventListener('abort', () => reject(new Error('annulée')));
   })) as unknown as typeof fetch;
 
-test('une requête qui ne répond jamais échoue après le délai au lieu de rester suspendue', async () => {
+test('une requête qui ne répond jamais échoue après le délai, avec une erreur AbortError (non relancée par supabase-js)', async () => {
   const f = withTimeout(hanging, 30);
   const t0 = Date.now();
-  await assert.rejects(f('https://exemple.test/'), /annulée/);
+  await assert.rejects(f('https://exemple.test/'), (e: Error) => e.name === 'AbortError' && /Délai dépassé/.test(e.message));
   assert.ok(Date.now() - t0 < 1000);
+});
+
+test('le délai couvre aussi la lecture du corps : une réponse dont le corps ne vient jamais est annulée', async () => {
+  let seenSignal: AbortSignal | undefined;
+  const slowBody = ((_input: unknown, init?: { signal?: AbortSignal }) => {
+    seenSignal = init?.signal;
+    return Promise.resolve({ ok: true, status: 200 });
+  }) as unknown as typeof fetch;
+  await withTimeout(slowBody, 30)('https://exemple.test/');
+  assert.equal(seenSignal?.aborted, false);
+  await new Promise((r) => setTimeout(r, 80));
+  assert.equal(seenSignal?.aborted, true, 'le minuteur doit rester actif après les en-têtes');
+});
+
+test('une erreur réseau ordinaire est transmise telle quelle', async () => {
+  const boom = (async () => { throw new TypeError('Network request failed'); }) as unknown as typeof fetch;
+  await assert.rejects(withTimeout(boom, 1000)('https://exemple.test/'), (e: Error) => e.name === 'TypeError');
 });
 
 test('une réponse rapide passe sans modification', async () => {

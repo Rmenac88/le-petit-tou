@@ -37,7 +37,7 @@ export default function RootLayout() {
     setIntroFinished(true);
     appStorage.setItem(INTRO_SEEN_KEY, '1');
   };
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     BricolageGrotesque_700Bold,
     BricolageGrotesque_800ExtraBold,
     PlusJakartaSans_400Regular,
@@ -46,6 +46,15 @@ export default function RootLayout() {
     PlusJakartaSans_700Bold,
     PlusJakartaSans_800ExtraBold,
   });
+
+  // Les polices ne doivent jamais bloquer l'affichage : en cas d'erreur ou de lenteur (4 s),
+  // l'appli s'affiche avec la police du système plutôt que de rester sur un écran vide.
+  const [fontWaitOver, setFontWaitOver] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setFontWaitOver(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+  const ready = fontsLoaded || !!fontError || fontWaitOver;
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -82,12 +91,12 @@ export default function RootLayout() {
         }} />
       )}
       <View style={{ flex: 1, width: '100%', overflow: 'hidden' }}>
-        {fontsLoaded && (
+        {ready && (
           <ErrorBoundary scope="racine">
             <Stack screenOptions={{ headerShown: false }} />
           </ErrorBoundary>
         )}
-        {fontsLoaded && introChecked && !introFinished && <IntroScreen onFinish={handleIntroFinish} />}
+        {ready && introChecked && !introFinished && <IntroScreen onFinish={handleIntroFinish} />}
       </View>
     </ThemeProvider>
   );

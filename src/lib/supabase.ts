@@ -6,6 +6,15 @@ import { withTimeout } from './fetchWithTimeout';
 
 /** Délai maximal d'une requête vers la base : au-delà, l'appli bascule sur ses données locales. */
 const REQUEST_TIMEOUT_MS = 10_000;
+/** Les envois de fichiers (photos du portail admin) sont plus longs : délai séparé. */
+const UPLOAD_TIMEOUT_MS = 60_000;
+
+const quickFetch = withTimeout((...args) => fetch(...args), REQUEST_TIMEOUT_MS);
+const uploadFetch = withTimeout((...args) => fetch(...args), UPLOAD_TIMEOUT_MS);
+const supabaseFetch: typeof fetch = (input, init) =>
+  (String(typeof input === 'string' ? input : (input as any)?.url ?? input).includes('/storage/v1/')
+    ? uploadFetch
+    : quickFetch)(input, init);
 
 const SUPABASE_URL = 
   process.env.EXPO_PUBLIC_SUPABASE_URL || 
@@ -50,7 +59,7 @@ const ExpoSecureStoreAdapter = {
 };
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  global: { fetch: withTimeout((...args) => fetch(...args), REQUEST_TIMEOUT_MS) },
+  global: { fetch: supabaseFetch },
   auth: {
     storage: ExpoSecureStoreAdapter as any,
     autoRefreshToken: true,

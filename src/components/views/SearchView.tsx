@@ -163,7 +163,7 @@ export default function SearchView({
         {query.length > 0 || selectedTag ? (
           <View style={styles.sectionWrapper}>
             <Text style={styles.sectionTitle}>
-              Résultats ({filteredSpots.length})
+              Résultats ({Math.min(filteredSpots.length, searchLimit)}{filteredSpots.length > searchLimit ? '+' : ''})
             </Text>
 
             {filteredSpots.length === 0 ? (
@@ -235,7 +235,7 @@ export default function SearchView({
                     onPress={() => setSearchLimit(prev => prev + 20)}
                   >
                     <Text style={{ fontSize: 13, fontWeight: '800', color: Brand.white }}>
-                      Afficher plus de résultats ({Math.min(searchLimit, filteredSpots.length)} / {filteredSpots.length}) ↓
+                      Afficher plus de résultats ↓
                     </Text>
                   </Pressable>
                 )}

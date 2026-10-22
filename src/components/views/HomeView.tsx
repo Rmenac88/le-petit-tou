@@ -527,6 +527,8 @@ export default function HomeView({
   const [events, setEvents] = useState<any[]>([]);
   const [sponsoredPartners, setSponsoredPartners] = useState<any[]>(() => getStoredPartners());
   const [loading, setLoading] = useState(true);
+  // La section événements attend sa propre réponse : les autres sections s'affichent aussitôt avec les données embarquées
+  const [eventsReady, setEventsReady] = useState(false);
   const [isConfigured, setIsConfigured] = useState(true);
 
   const [bookingEvent, setBookingEvent] = useState<any | null>(null);
@@ -621,6 +623,7 @@ export default function HomeView({
       const currentStoredPartners = getStoredPartners();
       setSponsoredPartners(currentStoredPartners);
 
+      let cacheShown = false;
       if (!forceRefresh) {
         // Check in-memory SWR cache first (0ms instant response)
         const cachedCat = appCache.get<Category[]>('categories');
@@ -630,16 +633,25 @@ export default function HomeView({
           setCategories(cachedCat);
           setAddresses(cachedAddr);
           setEvents(cachedEvt);
+          setEventsReady(true);
           setLoading(false);
+          cacheShown = true;
           // Continuer en arrière-plan pour récupérer les données fraîches de Supabase
         }
       }
 
-      setLoading(true);
+      // Pas de cache : on affiche tout de suite les 790 adresses embarquées dans l'appli ; la base les
+      // complète ensuite en arrière-plan. Un réseau lent ou coupé ne bloque donc jamais l'écran d'accueil.
+      if (!cacheShown && !forceRefresh) {
+        setCategories(dataset.categories as any);
+        setAddresses(dataset.addresses as any);
+        setLoading(false);
+      }
       
       // Check if keys are set
       if (!isSupabaseConfigured || !supabase) {
         setIsConfigured(false);
+        setEventsReady(true);
         setLoading(false);
         return;
       }
@@ -692,10 +704,11 @@ export default function HomeView({
             booking_url: getEventBookingUrl(ev),
           }));
         }
-        setEvents(finalEvents);
+        if (!eventsError) setEvents(finalEvents);
       } catch (e) {
-        setEvents([]);
+        // panne isolée des événements : on conserve la liste déjà affichée
       }
+      setEventsReady(true);
 
       // Fetch & Sync Sponsored Partners (Top Netflix) in background
       try {
@@ -718,8 +731,9 @@ export default function HomeView({
       // Fallback
       setCategories(dataset.categories as any);
       setAddresses(dataset.addresses as any);
-      setEvents([]);
-      setIsConfigured(false);
+      // Réseau coupé ou serveur en panne : on garde les données embarquées. La bannière « configuration »
+      // est réservée au cas où les clés manquent réellement (plus haut), pas à une panne passagère.
+      setEventsReady(true);
       setLoading(false);
     }
   };
@@ -1948,7 +1962,7 @@ export default function HomeView({
                 <Text style={styles.sectionTitle}>Événements de l'association</Text>
               </View>
 
-              {loading ? (
+              {!eventsReady ? (
                 <ActivityIndicator size="small" color={Brand.primaryDeep} style={{ marginVertical: 20 }} />
               ) : upcomingEvents(events, todayIso()).length === 0 ? (
                 <Text style={styles.emptyText}>Aucun événement pour l'instant</Text>
