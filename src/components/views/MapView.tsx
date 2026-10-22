@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { withDeadline, withTimeout } from '../../lib/fetchWithTimeout';
+import { visibleSpots, type MapRegion } from '../../lib/visibleSpots';
 import {
   Compass,
   Navigation,
@@ -218,6 +219,24 @@ export default function MapView({
   // Real-time Database loaded/filtered spots list
   const [spots, setSpots] = useState<any[]>(PT_SPOTS);
   const [filteredSpots, setFilteredSpots] = useState<any[]>(PT_SPOTS);
+  // Carte native : seuls les marqueurs de la zone visible sont dessinés (voir lib/visibleSpots)
+  const [nativeRegion, setNativeRegion] = useState<MapRegion>({
+    latitude: TOULOUSE_LAT,
+    longitude: TOULOUSE_LNG,
+    latitudeDelta: 0.02,
+    longitudeDelta: 0.02,
+  });
+  // Les marqueurs à vue personnalisée doivent être « suivis » brièvement pour que leur icône soit dessinée
+  const [trackMarkerViews, setTrackMarkerViews] = useState(true);
+  const nativeSpots = useMemo(
+    () => visibleSpots(filteredSpots, nativeRegion, selectedSpot?.id ?? null),
+    [filteredSpots, nativeRegion, selectedSpot?.id]
+  );
+  useEffect(() => {
+    setTrackMarkerViews(true);
+    const t = setTimeout(() => setTrackMarkerViews(false), 1200);
+    return () => clearTimeout(t);
+  }, [nativeSpots.length, nativeSpots[0]?.id]);
 
   // Filters State Properties (Matching your design screenshot!)
   const [searchQuery, setSearchQuery] = useState('');
@@ -1135,9 +1154,10 @@ export default function MapView({
             showsUserLocation={true}
             showsMyLocationButton={false}
             onPress={handleCloseCard}
+            onRegionChangeComplete={setNativeRegion}
           >
-            {/* Render custom filtered spots */}
-            {filteredSpots.map((s) => {
+            {/* Seuls les marqueurs de la zone visible sont dessinés */}
+            {nativeSpots.map((s) => {
               const isSelected = selectedSpot?.id === s.id;
               return (
                 <NativeMarker
@@ -1145,7 +1165,7 @@ export default function MapView({
                   coordinate={{ latitude: s.lat, longitude: s.lng }}
                   onPress={() => handleSelectSpot(s)}
                   zIndex={isSelected ? 99 : 1}
-                  tracksViewChanges={isSelected}
+                  tracksViewChanges={isSelected || trackMarkerViews}
                 >
                   <View
                     style={[

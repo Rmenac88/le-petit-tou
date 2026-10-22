@@ -39,9 +39,7 @@ class FastSearchIndex {
   private tokenMap: Map<string, Set<number>> = new Map();
   private initialized = false;
 
-  constructor() {
-    this.init();
-  }
+  // Index construit à la première recherche (et non à l'import) : le démarrage n'attend pas ce travail.
 
   private init() {
     if (this.initialized) return;

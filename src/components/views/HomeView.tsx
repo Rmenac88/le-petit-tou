@@ -1074,6 +1074,7 @@ export default function HomeView({
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Header Row & Brutalist Search Bar */}
           <HomeHeader
