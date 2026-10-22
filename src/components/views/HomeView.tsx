@@ -118,6 +118,8 @@ import { discoveryStore, DiscoveryStats } from '../../lib/discoveryStore';
 import { formatRating } from '../../lib/formatRating';
 import { todayIso, upcomingEvents } from '../../lib/upcomingEvents';
 import { mark, startupReport } from '../../lib/startupTrace';
+import { getPushState, isPushSupported } from '../../lib/pushNotifications';
+import { appStorage } from '../../lib/storage';
 import {
   isAddressInCategory,
   getCategorySpotCount,
@@ -541,6 +543,29 @@ export default function HomeView({
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showNotifSettings, setShowNotifSettings] = useState(false);
+
+  // Premier lancement : on propose une seule fois d'activer les notifications (l'écran explique le choix ;
+  // la demande d'autorisation du système n'apparaît que quand l'utilisateur active l'interrupteur).
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!isPushSupported()) return;
+        if ((await appStorage.getItem('LPT_PUSH_PROMPTED_V1')) === '1') return;
+        const state = await getPushState();
+        if (cancelled || state.enabled || state.permission === 'blocked') return;
+        timer = setTimeout(() => {
+          setShowNotifSettings(true);
+          appStorage.setItem('LPT_PUSH_PROMPTED_V1', '1').catch(() => {});
+        }, 5000);
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
   const adminTapCountRef = React.useRef(0);
   const adminTapTimerRef = React.useRef<any>(null);

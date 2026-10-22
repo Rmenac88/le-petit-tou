@@ -111,7 +111,7 @@ export default function NotificationSettingsModal({ visible, onClose }: Props) {
                   <View style={styles.row}>
                     <View style={styles.rowText}>
                       <Text style={styles.label}>Recevoir les notifications</Text>
-                      <Text style={styles.hint}>Au plus 2 par jour, jamais la nuit.</Text>
+                      <Text style={styles.hint}>Peu de messages, jamais la nuit (21 h – 8 h).</Text>
                     </View>
                     <Switch
                       value={state.enabled}

@@ -936,7 +936,8 @@ export default function MapView({
         }),
         '*'
       );
-      // setRouteLoading sera remis à false par ROUTE_READY ou ROUTE_ERROR
+      // setRouteLoading sera remis à false par ROUTE_READY ou ROUTE_ERROR ; filet de sécurité si la page ne répond jamais
+      setTimeout(() => setRouteLoading(false), 15000);
     } else {
       // Sur mobile natif (iOS / Android), fetch Mapbox direct
       try {
@@ -1399,7 +1400,10 @@ export default function MapView({
           setSelectedSpot(null);
         }}
         onOpenItinerary={(spot) => {
-          handleCalculateRoute(spot);
+          // Téléphone : ouverture immédiate de l'appli de navigation (Google Maps, Plans…).
+          // Web : tracé de l'itinéraire directement sur la carte.
+          if (Platform.OS === 'web') handleCalculateRoute(spot);
+          else handleOpenItinerary(spot);
         }}
         isFavorite={selectedSpot ? likedSpotIds.includes(selectedSpot.id) : false}
         likesCount={selectedSpot ? (likesMap[selectedSpot.id] ?? (Number(selectedSpot.likes_count) || 0)) : 0}

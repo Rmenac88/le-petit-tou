@@ -66,7 +66,30 @@ const cleanNormalize = (str: string): string => {
  * Classifie précisément n'importe quelle adresse dans sa catégorie idéale,
  * qu'elle provienne de Supabase, du JSON local ou qu'elle vienne d'être créée dans le portail admin.
  */
+// Mémoire des classifications : classer une adresse analyse son texte avec des dizaines d'expressions régulières.
+// L'accueil classe chaque adresse pour chaque catégorie à chaque affichage (~30 000 appels) : sans mémoire, ce calcul
+// gèle un téléphone pendant plusieurs dizaines de secondes quand les adresses de la base arrivent.
+const classificationCache = new Map<string, string>();
+const classificationKey = (a: any): string | null =>
+  a && a.id
+    ? `${a.id}|${a.category_id ?? ''}|${a.title ?? a.name ?? ''}|${(a.tags || []).length}|${(a.breadcrumbs || []).length}|${(a.description || a.full_description || '').length}`
+    : null;
+
+/** Nombre de classifications mémorisées (utile aux tests). */
+export const classificationCacheSize = (): number => classificationCache.size;
+
 export const classifyAddress = (addr: any): string => {
+  const key = classificationKey(addr);
+  if (key !== null) {
+    const hit = classificationCache.get(key);
+    if (hit !== undefined) return hit;
+  }
+  const result = classifyAddressUncached(addr);
+  if (key !== null) classificationCache.set(key, result);
+  return result;
+};
+
+const classifyAddressUncached = (addr: any): string => {
   if (!addr) return CAT_RESTAURANTS;
 
   // Si l'adresse est déjà assignée à une sous-catégorie spécifique non-legacy, on la respecte
