@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { withDeadline, withTimeout } from '../../lib/fetchWithTimeout';
-import { visibleSpots, type MapRegion } from '../../lib/visibleSpots';
+import { BRIDGE_BEFORE_LOAD, buildMapMessageScript } from '../../lib/mapBridge';
 import {
   Compass,
   Navigation,
@@ -57,20 +57,20 @@ import { discoveryStore } from '../../lib/discoveryStore';
 import { formatRating } from '../../lib/formatRating';
 import { onAppEvent } from '../../lib/appEvents';
 import { Brand } from '../../constants/brand';
-// Conditional dynamic imports to prevent native modules breaking the web bundle
-let NativeMapView: any = null;
-let NativeMarker: any = null;
-let NativePolyline: any = null;
+// Carte Mapbox GL : une page HTML unique, affichée dans une iframe sur le web et dans une WebView sur téléphone.
+// (chargement conditionnel pour ne pas casser le bundle web)
+let NativeWebView: any = null;
 if (Platform.OS !== 'web') {
   try {
-    const Maps = require('react-native-maps');
-    NativeMapView = Maps.default;
-    NativeMarker = Maps.Marker;
-    NativePolyline = Maps.Polyline;
+    NativeWebView = require('react-native-webview').WebView;
   } catch (e) {
-    console.warn('Native maps not loaded', e);
+    console.warn('WebView non chargée', e);
   }
 }
+
+// La carte est la même page Mapbox GL partout (iframe sur le web, WebView sur téléphone) :
+// tout le dialogue avec elle passe par `iframeRef.current.contentWindow.postMessage` (émulé sur téléphone).
+const USE_WEB_MAP = true;
 
 // Toulouse Default Center Coordinates
 const TOULOUSE_LAT = 43.6047;
@@ -219,24 +219,6 @@ export default function MapView({
   // Real-time Database loaded/filtered spots list
   const [spots, setSpots] = useState<any[]>(PT_SPOTS);
   const [filteredSpots, setFilteredSpots] = useState<any[]>(PT_SPOTS);
-  // Carte native : seuls les marqueurs de la zone visible sont dessinés (voir lib/visibleSpots)
-  const [nativeRegion, setNativeRegion] = useState<MapRegion>({
-    latitude: TOULOUSE_LAT,
-    longitude: TOULOUSE_LNG,
-    latitudeDelta: 0.02,
-    longitudeDelta: 0.02,
-  });
-  // Les marqueurs à vue personnalisée doivent être « suivis » brièvement pour que leur icône soit dessinée
-  const [trackMarkerViews, setTrackMarkerViews] = useState(true);
-  const nativeSpots = useMemo(
-    () => visibleSpots(filteredSpots, nativeRegion, selectedSpot?.id ?? null),
-    [filteredSpots, nativeRegion, selectedSpot?.id]
-  );
-  useEffect(() => {
-    setTrackMarkerViews(true);
-    const t = setTimeout(() => setTrackMarkerViews(false), 1200);
-    return () => clearTimeout(t);
-  }, [nativeSpots.length, nativeSpots[0]?.id]);
 
   // Filters State Properties (Matching your design screenshot!)
   const [searchQuery, setSearchQuery] = useState('');
@@ -263,6 +245,19 @@ export default function MapView({
 
   const mapRef = useRef<any>(null);
   const iframeRef = useRef<any>(null);
+  const webViewRef = useRef<any>(null);
+  // Dernier gestionnaire des messages de la carte (iframe sur le web, WebView sur téléphone)
+  const mapMessageRef = useRef<((event: { data: any }) => void) | null>(null);
+  // Sur téléphone, `iframeRef.current.contentWindow.postMessage(...)` est émulé par la WebView :
+  // tout le code de la carte web s'applique alors tel quel.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    iframeRef.current = {
+      contentWindow: {
+        postMessage: (data: string) => webViewRef.current?.injectJavaScript(buildMapMessageScript(data)),
+      },
+    };
+  }, []);
 
   // Une seule vérification de la permission de localisation (et non à chaque changement de `spots`)
   useEffect(() => {
@@ -271,8 +266,7 @@ export default function MapView({
 
   // Messages de l'iframe Mapbox : web uniquement (`window.addEventListener` n'existe pas sur téléphone)
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
-      const handleWebMessage = (event: MessageEvent) => {
+      const handleWebMessage = (event: { data: any }) => {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'SPOT_CLICKED') {
@@ -322,10 +316,13 @@ export default function MapView({
           }
         } catch (e) {}
       };
-      window.addEventListener('message', handleWebMessage);
+      mapMessageRef.current = handleWebMessage;
+      // `window.addEventListener` n'existe que sur le web ; sur téléphone la WebView appelle `mapMessageRef`
+      if (Platform.OS !== 'web') return;
+      window.addEventListener('message', handleWebMessage as any);
 
       return () => {
-        window.removeEventListener('message', handleWebMessage);
+        window.removeEventListener('message', handleWebMessage as any);
       };
   }, [spots]);
 
@@ -336,7 +333,7 @@ export default function MapView({
       if (spot) {
         handleSelectSpot(spot);
 
-        if (Platform.OS === 'web') {
+        if (USE_WEB_MAP) {
           setTimeout(() => {
             if (iframeRef.current) {
               iframeRef.current.contentWindow?.postMessage(
@@ -362,7 +359,7 @@ export default function MapView({
 
   // Auto-sync filtered spots to web Leaflet map
   useEffect(() => {
-    if (Platform.OS === 'web' && iframeRef.current) {
+    if (USE_WEB_MAP && iframeRef.current) {
       iframeRef.current.contentWindow?.postMessage(
         JSON.stringify({ type: 'UPDATE_SPOTS', spots: filteredSpots }),
         '*'
@@ -471,7 +468,7 @@ export default function MapView({
   const handleSelectSpot = (spot: any, skipMapFly = false) => {
     triggerHaptic();
     setSelectedSpot(spot);
-    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+    if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({
           type: 'SELECT_SPOT',
@@ -503,7 +500,7 @@ export default function MapView({
   const handleResetToulouseView = () => {
     triggerHaptic();
     handleCloseCard();
-    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+    if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({ type: 'RESET_TOULOUSE' }),
         '*'
@@ -520,7 +517,7 @@ export default function MapView({
 
   const handleCloseCard = () => {
     setIsSearchFocused(false);
-    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+    if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({ type: 'DESELECT_SPOT', spots: filteredSpots }),
         '*'
@@ -707,7 +704,7 @@ export default function MapView({
         };
         userLocationRef.current = coords;
         setUserLocation(coords);
-        if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+        if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
           iframeRef.current.contentWindow.postMessage(
             JSON.stringify({ type: 'USER_LOCATION', ...coords, center: false }),
             '*'
@@ -776,7 +773,7 @@ export default function MapView({
     try {
       const coords = await getPreciseUserLocation(6000);
       if (coords && centerMap) {
-        if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+        if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
           iframeRef.current.contentWindow.postMessage(
             JSON.stringify({ type: 'USER_LOCATION', ...coords, center: true }),
             '*'
@@ -796,7 +793,7 @@ export default function MapView({
   };
 
   const handleResetToToulouse = () => {
-    if (Platform.OS === 'web') {
+    if (USE_WEB_MAP) {
       if (iframeRef.current) {
         iframeRef.current.contentWindow?.postMessage(
           JSON.stringify({ type: 'RESET_TOULOUSE' }),
@@ -822,7 +819,7 @@ export default function MapView({
     }
 
     if (coords) {
-      if (Platform.OS === 'web') {
+      if (USE_WEB_MAP) {
         if (iframeRef.current?.contentWindow) {
           iframeRef.current.contentWindow.postMessage(
             JSON.stringify({ type: 'USER_LOCATION', ...coords, center: true }),
@@ -850,7 +847,7 @@ export default function MapView({
     triggerHaptic();
     const next = !is3dMode;
     setIs3dMode(next);
-    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+    if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({ type: 'SET_3D_MODE', enabled: next }),
         '*'
@@ -916,7 +913,7 @@ export default function MapView({
     setRouteLoading(true);
     const endCoord = { lat: spot.lat, lng: spot.lng };
 
-    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+    if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
       // Mettre à jour le point de position utilisateur sur la carte web
       if (isFromUser) {
         iframeRef.current.contentWindow.postMessage(
@@ -985,7 +982,7 @@ export default function MapView({
   const handleClearRoute = () => {
     triggerHaptic();
     setActiveRoute(null);
-    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+    if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({ type: 'CLEAR_ROUTE' }),
         '*'
@@ -1140,66 +1137,24 @@ export default function MapView({
           tabIndex={-1}
         />
       ) : (
-        NativeMapView && (
-          <NativeMapView
-            ref={mapRef}
+        NativeWebView && (
+          <NativeWebView
+            ref={webViewRef}
             style={styles.nativeMap}
-            customMapStyle={customGoogleMapStyle}
-            initialRegion={{
-              latitude: userLocation?.lat || TOULOUSE_LAT,
-              longitude: userLocation?.lng || TOULOUSE_LNG,
-              latitudeDelta: 0.02,
-              longitudeDelta: 0.02,
-            }}
-            showsUserLocation={true}
-            showsMyLocationButton={false}
-            onPress={handleCloseCard}
-            onRegionChangeComplete={setNativeRegion}
-          >
-            {/* Seuls les marqueurs de la zone visible sont dessinés */}
-            {nativeSpots.map((s) => {
-              const isSelected = selectedSpot?.id === s.id;
-              return (
-                <NativeMarker
-                  key={s.id}
-                  coordinate={{ latitude: s.lat, longitude: s.lng }}
-                  onPress={() => handleSelectSpot(s)}
-                  zIndex={isSelected ? 99 : 1}
-                  tracksViewChanges={isSelected || trackMarkerViews}
-                >
-                  <View
-                    style={[
-                      styles.nativeMarker,
-                      { backgroundColor: getMarkerColor(s.cat || s.category) },
-                      visitedSpotIds.includes(s.id) && styles.nativeMarkerDiscovered,
-                      isSelected && styles.nativeMarkerSelected,
-                    ]}
-                  >
-                    {renderCategoryIcon(s.cat || s.category)}
-                    {visitedSpotIds.includes(s.id) && (
-                      <View style={styles.discoveredBadgeDot} />
-                    )}
-                  </View>
-                </NativeMarker>
-              );
-            })}
-
-            {/* Tracé de l'itinéraire piéton sur carte native */}
-            {NativePolyline && activeRoute?.routeCoordinates && activeRoute.routeCoordinates.length > 0 && (
-              <>
-                <NativePolyline
-                  coordinates={activeRoute.routeCoordinates}
-                  strokeColor={Brand.ink}
-                  strokeWidth={7}
-                />
-                <NativePolyline
-                  coordinates={activeRoute.routeCoordinates}
-                  strokeColor={Brand.primary}
-                  strokeWidth={4.5}
-                />
-              </>
-            )}
-          </NativeMapView>
+            originWhitelist={['*']}
+            source={{ html: getWebMapHtml(MAPBOX_ACCESS_TOKEN), baseUrl: 'https://localhost' }}
+            injectedJavaScriptBeforeContentLoaded={BRIDGE_BEFORE_LOAD}
+            onMessage={(e: any) => mapMessageRef.current?.({ data: e.nativeEvent.data })}
+            javaScriptEnabled
+            domStorageEnabled
+            setSupportMultipleWindows={false}
+            overScrollMode="never"
+            scrollEnabled={false}
+            bounces={false}
+            allowsInlineMediaPlayback
+            androidLayerType="hardware"
+            onError={(e: any) => console.warn('[Map] WebView error', e?.nativeEvent?.description)}
+          />
         )
       )}
 
@@ -1781,6 +1736,7 @@ const styles = StyleSheet.create({
   },
   nativeMap: {
     ...StyleSheet.absoluteFill,
+    backgroundColor: Brand.bg,
   },
   permissionContainer: {
     flex: 1,

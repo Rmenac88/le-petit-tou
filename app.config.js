@@ -1,19 +1,16 @@
 /**
  * Configuration Expo dynamique : complète app.json avec les valeurs propres à l'environnement de build.
- * - GOOGLE_MAPS_ANDROID_API_KEY : clé Google Maps SDK pour Android (sans elle, la carte Android plante).
- * - EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN : jeton public Mapbox (itinéraires et carte web).
+ * - EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN : jeton public Mapbox (carte et itinéraires, sur téléphone comme sur le web).
  * - GOOGLE_SERVICES_JSON : chemin du fichier google-services.json (Firebase, requis pour les notifications Android) ;
  *   variable de type « fichier » dans EAS.
  * Un build de production sans ces valeurs est refusé pour ne jamais publier une application cassée.
  */
 module.exports = ({ config }) => {
   const isProduction = process.env.EAS_BUILD_PROFILE === 'production';
-  const googleMapsKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY || '';
   const googleServicesFile = process.env.GOOGLE_SERVICES_JSON || '';
 
   if (isProduction) {
     const missing = [];
-    if (!googleMapsKey) missing.push('GOOGLE_MAPS_ANDROID_API_KEY');
     if (!process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN) missing.push('EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN');
     if (!googleServicesFile) missing.push('GOOGLE_SERVICES_JSON');
     if (missing.length > 0) {
@@ -37,11 +34,6 @@ module.exports = ({ config }) => {
     android: {
       ...config.android,
       ...(googleServicesFile ? { googleServicesFile } : {}),
-      config: {
-        ...(config.android && config.android.config),
-        // Hors production sans clé : valeur factice pour que la carte reste vide au lieu de faire planter l'appli
-        googleMaps: { apiKey: googleMapsKey || 'CLE_GOOGLE_MAPS_MANQUANTE' },
-      },
     },
   };
 };
