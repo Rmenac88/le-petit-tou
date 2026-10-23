@@ -98,3 +98,23 @@ export function createAdminDb(code: string, client: RpcClient) {
     },
   };
 }
+
+/**
+ * Lecture admin des partenaires, montant payé compris. La table n'est plus lisible avec la clé publique
+ * (voir scripts/009_hide_partner_price.sql) : seule admin_read la renvoie, après vérification du code.
+ */
+export async function readAdminPartners(code: string, client: RpcClient): Promise<AdminResult> {
+  if (!code || !code.trim()) {
+    return { data: null, error: { message: adminErrorMessage('forbidden') } };
+  }
+  try {
+    const { data, error } = await client.rpc('admin_read', { p_code: code, p_table: 'sponsored_partners' });
+    if (error) return { data: null, error: { message: error.message } };
+    if (!data || data.ok !== true) {
+      return { data: null, error: { message: adminErrorMessage(data?.error) } };
+    }
+    return { data: Array.isArray(data.rows) ? data.rows : [], error: null };
+  } catch (e: any) {
+    return { data: null, error: { message: e?.message || 'Connexion impossible.' } };
+  }
+}

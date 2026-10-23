@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { View, Text, TextInput, Pressable, Image, StyleSheet, Platform } from 'react-native';
-import { Search } from 'lucide-react-native';
+import { Bell, Search } from 'lucide-react-native';
 import Stars from '../../Stars';
 
 import { Brand } from '../../../constants/brand';
@@ -10,6 +10,7 @@ export interface HomeHeaderProps {
   onSearchFocus?: () => void;
   onSearchBlur?: () => void;
   onTitlePress: () => void;
+  onOpenNotifications?: () => void;
   labelStyle?: any;
 }
 
@@ -19,23 +20,36 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   onSearchFocus,
   onSearchBlur,
   onTitlePress,
+  onOpenNotifications,
 }) => {
   const searchInputRef = useRef<TextInput>(null);
 
   return (
     <>
       {/* Marque : logo + descripteur statutaire (accès discret au portail membres : 7 appuis) */}
-      <Pressable onPress={onTitlePress} hitSlop={14} accessibilityLabel="Le Petit Tou" style={styles.brandRow}>
-        <Image
-          source={require('../../../../assets/images/logo-transparent.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <View>
-          <Text style={styles.brandKicker}>Votre city-guide gratuit</Text>
-          <Text style={styles.brandCity}>Toulouse · par des étudiants</Text>
-        </View>
-      </Pressable>
+      <View style={styles.topRow}>
+        <Pressable onPress={onTitlePress} hitSlop={14} accessibilityLabel="Le Petit Tou" style={styles.brandRow}>
+          <Image
+            source={require('../../../../assets/images/logo-transparent.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <View>
+            <Text style={styles.brandKicker}>Votre city-guide gratuit</Text>
+            <Text style={styles.brandCity}>Toulouse · par des étudiants</Text>
+          </View>
+        </Pressable>
+        {onOpenNotifications && (
+          <Pressable
+            style={styles.bell}
+            onPress={onOpenNotifications}
+            hitSlop={6}
+            accessibilityLabel="Notifications"
+          >
+            <Bell size={20} color={Brand.ink} strokeWidth={2} />
+          </Pressable>
+        )}
+      </View>
 
       {/* Hero violet sidéral */}
       <View style={styles.hero}>
@@ -63,7 +77,23 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
 };
 
 const styles = StyleSheet.create({
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bell: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 20,
+    backgroundColor: Brand.white,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   brandRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,

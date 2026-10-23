@@ -138,6 +138,7 @@ import {
 } from '../../lib/categoryResolver';
 
 import { Brand } from '../../constants/brand';
+import { Features } from '../../constants/features';
 const ALL_EXPANDED_CATEGORIES = [
   { id: 'all', name: 'Toutes les adresses', icon_name: 'Compass', color: Brand.ink },
   { id: 'gourmand-gourmet', name: 'Gourmand & Restauration', icon_name: 'Utensils', color: Brand.primaryDeep },
@@ -542,6 +543,7 @@ export default function HomeView({
   const adminTapTimerRef = React.useRef<any>(null);
 
   const handleTitlePress = () => {
+    if (!Features.adminPortal) return;
     triggerHaptic();
     adminTapCountRef.current += 1;
     if (adminTapTimerRef.current) {
@@ -1068,13 +1070,14 @@ export default function HomeView({
             onSearchFocus={() => setIsSearchFocused(true)}
             onSearchBlur={() => setIsSearchFocused(false)}
             onTitlePress={handleTitlePress}
+            onOpenNotifications={() => setShowNotifSettings(true)}
             labelStyle={labelStyle}
           />
 
           {/* Personal Progression & Discovery Bar */}
           <ProgressionBanner
             discoveryStats={discoveryStats}
-            onOpenWallet={() => onChangeTab?.('cards')}
+            onOpenCard={() => onChangeTab?.('cards')}
           />
 
           {/* Config Alert Banner (Visible only if Supabase environment variables are missing) */}
@@ -1389,12 +1392,14 @@ export default function HomeView({
                           transition={150}
                           cachePolicy="memory-disk"
                         />
-                        <View style={styles.ratingBadgeGrid}>
+                        {Features.externalRatings && (
+                          <View style={styles.ratingBadgeGrid}>
                           <Star color={Brand.chouchou} size={11} fill={Brand.chouchou} />
                           <Text style={styles.ratingTextSmall}>
                             {formatRating(addr.rating)}
                           </Text>
                         </View>
+                        )}
                         <View style={styles.gridCardBody}>
                           <View style={styles.cardHeaderMetaRow}>
                             <Text style={styles.gridCardCategory}>
@@ -1493,10 +1498,12 @@ export default function HomeView({
                       }}
                     >
                       <Image source={{ uri: getOptimizedImageUrl(addr.image_url, 400) }} style={styles.gridCardImage} contentFit="cover" transition={150} cachePolicy="memory-disk" />
-                      <View style={styles.ratingBadgeGrid}>
+                      {Features.externalRatings && (
+                        <View style={styles.ratingBadgeGrid}>
                         <Star color={Brand.chouchou} size={11} fill={Brand.chouchou} />
                         <Text style={styles.ratingTextSmall}>{formatRating(addr.rating)}</Text>
                       </View>
+                      )}
                       <View style={styles.gridCardBody}>
                         <Text style={styles.gridCardCategory}>
                           {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'} • {addr.price_level}
@@ -1570,10 +1577,12 @@ export default function HomeView({
                       }}
                     >
                       <Image source={{ uri: getOptimizedImageUrl(addr.image_url, 400) }} style={styles.gridCardImage} contentFit="cover" transition={150} cachePolicy="memory-disk" />
-                      <View style={styles.ratingBadgeGrid}>
+                      {Features.externalRatings && (
+                        <View style={styles.ratingBadgeGrid}>
                         <Star color={Brand.chouchou} size={11} fill={Brand.chouchou} />
                         <Text style={styles.ratingTextSmall}>{formatRating(addr.rating)}</Text>
                       </View>
+                      )}
                       <View style={styles.gridCardBody}>
                         <Text style={styles.gridCardCategory}>
                           {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'} • {addr.price_level}
@@ -1660,9 +1669,9 @@ export default function HomeView({
               {sponsoredPartners.length > 0 && (
                 <View style={styles.netflixSection}>
                   <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Top Partenaires Le Petit Tou</Text>
+                    <Text style={styles.sectionTitle}>Nos partenaires</Text>
                     <View style={styles.netflixOfficialPill}>
-                      <Text style={styles.netflixOfficialText}>OFFICIEL</Text>
+                      <Text style={styles.netflixOfficialText}>SPONSORISÉ</Text>
                     </View>
                   </View>
 
@@ -1672,7 +1681,6 @@ export default function HomeView({
                     contentContainerStyle={styles.netflixScroll}
                   >
                     {sponsoredPartners.map((partner, idx) => {
-                      const rankNum = partner.rank_position || idx + 1;
                       return (
                         <Pressable
                           key={partner.id || idx}
@@ -1714,14 +1722,12 @@ export default function HomeView({
                               full_description: publicPartnerText(partner.subtitle),
                               image_url: partner.image_url,
                               photos: partner.image_url ? [partner.image_url] : [],
-                              category: 'Partenaire Officiel',
+                              category: 'Partenaire',
                               rating: 5.0,
                               location: 'Toulouse',
                             });
                           }}
                         >
-                          {/* Giant Netflix Style Number */}
-                          <Text style={styles.netflixRankNumber}>{rankNum}</Text>
 
                           {/* Card Body */}
                           <View style={styles.netflixCardBody}>
@@ -1733,7 +1739,7 @@ export default function HomeView({
                               cachePolicy="memory-disk"
                             />
                             <View style={styles.netflixBadgePill}>
-                              <Text style={styles.netflixBadgeText}>{partner.badge_text || `TOP #${rankNum}`}</Text>
+                              <Text style={styles.netflixBadgeText}>SPONSORISÉ</Text>
                             </View>
                             <View style={styles.netflixCardInfo}>
                               <Text style={styles.netflixPartnerTitle} numberOfLines={1}>
@@ -1811,10 +1817,12 @@ export default function HomeView({
                           <Star size={12} color={Brand.ink} fill={Brand.ink} strokeWidth={2} />
                           <Text style={styles.chouchouBadgeText}>CHOUCHOU</Text>
                         </View>
-                        <View style={styles.ratingBadge}>
+                        {Features.externalRatings && (
+                          <View style={styles.ratingBadge}>
                           <Star color={Brand.chouchou} size={13} fill={Brand.chouchou} />
                           <Text style={styles.ratingText}>{formatRating(addr.rating)}</Text>
                         </View>
+                        )}
                         <View style={styles.largeCardInfo}>
                           <View style={styles.cardHeaderRow}>
                             <Text style={styles.cardCategoryText}>
@@ -1908,10 +1916,12 @@ export default function HomeView({
                           <View style={styles.paginatorDotSmall} />
                           <View style={styles.paginatorDotSmall} />
                         </View>
-                        <View style={styles.ratingBadge}>
+                        {Features.externalRatings && (
+                          <View style={styles.ratingBadge}>
                           <Star color={Brand.chouchou} size={11} fill={Brand.chouchou} />
                           <Text style={styles.ratingTextSmall}>{formatRating(addr.rating)}</Text>
                         </View>
+                        )}
                         <View style={styles.smallCardInfo}>
                           <Text style={styles.smallCardCategory}>
                             {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'} • {addr.price_level}
@@ -2461,8 +2471,8 @@ export default function HomeView({
                     { id: 'likes', label: 'Plus aimés', desc: 'Classés selon les likes réels de la communauté Le Petit Tou' },
                     { id: 'rating', label: 'Mieux notés', desc: 'Les meilleures notes Google & Petit Tou en premier' },
                     { id: 'recommended', label: 'Coups de cœur', desc: 'La sélection officielle recommandée par nos rédacteurs' },
-                    { id: 'new', label: '🆕 Nouveautés', desc: 'Les adresses les plus récentes de notre guide' },
-                  ].map(s => {
+                    { id: 'new', label: 'Nouveautés', desc: 'Les adresses les plus récentes de notre guide' },
+                  ].filter(s => Features.externalRatings || s.id !== 'rating').map(s => {
                     const isSelected = selectedSort === s.id;
                     return (
                       <Pressable
@@ -2571,6 +2581,7 @@ export default function HomeView({
       <NotificationSettingsModal visible={showNotifSettings} onClose={() => setShowNotifSettings(false)} />
 
       {/* Privacy Policy Modal */}
+
       <PrivacyPolicyModal
         visible={showPrivacyPolicy}
         onClose={() => setShowPrivacyPolicy(false)}

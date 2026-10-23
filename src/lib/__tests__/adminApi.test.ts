@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAdminDb, adminErrorMessage } from '../adminApi.ts';
+import { createAdminDb, adminErrorMessage, readAdminPartners } from '../adminApi.ts';
 
 type Call = { fn: string; args: Record<string, unknown> };
 
@@ -83,4 +83,24 @@ test('.eq sur une autre colonne que id est refusé (jamais d’écriture de mass
 test('adminErrorMessage', () => {
   assert.match(adminErrorMessage('forbidden'), /tentatives/);
   assert.equal(adminErrorMessage(undefined), 'Opération refusée.');
+});
+
+test('readAdminPartners : appelle admin_read et renvoie les lignes (prix compris)', async () => {
+  const { client, calls } = fakeClient({ data: { ok: true, rows: [{ id: 'p', price_paid: 150 }] }, error: null });
+  const res = await readAdminPartners('mon-code', client);
+  assert.deepEqual(res.data, [{ id: 'p', price_paid: 150 }]);
+  assert.equal(res.error, null);
+  assert.deepEqual(calls[0], { fn: 'admin_read', args: { p_code: 'mon-code', p_table: 'sponsored_partners' } });
+});
+
+test('readAdminPartners : code refusé ou code vide donnent une erreur lisible, sans appel serveur pour un code vide', async () => {
+  const refused = fakeClient({ data: { ok: false, error: 'forbidden' }, error: null });
+  const res = await readAdminPartners('mauvais', refused.client);
+  assert.equal(res.data, null);
+  assert.match(res.error!.message, /Code admin refusé/);
+
+  const empty = fakeClient({ data: { ok: true, rows: [] }, error: null });
+  const none = await readAdminPartners('  ', empty.client);
+  assert.equal(none.data, null);
+  assert.equal(empty.calls.length, 0);
 });

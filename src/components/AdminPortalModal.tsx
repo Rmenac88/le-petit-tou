@@ -50,7 +50,7 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
-import { createAdminDb } from '../lib/adminApi';
+import { createAdminDb, readAdminPartners } from '../lib/adminApi';
 import { emitAppEvent } from '../lib/appEvents';
 import { ADMIN_IDLE_LOCK_MS } from '../constants/config';
 import dataset from '../constants/dataset.json';
@@ -626,8 +626,8 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
         let removedRemotely = !!(data && data.length > 0);
         if (!removedRemotely) {
           // 0 ligne supprimée : soit il n'existait qu'en local, soit le serveur a refusé
-          const { data: stillThere } = await supabase.from('sponsored_partners').select('id').eq('id', id);
-          if (stillThere && stillThere.length > 0) {
+          const { data: stillThere } = await readAdminPartners(adminCode ?? '', supabase);
+          if (stillThere && stillThere.some((r: any) => String(r.id) === String(id))) {
             showAlert(
               'Suppression impossible',
               `"${name}" n'a pas pu être retiré côté serveur. Rien n'a été modifié.`
@@ -770,10 +770,8 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
   const fetchPartners = async (): Promise<any[]> => {
     try {
       setLoadingPartners(true);
-      const { data, error } = await supabase
-        .from('sponsored_partners')
-        .select('*')
-        .order('rank_position', { ascending: true });
+      const { data: rows, error } = await readAdminPartners(adminCode ?? '', supabase);
+      const data = rows ? [...rows].sort((a, b) => (a.rank_position ?? 999) - (b.rank_position ?? 999)) : null;
       if (!error && data) {
         setPartners(data);
         saveStoredPartners(data);

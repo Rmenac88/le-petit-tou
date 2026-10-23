@@ -13,7 +13,7 @@ import {
   Palette,
   ShieldCheck,
 } from 'lucide-react-native';
-import AppleWalletCard, { CardSkin } from '../AppleWalletCard';
+import MemberCard, { CardSkin } from '../MemberCard';
 
 import { Brand } from '../../constants/brand';
 const triggerHaptic = () => {
@@ -38,7 +38,7 @@ export default function CardsView() {
   return (
     <SafeAreaView style={styles.safeContainer} edges={['top']}>
       <View style={styles.container}>
-        {/* Apple Wallet Header */}
+        {/* En-tête */}
         <View style={styles.header}>
           <Text style={styles.title}>Ta carte Petit Tou</Text>
           <Text style={styles.subtitle}>
@@ -46,9 +46,9 @@ export default function CardsView() {
           </Text>
         </View>
 
-        {/* Center Stage: The Hero Floating 3D Apple Wallet Card */}
+        {/* La carte membre, au centre */}
         <View style={styles.heroCardContainer}>
-          <AppleWalletCard
+          <MemberCard
             activeSkin={activeSkin}
             onFlipChange={(flipped) => setIsFlipped(flipped)}
           />
