@@ -14,6 +14,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  AppState,
   PanResponder,
   Linking,
   Modal,
@@ -118,6 +119,8 @@ import { discoveryStore, DiscoveryStats } from '../../lib/discoveryStore';
 import { formatRating } from '../../lib/formatRating';
 import { todayIso, upcomingEvents } from '../../lib/upcomingEvents';
 import { mark, startupReport } from '../../lib/startupTrace';
+import { FEATURED_CHANGED_EVENT, fetchFeatured, loadStoredFeatured } from '../../lib/featuredStore';
+import { resolveFeatured, type FeaturedRow } from '../../lib/featuredLogic';
 import { getPushState, isPushSupported } from '../../lib/pushNotifications';
 import { appStorage } from '../../lib/storage';
 import {
@@ -543,6 +546,29 @@ export default function HomeView({
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showNotifSettings, setShowNotifSettings] = useState(false);
+
+  // « Les chouchous du Petit Tou » : dernière liste connue tout de suite, puis liste fraîche de la base
+  const [featuredRows, setFeaturedRows] = useState<FeaturedRow[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const refresh = async () => {
+      const fresh = await fetchFeatured();
+      if (alive && fresh) setFeaturedRows(fresh);
+    };
+    loadStoredFeatured().then((rows) => {
+      if (alive) setFeaturedRows(rows);
+    });
+    refresh();
+    const off = onAppEvent(FEATURED_CHANGED_EVENT, refresh);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
+    });
+    return () => {
+      alive = false;
+      off();
+      sub.remove();
+    };
+  }, []);
 
   // Premier lancement : on propose une seule fois d'activer les notifications (l'écran explique le choix ;
   // la demande d'autorisation du système n'apparaît que quand l'utilisateur active l'interrupteur).
@@ -1099,6 +1125,35 @@ export default function HomeView({
     }
     return counts;
   }, [categories, addresses]);
+
+  const featuredCards = useMemo(
+    () => resolveFeatured(featuredRows, addresses as any[], todayIso()),
+    [featuredRows, addresses]
+  );
+
+  // Ouvre la fiche d'une adresse (même contenu que les autres cartes de l'accueil)
+  const openAddressDetail = (addr: any) => {
+    const gallery = addr.gallery_urls || [];
+    const allPhotos = addr.image_url ? [addr.image_url, ...gallery] : gallery;
+    setSelectedSpotDetail({
+      id: addr.id,
+      title: addr.title,
+      description: addr.full_description || addr.description,
+      full_description: addr.full_description || addr.description,
+      breadcrumbs: addr.breadcrumbs || [],
+      tags: addr.tags || [],
+      image_url: addr.image_url,
+      photos: allPhotos,
+      rating: addr.rating,
+      category: categories.find((c) => c.id === addr.category_id)?.name || (addr.tags ? addr.tags[0] : 'Lieu'),
+      price_level: addr.price_level,
+      location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
+      address: addr.address || addr.location || 'Toulouse',
+      phone: addr.telephone || addr.phone || '',
+      website: addr.site_web || addr.website || '',
+      hours: addr.horaires || addr.hours || '',
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -2058,6 +2113,86 @@ export default function HomeView({
                     );
                   })}
                 </View>
+              )}
+
+              {/* Les chouchous du Petit Tou : sélection éditoriale, tout en bas (gérée depuis le portail admin) */}
+              {featuredCards.length > 0 && (
+                <>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Les chouchous du Petit Tou</Text>
+                  </View>
+                  <Text style={styles.featuredIntro}>Notre sélection du moment, choisie par l’équipe.</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.cardsScroll}
+                  >
+                    {featuredCards.map(({ row, address: addr }) => {
+                      const isFav = favorites.includes(addr.id);
+                      const likesCount = likesMap[addr.id] ?? (Number((addr as any).likes_count) || 0);
+                      return (
+                        <Pressable
+                          key={row.id}
+                          style={styles.largeCard}
+                          onPress={() => openAddressDetail(addr)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Chouchou du Petit Tou : ${addr.title}`}
+                        >
+                          <Image
+                            source={{ uri: getOptimizedImageUrl((addr as any).image_url, 600) }}
+                            style={styles.largeCardImage}
+                            contentFit="cover"
+                            transition={200}
+                          />
+                          <View style={styles.featuredBadge}>
+                            <Heart size={12} color={Brand.white} fill={Brand.white} strokeWidth={2} />
+                            <Text style={styles.featuredBadgeText}>CHOUCHOU DU PETIT TOU</Text>
+                          </View>
+                          <View style={styles.ratingBadge}>
+                            <Star color={Brand.chouchou} size={13} fill={Brand.chouchou} />
+                            <Text style={styles.ratingText}>{formatRating((addr as any).rating)}</Text>
+                          </View>
+                          <View style={styles.largeCardInfo}>
+                            <View style={styles.cardHeaderRow}>
+                              <Text style={styles.cardCategoryText}>
+                                {categories.find((c) => c.id === (addr as any).category_id)?.name || 'Lieu'}
+                              </Text>
+                              <Text style={styles.cardPriceText}>{(addr as any).price_level}</Text>
+                            </View>
+                            <Text style={styles.cardTitle} numberOfLines={1}>{addr.title}</Text>
+                            {row.label ? (
+                              <View style={styles.featuredLabelPill}>
+                                <Text style={styles.featuredLabelText} numberOfLines={1}>{row.label}</Text>
+                              </View>
+                            ) : null}
+                            <View style={styles.cardFooterRow}>
+                              <View style={styles.locationRow}>
+                                <MapPin color={Brand.inkSoft} size={14} strokeWidth={2} />
+                                <Text style={styles.locationText}>{(addr as any).location}</Text>
+                              </View>
+                              <Pressable
+                                onPress={() => toggleFavorite(addr.id)}
+                                accessibilityLabel={isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                              >
+                                <Heart
+                                  color={isFav ? Brand.primary : Brand.inkMute}
+                                  fill={isFav ? Brand.primary : 'transparent'}
+                                  size={17}
+                                  strokeWidth={2}
+                                />
+                                {likesCount > 0 && (
+                                  <Text style={[styles.likeCountText, isFav && styles.likeCountTextActive]}>
+                                    {likesCount}
+                                  </Text>
+                                )}
+                              </Pressable>
+                            </View>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </>
               )}
             </>
           )}

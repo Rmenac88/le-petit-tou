@@ -65,6 +65,7 @@ import {
 import { Brand } from '../constants/brand';
 import AgendaAdminPanel from './admin/AgendaAdminPanel';
 import PushAdminPanel from './admin/PushAdminPanel';
+import FeaturedAdminPanel from './admin/FeaturedAdminPanel';
 const generateUUID = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -165,7 +166,8 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
     };
   }, [visible, resetIdleLock]);
   const [agendaCount, setAgendaCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<'spots' | 'editSpot' | 'categories' | 'events' | 'partners' | 'agenda' | 'notifs'>('spots');
+  const [featuredCount, setFeaturedCount] = useState(0);
+  const [activeTab, setActiveTab] = useState<'spots' | 'editSpot' | 'categories' | 'events' | 'partners' | 'agenda' | 'notifs' | 'featured'>('spots');
 
   // Spots Data & Filters State
   const [spots, setSpots] = useState<any[]>(dataset.addresses || []);
@@ -1036,6 +1038,10 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
               <Calendar size={14} color={activeTab === 'agenda' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
               <Text style={[styles.tabBtnText, activeTab === 'agenda' && styles.tabBtnTextActive]}>Agenda ({agendaCount})</Text>
             </Pressable>
+            <Pressable style={[styles.tabBtn, activeTab === 'featured' && styles.tabBtnActive]} onPress={() => setActiveTab('featured')}>
+              <Star size={14} color={activeTab === 'featured' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
+              <Text style={[styles.tabBtnText, activeTab === 'featured' && styles.tabBtnTextActive]}>Chouchous du Petit Tou ({featuredCount})</Text>
+            </Pressable>
           </ScrollView>
         </View>
 
@@ -1525,6 +1531,9 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
           {activeTab === 'notifs' && <PushAdminPanel adminCode={adminCode} />}
           {activeTab === 'agenda' && (
             <AgendaAdminPanel adminCode={adminCode} spots={spots} onCountChange={setAgendaCount} />
+          )}
+          {activeTab === 'featured' && (
+            <FeaturedAdminPanel adminCode={adminCode} spots={spots} onCountChange={setFeaturedCount} />
           )}
 
           {activeTab === 'partners' && (
