@@ -13,6 +13,7 @@ const m006 = readFileSync(new URL('../../src/scripts/006_security_lockdown.sql',
 const m007 = readFileSync(new URL('../../src/scripts/007_push_notifications.sql', here), 'utf8');
 const m010 = readFileSync(new URL('../../src/scripts/010_push_style.sql', here), 'utf8');
 const m011 = readFileSync(new URL('../../src/scripts/011_featured_spots.sql', here), 'utf8');
+const m012 = readFileSync(new URL('../../src/scripts/012_home_background.sql', here), 'utf8');
 
 const GOOD_CODE = 'Code-De-Test-Synthetique-01';
 const BAD_CODE = 'mauvais-code-de-test';
@@ -49,6 +50,7 @@ async function newDb({ withPush = true } = {}) {
     await db.exec(m007);
     await db.exec(m010);
     await db.exec(m011);
+    await db.exec(m012);
   }
   return db;
 }
@@ -127,6 +129,8 @@ describe('surface d’attaque : fonctions appelables avec la clé publique', () 
     'update_push_preferences', 'use_discount_card', 'verify_admin_access',
     // 011 : chouchous du Petit Tou (gérés par code admin) et date du jour utilisée par la politique de lecture
     'admin_list_featured', 'admin_save_featured', 'admin_delete_featured', '_lpt_today',
+    // 012 : fond d'accueil (billet d'envoi vérifié par code admin ; la vérification de billet sert la politique de stockage)
+    'admin_request_upload', 'admin_set_home_background', '_upload_ticket_ok',
   ];
   test('anon et authenticated ne peuvent exécuter que la liste blanche ; aucune fonction interne exposée', async () => {
     const db = await newDb();

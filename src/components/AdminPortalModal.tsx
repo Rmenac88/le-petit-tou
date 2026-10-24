@@ -66,6 +66,7 @@ import { Brand } from '../constants/brand';
 import AgendaAdminPanel from './admin/AgendaAdminPanel';
 import PushAdminPanel from './admin/PushAdminPanel';
 import FeaturedAdminPanel from './admin/FeaturedAdminPanel';
+import HomeBackgroundAdminPanel from './admin/HomeBackgroundAdminPanel';
 const generateUUID = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -167,7 +168,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
   }, [visible, resetIdleLock]);
   const [agendaCount, setAgendaCount] = useState(0);
   const [featuredCount, setFeaturedCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<'spots' | 'editSpot' | 'categories' | 'events' | 'partners' | 'agenda' | 'notifs' | 'featured'>('spots');
+  const [activeTab, setActiveTab] = useState<'spots' | 'editSpot' | 'categories' | 'events' | 'partners' | 'agenda' | 'notifs' | 'featured' | 'background'>('spots');
 
   // Spots Data & Filters State
   const [spots, setSpots] = useState<any[]>(dataset.addresses || []);
@@ -1042,6 +1043,10 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
               <Star size={14} color={activeTab === 'featured' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
               <Text style={[styles.tabBtnText, activeTab === 'featured' && styles.tabBtnTextActive]}>Chouchous du Petit Tou ({featuredCount})</Text>
             </Pressable>
+            <Pressable style={[styles.tabBtn, activeTab === 'background' && styles.tabBtnActive]} onPress={() => setActiveTab('background')}>
+              <Sparkles size={14} color={activeTab === 'background' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
+              <Text style={[styles.tabBtnText, activeTab === 'background' && styles.tabBtnTextActive]}>Apparence</Text>
+            </Pressable>
           </ScrollView>
         </View>
 
@@ -1535,6 +1540,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
           {activeTab === 'featured' && (
             <FeaturedAdminPanel adminCode={adminCode} spots={spots} onCountChange={setFeaturedCount} />
           )}
+          {activeTab === 'background' && <HomeBackgroundAdminPanel adminCode={adminCode} />}
 
           {activeTab === 'partners' && (
             <ScrollView ref={partnersScrollRef} style={{ flex: 1, padding: 16 }} contentContainerStyle={{ paddingBottom: 60 }}>

@@ -16,7 +16,7 @@ const supabaseFetch: typeof fetch = (input, init) =>
     ? uploadFetch
     : quickFetch)(input, init);
 
-const SUPABASE_URL = 
+export const SUPABASE_URL =
   process.env.EXPO_PUBLIC_SUPABASE_URL || 
   'https://ckesvawakxblsuhmzaeo.supabase.co';
 

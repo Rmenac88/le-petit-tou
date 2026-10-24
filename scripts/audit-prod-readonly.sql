@@ -7,7 +7,8 @@ with allowed(fn) as (values
   ('admin_send_push'), ('admin_write'), ('delete_my_data'), ('discover_place'), ('get_my_card_usage'),
   ('get_my_discoveries'), ('get_push_preferences'), ('increment_spot_like'), ('register_push_token'),
   ('unregister_push_token'), ('update_push_preferences'), ('use_discount_card'), ('verify_admin_access'),
-  ('admin_list_featured'), ('admin_save_featured'), ('admin_delete_featured'), ('_lpt_today')
+  ('admin_list_featured'), ('admin_save_featured'), ('admin_delete_featured'), ('_lpt_today'),
+  ('admin_request_upload'), ('admin_set_home_background'), ('_upload_ticket_ok')
 ),
 exposed as (
   select p.proname as fn, r.rolname as role
@@ -31,7 +32,7 @@ select 'FAIL', 'anon peut écrire directement dans la table', c.relname
         or has_table_privilege('anon', c.oid, 'delete'))
    and c.relname in ('addresses', 'categories', 'events', 'sponsored_partners', 'partner_events', 'admin_users',
                      'admin_secrets', 'admin_login_attempts', 'push_devices', 'push_outbox', 'push_deliveries', 'push_requests',
-                     'featured_spots')
+                     'featured_spots', 'app_settings', 'upload_tickets')
 union all
 select 'FAIL', 'tâche planifiée absente ou inactive', j.name
   from (values ('lpt-push-tick'), ('lpt-purge')) j(name)

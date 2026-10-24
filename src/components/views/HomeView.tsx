@@ -121,6 +121,9 @@ import { todayIso, upcomingEvents } from '../../lib/upcomingEvents';
 import { mark, startupReport } from '../../lib/startupTrace';
 import { FEATURED_CHANGED_EVENT, fetchFeatured, loadStoredFeatured } from '../../lib/featuredStore';
 import { resolveFeatured, type FeaturedRow } from '../../lib/featuredLogic';
+import { HOME_BACKGROUND_CHANGED_EVENT, fetchHomeBackground, loadStoredHomeBackground } from '../../lib/homeBackgroundStore';
+import { GALAXY, backgroundImageUrl, type HomeBackground } from '../../lib/homeBackgroundLogic';
+import { SUPABASE_URL } from '../../lib/supabase';
 import { getPushState, isPushSupported } from '../../lib/pushNotifications';
 import { appStorage } from '../../lib/storage';
 import {
@@ -546,6 +549,30 @@ export default function HomeView({
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showNotifSettings, setShowNotifSettings] = useState(false);
+
+  // Fond du bandeau d'accueil : dernier réglage connu tout de suite, puis réglage frais de la base (Galaxy par défaut)
+  const [homeBg, setHomeBg] = useState<HomeBackground>(GALAXY);
+  useEffect(() => {
+    let alive = true;
+    const refresh = async () => {
+      const fresh = await fetchHomeBackground();
+      if (alive && fresh) setHomeBg(fresh);
+    };
+    loadStoredHomeBackground().then((bg) => {
+      if (alive) setHomeBg(bg);
+    });
+    refresh();
+    const off = onAppEvent(HOME_BACKGROUND_CHANGED_EVENT, refresh);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
+    });
+    return () => {
+      alive = false;
+      off();
+      sub.remove();
+    };
+  }, []);
+  const homeBackgroundUri = useMemo(() => backgroundImageUrl(SUPABASE_URL, homeBg), [homeBg]);
 
   // « Les chouchous du Petit Tou » : dernière liste connue tout de suite, puis liste fraîche de la base
   const [featuredRows, setFeaturedRows] = useState<FeaturedRow[]>([]);
@@ -1172,6 +1199,7 @@ export default function HomeView({
             onSearchBlur={() => setIsSearchFocused(false)}
             onTitlePress={handleTitlePress}
             labelStyle={labelStyle}
+            backgroundUri={homeBackgroundUri}
           />
 
           {/* Personal Progression & Discovery Bar */}

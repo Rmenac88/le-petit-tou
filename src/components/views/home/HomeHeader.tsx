@@ -1,6 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable, Image, StyleSheet, Platform } from 'react-native';
 import { Search } from 'lucide-react-native';
+import { Image as ExpoImage } from 'expo-image';
 import Stars from '../../Stars';
 
 import { Brand } from '../../../constants/brand';
@@ -11,6 +12,8 @@ export interface HomeHeaderProps {
   onSearchBlur?: () => void;
   onTitlePress: () => void;
   labelStyle?: any;
+  /** Image de fond choisie dans le portail ; absente ou illisible : thème Galaxy d'origine. */
+  backgroundUri?: string | null;
 }
 
 export const HomeHeader: React.FC<HomeHeaderProps> = ({
@@ -19,8 +22,17 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   onSearchFocus,
   onSearchBlur,
   onTitlePress,
+  backgroundUri,
 }) => {
   const searchInputRef = useRef<TextInput>(null);
+  // Le fond personnalisé ne remplace Galaxy qu'une fois chargé ; en cas d'échec, Galaxy reste affiché
+  const [bgLoaded, setBgLoaded] = useState(false);
+  const [bgFailed, setBgFailed] = useState(false);
+  useEffect(() => {
+    setBgLoaded(false);
+    setBgFailed(false);
+  }, [backgroundUri]);
+  const showImage = !!backgroundUri && !bgFailed;
 
   return (
     <>
@@ -39,7 +51,23 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
 
       {/* Hero violet sidéral */}
       <View style={styles.hero}>
-        <Stars />
+        {!(showImage && bgLoaded) && <Stars />}
+        {showImage && (
+          <>
+            <ExpoImage
+              source={{ uri: backgroundUri as string }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={400}
+              onLoad={() => setBgLoaded(true)}
+              onError={() => setBgFailed(true)}
+              accessible={false}
+            />
+            {/* Voile violet : garde le texte blanc lisible quelle que soit l'image */}
+            {bgLoaded && <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.heroScrim]} />}
+          </>
+        )}
         <Text style={styles.heroTitle}>Pour voir la ville</Text>
         <Text style={[styles.heroTitle, styles.heroTitleAccent]}>en rose.</Text>
         <Text style={styles.heroSub}>Les bonnes adresses, testées pour de vrai.</Text>
@@ -99,6 +127,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 26,
     elevation: 8,
+  },
+  heroScrim: {
+    backgroundColor: 'rgba(43, 29, 70, 0.5)',
   },
   heroGlow: {
     position: 'absolute',
