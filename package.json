@@ -55,7 +55,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test:agenda": "node --experimental-strip-types --test src/lib/__tests__/*.test.ts",
-    "test:sql": "node --test tests/sql/security-lockdown.test.mjs tests/sql/push-notifications.test.mjs tests/sql/backend-audit.test.mjs",
+    "test:sql": "node --test tests/sql/security-lockdown.test.mjs tests/sql/push-notifications.test.mjs tests/sql/backend-audit.test.mjs tests/sql/push-style.test.mjs",
     "test:data": "python3 src/scripts/test_all_modules.py && python3 src/scripts/test_filters.py",
     "test:all": "npm run test:agenda && npm run test:sql && npm run test:data && npm run typecheck",
     "typecheck": "tsc --noEmit"

@@ -4,6 +4,31 @@
 
 export type AppTab = 'home' | 'search' | 'map' | 'cards' | 'agenda';
 
+/** Couleur d'accent des notifications Android (même valeur que le plugin expo-notifications dans app.json). */
+export const NOTIFICATION_ACCENT = '#E84A5F';
+
+export const NOTIFICATION_CHANNEL_GROUP = { id: 'lpt', name: 'Le Petit Tou' } as const;
+
+export interface NotificationChannelSpec {
+  /** Identifiant Android : DOIT correspondre à public._push_style() dans la migration 010 (un test le vérifie). */
+  id: string;
+  name: string;
+  description: string;
+  importance: 'default' | 'high';
+}
+
+/**
+ * Canaux Android (visibles dans les réglages du téléphone, un par type de message). Une fois créé, un canal ne
+ * peut plus changer d'importance : ces valeurs sont donc définitives. « default » reçoit les anciens messages.
+ */
+export const NOTIFICATION_CHANNELS: readonly NotificationChannelSpec[] = [
+  { id: 'default', name: 'Le Petit Tou', description: 'Messages du Petit Tou.', importance: 'default' },
+  { id: 'lpt-events', name: 'Événements', description: 'Un nouvel événement de l’association est publié.', importance: 'default' },
+  { id: 'lpt-agenda', name: 'Agenda des partenaires', description: 'Une nouvelle date est ajoutée à l’agenda.', importance: 'default' },
+  { id: 'lpt-new-spots', name: 'Nouvelles adresses', description: 'Des adresses viennent d’arriver dans le guide.', importance: 'default' },
+  { id: 'lpt-announcements', name: 'Annonces', description: 'Les messages importants du Petit Tou.', importance: 'high' },
+];
+
 export interface PushPreferences {
   notify_events: boolean;
   notify_agenda: boolean;
@@ -46,6 +71,15 @@ export function targetForNotification(data: unknown): NotificationTarget {
     default:
       return { tab: 'home' };
   }
+}
+
+/**
+ * Vrai si l'erreur signifie « cette fonction (ou ce paramètre) n'existe pas côté base » (PGRST202 / 404) :
+ * la migration n'est pas encore appliquée. L'appli retente alors sans le paramètre récent.
+ */
+export function isMissingFunctionError(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  return error.code === 'PGRST202' || /could not find the function|schema cache/i.test(error.message ?? '');
 }
 
 export type PermissionOutcome = 'granted' | 'can_ask' | 'blocked';

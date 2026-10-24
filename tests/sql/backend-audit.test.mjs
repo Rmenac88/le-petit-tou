@@ -11,6 +11,7 @@ const here = new URL('.', import.meta.url);
 const baseline = readFileSync(new URL('baseline.sql', here), 'utf8');
 const m006 = readFileSync(new URL('../../src/scripts/006_security_lockdown.sql', here), 'utf8');
 const m007 = readFileSync(new URL('../../src/scripts/007_push_notifications.sql', here), 'utf8');
+const m010 = readFileSync(new URL('../../src/scripts/010_push_style.sql', here), 'utf8');
 
 const GOOD_CODE = 'Code-De-Test-Synthetique-01';
 const BAD_CODE = 'mauvais-code-de-test';
@@ -45,6 +46,7 @@ async function newDb({ withPush = true } = {}) {
   if (withPush) {
     await db.exec(NET_STUB);
     await db.exec(m007);
+    await db.exec(m010);
   }
   return db;
 }

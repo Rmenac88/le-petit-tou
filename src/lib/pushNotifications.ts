@@ -10,6 +10,10 @@ import { authService } from './authService';
 import {
   DEFAULT_PUSH_PREFERENCES,
   ENABLE_FAILURE_MESSAGES,
+  NOTIFICATION_ACCENT,
+  NOTIFICATION_CHANNELS,
+  NOTIFICATION_CHANNEL_GROUP,
+  isMissingFunctionError,
   isValidExpoPushToken,
   permissionOutcome,
   targetForNotification,
@@ -21,14 +25,57 @@ import {
 
 const ENABLED_KEY = 'LPT_PUSH_ENABLED_V1';
 const PREFS_KEY = 'LPT_PUSH_PREFS_V1';
-const ANDROID_CHANNEL = 'default';
 
 /** Les notifications n'existent que sur un vrai téléphone (ni web, ni simulateur : pas de jeton fiable). */
 export function isPushSupported(): boolean {
   return Platform.OS !== 'web' && Device.isDevice;
 }
 
-/** À appeler une fois au démarrage : affichage en premier plan et canal Android. */
+let channelsReady: Promise<boolean> | null = null;
+
+/**
+ * Crée le groupe et les canaux Android (un par type de message). Renvoie vrai si tous existent : le serveur
+ * n'enverra les messages sur un canal dédié qu'aux appareils qui l'annoncent (sinon la notification serait perdue).
+ * Sur iOS et le web, il n'y a pas de canaux : renvoie faux.
+ */
+function ensureChannels(): Promise<boolean> {
+  if (Platform.OS !== 'android') return Promise.resolve(false);
+  if (!channelsReady) {
+    channelsReady = (async () => {
+      try {
+        await Notifications.setNotificationChannelGroupAsync(NOTIFICATION_CHANNEL_GROUP.id, {
+          name: NOTIFICATION_CHANNEL_GROUP.name,
+        });
+        for (const c of NOTIFICATION_CHANNELS) {
+          await Notifications.setNotificationChannelAsync(c.id, {
+            name: c.name,
+            description: c.description,
+            importance:
+              c.importance === 'high'
+                ? Notifications.AndroidImportance.HIGH
+                : Notifications.AndroidImportance.DEFAULT,
+            groupId: NOTIFICATION_CHANNEL_GROUP.id,
+            lightColor: NOTIFICATION_ACCENT,
+            enableLights: true,
+            enableVibrate: true,
+            vibrationPattern: [0, 180, 90, 180],
+            sound: 'default',
+            showBadge: true,
+            // Aucun message ne contient de donnée personnelle : le texte peut s'afficher sur l'écran verrouillé
+            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          });
+        }
+        return true;
+      } catch (e) {
+        console.warn('[push] canaux Android impossibles:', e);
+        return false;
+      }
+    })();
+  }
+  return channelsReady;
+}
+
+/** À appeler une fois au démarrage : affichage en premier plan et canaux Android. */
 export async function configurePush(): Promise<void> {
   if (Platform.OS === 'web') return;
   try {
@@ -40,13 +87,7 @@ export async function configurePush(): Promise<void> {
         shouldSetBadge: false,
       }),
     });
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL, {
-        name: 'Actualités du Petit Tou',
-        importance: Notifications.AndroidImportance.DEFAULT,
-        lightColor: '#E84A5F',
-      });
-    }
+    await ensureChannels();
   } catch (e) {
     console.warn('[push] configuration impossible:', e);
   }
@@ -89,14 +130,20 @@ const fail = (reason: EnableFailure): EnableResult => ({ ok: false, reason, mess
 
 async function registerWithServer(token: string, prefs: PushPreferences): Promise<boolean> {
   const deviceId = await authService.getUserId();
-  const { data, error } = await supabase.rpc('register_push_token', {
+  const channelsV2 = await ensureChannels();
+  const args = {
     p_device_id: deviceId,
     p_token: token,
     p_platform: Platform.OS === 'ios' ? 'ios' : 'android',
     p_notify_events: prefs.notify_events,
     p_notify_agenda: prefs.notify_agenda,
     p_notify_new_spots: prefs.notify_new_spots,
-  });
+  };
+  let { data, error } = await supabase.rpc('register_push_token', { ...args, p_channels_v2: channelsV2 });
+  // Base pas encore migrée (010) : on s'inscrit quand même, sans le paramètre récent (canal « default »)
+  if (isMissingFunctionError(error)) {
+    ({ data, error } = await supabase.rpc('register_push_token', args));
+  }
   return !error && data?.success === true;
 }
 
