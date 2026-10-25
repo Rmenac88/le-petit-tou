@@ -546,6 +546,17 @@ export default function HomeView({
   const [infoAlert, setInfoAlert] = useState<{ title: string; message: string; type?: 'info' | 'warning' | 'error' } | null>(null);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const adminCodeRef = useRef('');
+  // Le portail n'envoie plus les données à l'accueil à chaque ouverture : un rafraîchissement unique, à la
+  // fermeture, et seulement si une écriture du catalogue a réussi pendant la session.
+  const catalogChangedRef = useRef(false);
+  const closeAdminPortal = () => {
+    adminCodeRef.current = '';
+    setShowAdminModal(false);
+    if (catalogChangedRef.current) {
+      catalogChangedRef.current = false;
+      loadSupabaseData(true);
+    }
+  };
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showNotifSettings, setShowNotifSettings] = useState(false);
@@ -2770,16 +2781,11 @@ export default function HomeView({
         <AdminPortalModal
           visible={showAdminModal}
           adminCode={adminCodeRef.current}
-          onClose={() => {
-            adminCodeRef.current = '';
-            setShowAdminModal(false);
-            loadSupabaseData(true);
+          onCatalogChanged={() => {
+            catalogChangedRef.current = true;
           }}
-          onLogout={() => {
-            adminCodeRef.current = '';
-            setShowAdminModal(false);
-            loadSupabaseData(true);
-          }}
+          onClose={closeAdminPortal}
+          onLogout={closeAdminPortal}
         />
         </ErrorBoundary>
       )}

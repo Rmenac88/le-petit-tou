@@ -91,7 +91,7 @@ export default function HomeBackgroundAdminPanel({ adminCode }: Props) {
     try {
       // Le sélecteur du système ne demande aucune autorisation d'accès à la galerie
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
