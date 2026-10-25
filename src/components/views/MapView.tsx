@@ -82,6 +82,9 @@ const SUBTAB_LABELS = { tout: 'Tout', adresses: 'Adresses', evenements: 'Événe
 const { height } = Dimensions.get('window');
 
 
+/** Paliers de budget proposés en un appui sur la carte (€ par personne). */
+const QUICK_BUDGETS = [10, 20, 30] as const;
+
 export const estimateSpotBudget = (addr: any) => getBudgetInfo(addr);
 
 const PT_SPOTS = placesRepository.getAllSpotsBaseline();
@@ -1335,6 +1338,7 @@ export default function MapView({
 
       {/* Floating Category Filter Pills Row (Instant 1-tap filtering directly on the map!) */}
       <View
+        pointerEvents="box-none"
         style={[
           styles.floatingCategoryBar,
           activeRoute && { top: Platform.OS === 'ios' ? 180 : 160 },
@@ -1380,6 +1384,35 @@ export default function MapView({
                 >
                   {catItem.label}
                 </Text>
+              </Pressable>
+            );
+          })}
+
+        </ScrollView>
+
+        {/* Budget en un appui : mêmes paliers que le curseur des filtres ; un second appui retire la limite */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryScrollContent}
+          style={styles.budgetRow}
+          keyboardShouldPersistTaps="handled"
+        >
+          {QUICK_BUDGETS.map((val) => {
+            const isSelected = budget === val;
+            return (
+              <Pressable
+                key={`budget-${val}`}
+                style={[styles.categoryPill, isSelected && styles.budgetPillActive]}
+                onPress={() => {
+                  triggerHaptic();
+                  setBudget(isSelected ? 50 : val);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSelected }}
+                accessibilityLabel={`Budget jusqu'à ${val} euros par personne`}
+              >
+                <Text style={[styles.categoryPillText, isSelected && styles.categoryPillTextSelected]}>{`Jusqu'à ${val} €`}</Text>
               </Pressable>
             );
           })}
@@ -2090,6 +2123,8 @@ const styles = StyleSheet.create({
   categoryPillTextSelected: {
     color: Brand.white,
   },
+  budgetRow: { marginTop: 8 },
+  budgetPillActive: { backgroundColor: Brand.ink, borderColor: Brand.ink },
   
   // Floating Action Buttons — colonne verticale à droite
   actionsRow: {

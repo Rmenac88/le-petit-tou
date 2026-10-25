@@ -3,6 +3,8 @@
  * Les offres sont les cartes de réduction de la base (table discount_cards).
  */
 
+import { HEX_COLOR, contrastRatio } from './colorContrast.ts';
+
 export type OfferCategory = 'food' | 'drinks' | 'shopping' | 'culture' | 'services';
 
 export interface Offer {
@@ -52,7 +54,7 @@ export const OFFER_CATEGORIES: readonly { id: OfferCategory; label: string }[] =
 export type OfferFilter = 'all' | OfferCategory;
 
 const CATEGORY_IDS = new Set<string>(OFFER_CATEGORIES.map((c) => c.id));
-const HEX = /^#[0-9A-Fa-f]{6}$/;
+const HEX = HEX_COLOR;
 // rose foncé : le texte blanc dessus atteint 5,2:1 (le rose vif de la marque seulement 3,8:1)
 const DEFAULT_PRIMARY = '#C93049';
 const DEFAULT_SECONDARY = '#8E1F37';
@@ -151,16 +153,6 @@ export function validityLabel(validUntil: string | null, nowMs: number): string 
   return `Jusqu'au ${last.getDate()} ${MONTHS[last.getMonth()]} ${last.getFullYear()}`;
 }
 
-const luminance = (hex: string): number => {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-
-const contrastOn = (fg: string, bg: string): number => {
-  const [hi, lo] = [luminance(fg), luminance(bg)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-};
-
 /**
  * Texte lisible sur une couleur de fond choisie par l'association : blanc de préférence, puis le noir de la marque,
  * puis noir pur pour les tons moyens où aucun des deux n'atteint 4,5:1.
@@ -168,7 +160,7 @@ const contrastOn = (fg: string, bg: string): number => {
 export function readableTextOn(hex: string): '#FFFFFF' | '#1A1A22' | '#000000' {
   if (!HEX.test(hex)) return '#FFFFFF';
   for (const candidate of ['#FFFFFF', '#1A1A22', '#000000'] as const) {
-    if (contrastOn(candidate, hex) >= 4.5) return candidate;
+    if (contrastRatio(candidate, hex) >= 4.5) return candidate;
   }
-  return contrastOn('#FFFFFF', hex) >= contrastOn('#000000', hex) ? '#FFFFFF' : '#000000';
+  return contrastRatio('#FFFFFF', hex) >= contrastRatio('#000000', hex) ? '#FFFFFF' : '#000000';
 }

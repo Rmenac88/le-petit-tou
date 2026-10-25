@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { ImagePlus, Sparkles } from 'lucide-react-native';
 
@@ -7,6 +7,8 @@ import { Brand, Radius, Touch, Type } from '../../constants/brand';
 import { supabase, SUPABASE_URL } from '../../lib/supabase';
 import { adminRequestUpload, adminSetHomeBackground } from '../../lib/homeBackgroundAdmin';
 import { FeaturedError } from '../../lib/featuredAdmin';
+import { confirmAction } from './confirmAction';
+import HomeThemeSection from './HomeThemeSection';
 import {
   BACKGROUND_BUCKET,
   BACKGROUND_MAX_BYTES,
@@ -41,17 +43,6 @@ const STEP_TEXT: Record<Exclude<Step, null>, string> = {
   verifying: 'Autorisation de l’envoi…',
   uploading: 'Envoi de l’image…',
   applying: 'Mise à jour de l’accueil…',
-};
-
-const confirm = (title: string, text: string, onYes: () => void) => {
-  if (Platform.OS === 'web') {
-    if (window.confirm(`${title}\n\n${text}`)) onYes();
-    return;
-  }
-  Alert.alert(title, text, [
-    { text: 'Annuler', style: 'cancel' },
-    { text: 'Confirmer', onPress: onYes },
-  ]);
 };
 
 export default function HomeBackgroundAdminPanel({ adminCode }: Props) {
@@ -153,7 +144,7 @@ export default function HomeBackgroundAdminPanel({ adminCode }: Props) {
   };
 
   const backToGalaxy = () =>
-    confirm('Revenir au thème Galaxy ?', 'L’image actuelle ne sera plus affichée sur l’accueil.', async () => {
+    confirmAction('Revenir au fond d’origine ?', 'L’image actuelle ne sera plus affichée sur l’accueil.', async () => {
       setNotice(null);
       setStep('applying');
       try {
@@ -161,7 +152,7 @@ export default function HomeBackgroundAdminPanel({ adminCode }: Props) {
         announceHomeBackgroundChanged();
         await refresh();
         setPicked(null);
-        setNotice({ kind: 'ok', text: 'Le thème Galaxy est de retour sur l’accueil.' });
+        setNotice({ kind: 'ok', text: 'Le fond d’origine est de retour sur l’accueil.' });
       } catch (err) {
         fail(err);
       } finally {
@@ -173,9 +164,11 @@ export default function HomeBackgroundAdminPanel({ adminCode }: Props) {
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Text style={styles.h}>Fond de l'accueil</Text>
+      <HomeThemeSection adminCode={adminCode} />
+
+      <Text style={[styles.h, styles.hSpaced]}>Fond de l'accueil</Text>
       <Text style={styles.intro}>
-        Choisis l'image affichée derrière « Pour voir la ville en rose » et la barre de recherche. Elle se met à jour
+        Choisis l'image affichée derrière le titre et la barre de recherche, en haut de l'accueil. Elle se met à jour
         directement dans l'application, sans nouvelle version.
       </Text>
 
@@ -195,15 +188,15 @@ export default function HomeBackgroundAdminPanel({ adminCode }: Props) {
             <Text style={styles.meta}>Image personnalisée</Text>
             <Pressable style={[styles.secondary, busy && styles.disabled]} disabled={busy} onPress={backToGalaxy} accessibilityRole="button">
               <Sparkles size={16} color={Brand.ink} strokeWidth={2} />
-              <Text style={styles.secondaryText}>Revenir au thème Galaxy</Text>
+              <Text style={styles.secondaryText}>Revenir au fond d’origine</Text>
             </Pressable>
           </>
         ) : (
           <>
             <View style={[styles.preview, styles.galaxyPreview]}>
-              <Text style={styles.galaxyText}>Thème Galaxy</Text>
+              <Text style={styles.galaxyText}>Fond d’origine</Text>
             </View>
-            <Text style={styles.meta}>Le thème d'origine est affiché.</Text>
+            <Text style={styles.meta}>Le fond d'origine est affiché (ciel étoilé).</Text>
           </>
         )}
       </View>
@@ -244,7 +237,7 @@ export default function HomeBackgroundAdminPanel({ adminCode }: Props) {
         )}
         <Text style={styles.tip}>
           JPEG, PNG ou WebP · {Math.round(BACKGROUND_MAX_BYTES / (1024 * 1024))} Mo au maximum · format paysage conseillé
-          (4:3), au moins 1200 px de large. Un voile violet est ajouté pour garder le texte lisible : les images
+          (4:3), au moins 1200 px de large. Un voile aux couleurs du thème est ajouté pour garder le texte lisible : les images
           sombres ou colorées donnent le meilleur résultat.
         </Text>
       </View>
@@ -256,6 +249,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 60, gap: 12 },
   h: { fontSize: Type.title2, fontWeight: '800', color: Brand.ink },
+  hSpaced: { marginTop: 12 },
   intro: { fontSize: Type.body, fontWeight: '500', color: Brand.inkSoft },
   box: { padding: 24, alignItems: 'center' },
   boxText: { fontSize: Type.body, fontWeight: '500', color: Brand.inkSoft, textAlign: 'center', paddingVertical: 8 },

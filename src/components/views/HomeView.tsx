@@ -126,6 +126,8 @@ import { FEATURED_CHANGED_EVENT, fetchFeatured, loadStoredFeatured } from '../..
 import { resolveFeatured, type FeaturedRow } from '../../lib/featuredLogic';
 import { HOME_BACKGROUND_CHANGED_EVENT, fetchHomeBackground, loadStoredHomeBackground } from '../../lib/homeBackgroundStore';
 import { GALAXY, backgroundImageUrl, type HomeBackground } from '../../lib/homeBackgroundLogic';
+import { HOME_THEME_CHANGED_EVENT, fetchHomeTheme, loadStoredHomeTheme } from '../../lib/homeThemeStore';
+import { DEFAULT_THEME, resolveTheme, type HomeTheme } from '../../lib/homeThemeLogic';
 import { SUPABASE_URL } from '../../lib/supabase';
 import { PUSH_PROMPTED_KEY, getPushState, isPushSupported } from '../../lib/pushNotifications';
 import { shouldOfferPushWelcome } from '../../lib/pushLogic';
@@ -593,6 +595,30 @@ export default function HomeView({
     };
   }, []);
   const homeBackgroundUri = useMemo(() => backgroundImageUrl(SUPABASE_URL, homeBg), [homeBg]);
+
+  // Thème de l'année (couleurs, étoiles, phrases du bandeau) : même principe que le fond, thème d'origine par défaut
+  const [homeTheme, setHomeTheme] = useState<HomeTheme>(DEFAULT_THEME);
+  useEffect(() => {
+    let alive = true;
+    const refresh = async () => {
+      const fresh = await fetchHomeTheme();
+      if (alive && fresh) setHomeTheme(fresh);
+    };
+    loadStoredHomeTheme().then((theme) => {
+      if (alive) setHomeTheme(theme);
+    });
+    refresh();
+    const off = onAppEvent(HOME_THEME_CHANGED_EVENT, refresh);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
+    });
+    return () => {
+      alive = false;
+      off();
+      sub.remove();
+    };
+  }, []);
+  const resolvedHomeTheme = useMemo(() => resolveTheme(homeTheme), [homeTheme]);
 
   // « Les chouchous du Petit Tou » : dernière liste connue tout de suite, puis liste fraîche de la base
   const [featuredRows, setFeaturedRows] = useState<FeaturedRow[]>([]);
@@ -1222,6 +1248,7 @@ export default function HomeView({
             onTitlePress={handleTitlePress}
             labelStyle={labelStyle}
             backgroundUri={homeBackgroundUri}
+            theme={resolvedHomeTheme}
             totalSpots={addresses.length}
             onOpenFilters={() => setShowFilterModal(true)}
             onOpenProfile={() => onChangeTab?.('profile')}
