@@ -24,6 +24,8 @@ import {
 } from './pushLogic';
 
 const ENABLED_KEY = 'LPT_PUSH_ENABLED_V1';
+/** Posée quand le choix des notifications a été proposé (une seule fois par téléphone). */
+export const PUSH_PROMPTED_KEY = 'LPT_PUSH_PROMPTED_V1';
 const PREFS_KEY = 'LPT_PUSH_PREFS_V1';
 
 /** Les notifications n'existent que sur un vrai téléphone (ni web, ni simulateur : pas de jeton fiable). */
@@ -224,6 +226,8 @@ export async function resyncPushRegistration(): Promise<void> {
 export async function clearLocalPushState(): Promise<void> {
   await appStorage.removeItem(ENABLED_KEY);
   await appStorage.removeItem(PREFS_KEY);
+  // le téléphone redevient « nouveau » : le choix des notifications sera reproposé une fois
+  await appStorage.removeItem(PUSH_PROMPTED_KEY);
 }
 
 /**

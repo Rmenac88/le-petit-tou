@@ -100,3 +100,36 @@ export const ENABLE_FAILURE_MESSAGES: Record<EnableFailure, string> = {
   token_error: "Impossible d'activer les notifications pour le moment. Réessayez dans un instant.",
   server_error: "Le serveur n'a pas pu enregistrer votre choix. Réessayez avec une connexion stable.",
 };
+
+/** Les trois familles de messages, avec le texte affiché dans les écrans de choix (accueil et réglages). */
+export interface PushOption {
+  key: keyof PushPreferences;
+  emoji: string;
+  label: string;
+  hint: string;
+}
+
+export const PUSH_OPTIONS: readonly PushOption[] = [
+  { key: 'notify_events', emoji: '🎉', label: 'Événements', hint: 'Les soirées et rendez-vous de l’association.' },
+  { key: 'notify_agenda', emoji: '📅', label: 'Agenda des partenaires', hint: 'Les nouvelles dates chez nos partenaires.' },
+  { key: 'notify_new_spots', emoji: '✨', label: 'Nouvelles adresses', hint: 'Quand des adresses arrivent dans le guide.' },
+];
+
+/**
+ * Faut-il proposer le choix des notifications au tout premier lancement ? Une seule fois par téléphone (`prompted`),
+ * jamais si c'est déjà activé (y compris après une réinstallation : l'état serveur est relu) ni si le système les
+ * a bloquées (l'écran de réglages explique alors comment les autoriser).
+ */
+export function shouldOfferPushWelcome(input: {
+  supported: boolean;
+  prompted: boolean;
+  enabled: boolean;
+  permission: PermissionOutcome;
+}): boolean {
+  return input.supported && !input.prompted && !input.enabled && input.permission !== 'blocked';
+}
+
+/** Vrai si au moins une famille de messages est choisie. */
+export function hasAnyPushChoice(prefs: PushPreferences): boolean {
+  return prefs.notify_events || prefs.notify_agenda || prefs.notify_new_spots;
+}

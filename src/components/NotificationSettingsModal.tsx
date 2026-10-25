@@ -6,16 +6,16 @@ import {
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bell, X } from 'lucide-react-native';
 
-import { Brand } from '../constants/brand';
+import { Brand, Font } from '../constants/brand';
+import BrandSwitch from './BrandSwitch';
 import {
   disablePush,
   enablePush,
@@ -23,7 +23,7 @@ import {
   updatePushPreferences,
   type PushState,
 } from '../lib/pushNotifications';
-import { DEFAULT_PUSH_PREFERENCES, type PushPreferences } from '../lib/pushLogic';
+import { DEFAULT_PUSH_PREFERENCES, PUSH_OPTIONS, type PushPreferences } from '../lib/pushLogic';
 
 interface Props {
   visible: boolean;
@@ -35,15 +35,10 @@ const message = (title: string, text: string) => {
   else Alert.alert(title, text);
 };
 
-const OPTIONS: { key: keyof PushPreferences; label: string; hint: string }[] = [
-  { key: 'notify_events', label: 'Événements', hint: 'Un nouvel événement est publié.' },
-  { key: 'notify_agenda', label: 'Agenda des partenaires', hint: 'Une nouvelle date est ajoutée à l’agenda.' },
-  { key: 'notify_new_spots', label: 'Nouvelles adresses', hint: 'Des adresses viennent d’arriver dans le guide.' },
-];
-
 export default function NotificationSettingsModal({ visible, onClose }: Props) {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const refresh = useCallback(async () => {
     setState(await getPushState());
@@ -87,7 +82,8 @@ export default function NotificationSettingsModal({ visible, onClose }: Props) {
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <SafeAreaView style={styles.safe}>
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Fermer" />
+        <View style={styles.safe}>
           <View style={styles.sheet}>
             <View style={styles.header}>
               <View style={styles.titleRow}>
@@ -99,7 +95,7 @@ export default function NotificationSettingsModal({ visible, onClose }: Props) {
               </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={styles.body}>
+            <ScrollView contentContainerStyle={[styles.body, { paddingBottom: Math.max(insets.bottom, 12) + 12 }]} showsVerticalScrollIndicator={false}>
               {!state ? (
                 <ActivityIndicator color={Brand.primary} />
               ) : !state.supported ? (
@@ -108,16 +104,18 @@ export default function NotificationSettingsModal({ visible, onClose }: Props) {
                 </Text>
               ) : (
                 <>
-                  <View style={styles.row}>
+                  <View style={[styles.card, styles.masterCard]}>
+                    <View style={styles.bellCircle}>
+                      <Bell size={20} color={Brand.primaryDeep} strokeWidth={2.2} />
+                    </View>
                     <View style={styles.rowText}>
                       <Text style={styles.label}>Recevoir les notifications</Text>
                       <Text style={styles.hint}>Peu de messages, jamais la nuit (21 h – 8 h).</Text>
                     </View>
-                    <Switch
+                    <BrandSwitch
                       value={state.enabled}
                       onValueChange={toggleMaster}
                       disabled={busy || state.permission === 'blocked'}
-                      trackColor={{ true: Brand.primary, false: Brand.line }}
                       accessibilityLabel="Recevoir les notifications"
                     />
                   </View>
@@ -138,17 +136,17 @@ export default function NotificationSettingsModal({ visible, onClose }: Props) {
                   )}
 
                   <Text style={styles.section}>Me prévenir quand…</Text>
-                  {OPTIONS.map((o) => (
-                    <View key={o.key} style={styles.row}>
+                  {PUSH_OPTIONS.map((o) => (
+                    <View key={o.key} style={[styles.card, !state.enabled && styles.cardOff]}>
+                      <Text style={styles.emoji}>{o.emoji}</Text>
                       <View style={styles.rowText}>
                         <Text style={styles.label}>{o.label}</Text>
                         <Text style={styles.hint}>{o.hint}</Text>
                       </View>
-                      <Switch
+                      <BrandSwitch
                         value={prefs[o.key]}
                         onValueChange={(v) => toggleOption(o.key, v)}
                         disabled={busy}
-                        trackColor={{ true: Brand.primary, false: Brand.line }}
                         accessibilityLabel={o.label}
                       />
                     </View>
@@ -162,7 +160,7 @@ export default function NotificationSettingsModal({ visible, onClose }: Props) {
               )}
             </ScrollView>
           </View>
-        </SafeAreaView>
+        </View>
       </View>
     </Modal>
   );
@@ -170,8 +168,9 @@ export default function NotificationSettingsModal({ visible, onClose }: Props) {
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(43, 29, 70, 0.65)', justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFill },
   safe: { justifyContent: 'flex-end' },
-  sheet: { backgroundColor: Brand.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '85%' },
+  sheet: { backgroundColor: Brand.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '88%' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -182,13 +181,33 @@ const styles = StyleSheet.create({
     borderBottomColor: Brand.line,
   },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  title: { fontSize: 18, fontWeight: '700', color: Brand.ink },
-  body: { padding: 20, gap: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 56, gap: 12 },
-  rowText: { flex: 1 },
-  label: { fontSize: 15, fontWeight: '600', color: Brand.ink },
-  hint: { fontSize: 13, color: Brand.inkSoft, marginTop: 2 },
-  section: { fontSize: 13, fontWeight: '700', color: Brand.inkSoft, marginTop: 16, textTransform: 'uppercase', letterSpacing: 0.8 },
+  title: { fontFamily: Font.display, fontSize: 20, color: Brand.ink },
+  body: { paddingHorizontal: 20, paddingTop: 16, gap: 10 },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: Brand.bg,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingLeft: 14,
+    paddingRight: 12,
+  },
+  masterCard: { backgroundColor: Brand.primarySoft },
+  cardOff: { opacity: 0.7 },
+  bellCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Brand.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emoji: { fontSize: 22, width: 30, textAlign: 'center' },
+  rowText: { flex: 1, minWidth: 0 },
+  label: { fontSize: 15, fontWeight: '700', color: Brand.ink },
+  hint: { fontSize: 12.5, lineHeight: 17, color: Brand.inkSoft, marginTop: 2 },
+  section: { fontSize: 12, fontWeight: '800', color: Brand.inkSoft, marginTop: 10, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.9 },
   text: { fontSize: 14, color: Brand.ink, lineHeight: 20 },
   small: { fontSize: 12, color: Brand.inkSoft, marginTop: 16, lineHeight: 18 },
   notice: { backgroundColor: Brand.primarySoft, borderRadius: 12, padding: 14, gap: 10, marginTop: 8 },

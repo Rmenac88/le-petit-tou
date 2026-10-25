@@ -2,6 +2,7 @@ import { safeWebUrl } from '../../lib/safeLinks';
 import { onAppEvent } from '../../lib/appEvents';
 import ErrorBoundary from '../ErrorBoundary';
 import NotificationSettingsModal from '../NotificationSettingsModal';
+import NotificationWelcomeModal from '../NotificationWelcomeModal';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet,
@@ -124,7 +125,8 @@ import { resolveFeatured, type FeaturedRow } from '../../lib/featuredLogic';
 import { HOME_BACKGROUND_CHANGED_EVENT, fetchHomeBackground, loadStoredHomeBackground } from '../../lib/homeBackgroundStore';
 import { GALAXY, backgroundImageUrl, type HomeBackground } from '../../lib/homeBackgroundLogic';
 import { SUPABASE_URL } from '../../lib/supabase';
-import { getPushState, isPushSupported } from '../../lib/pushNotifications';
+import { PUSH_PROMPTED_KEY, getPushState, isPushSupported } from '../../lib/pushNotifications';
+import { shouldOfferPushWelcome } from '../../lib/pushLogic';
 import { appStorage } from '../../lib/storage';
 import {
   isAddressInCategory,
@@ -560,6 +562,8 @@ export default function HomeView({
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showNotifSettings, setShowNotifSettings] = useState(false);
+  const [showNotifWelcome, setShowNotifWelcome] = useState(false);
+  const anyModalOpenRef = useRef(false);
 
   // Fond du bandeau d'accueil : dernier réglage connu tout de suite, puis réglage frais de la base (Galaxy par défaut)
   const [homeBg, setHomeBg] = useState<HomeBackground>(GALAXY);
@@ -608,21 +612,33 @@ export default function HomeView({
     };
   }, []);
 
-  // Premier lancement : on propose une seule fois d'activer les notifications (l'écran explique le choix ;
-  // la demande d'autorisation du système n'apparaît que quand l'utilisateur active l'interrupteur).
+  // Premier lancement : le choix des notifications est proposé UNE seule fois par téléphone, juste après l'arrivée
+  // sur l'accueil (la demande d'autorisation du système ne vient qu'après le choix de l'utilisateur). Pas pour un
+  // téléphone déjà inscrit (état relu : même après une réinstallation) ni si le système les a bloquées. Si un autre
+  // écran est ouvert à ce moment-là, on réessaie quelques secondes plus tard.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
+    let attempts = 0;
+    const offerWhenFree = () => {
+      if (cancelled) return;
+      if (anyModalOpenRef.current && attempts++ < 6) {
+        timer = setTimeout(offerWhenFree, 3000);
+        return;
+      }
+      if (anyModalOpenRef.current) return;
+      setShowNotifWelcome(true);
+      appStorage.setItem(PUSH_PROMPTED_KEY, '1').catch(() => {});
+    };
     (async () => {
       try {
         if (!isPushSupported()) return;
-        if ((await appStorage.getItem('LPT_PUSH_PROMPTED_V1')) === '1') return;
+        const prompted = (await appStorage.getItem(PUSH_PROMPTED_KEY)) === '1';
         const state = await getPushState();
-        if (cancelled || state.enabled || state.permission === 'blocked') return;
-        timer = setTimeout(() => {
-          setShowNotifSettings(true);
-          appStorage.setItem('LPT_PUSH_PROMPTED_V1', '1').catch(() => {});
-        }, 5000);
+        if (cancelled) return;
+        if (shouldOfferPushWelcome({ supported: state.supported, prompted, enabled: state.enabled, permission: state.permission })) {
+          timer = setTimeout(offerWhenFree, 1500);
+        }
       } catch {}
     })();
     return () => {
@@ -903,7 +919,8 @@ export default function HomeView({
     };
   }, []);
 
-  const isAnyModalOpen = showAllCategories || showFilterModal || !!bookingEvent || !!successEvent || !!infoAlert || !!selectedSpotDetail || showAdminModal || showPasswordModal || showPrivacyPolicy || showNotifSettings;
+  const isAnyModalOpen = showAllCategories || showFilterModal || !!bookingEvent || !!successEvent || !!infoAlert || !!selectedSpotDetail || showAdminModal || showPasswordModal || showPrivacyPolicy || showNotifSettings || showNotifWelcome;
+  anyModalOpenRef.current = isAnyModalOpen;
 
   const orderedModalCategories = useMemo(() => {
     return getOrderedPopularCategories(categories, addresses, true);
@@ -2791,6 +2808,7 @@ export default function HomeView({
       )}
 
       <NotificationSettingsModal visible={showNotifSettings} onClose={() => setShowNotifSettings(false)} />
+      <NotificationWelcomeModal visible={showNotifWelcome} onClose={() => setShowNotifWelcome(false)} />
 
       {/* Privacy Policy Modal */}
       <PrivacyPolicyModal
