@@ -1,7 +1,7 @@
 /**
  * Listes personnelles de l'utilisateur (« À tester plus tard », « Y retourner » et ses propres listes).
  * Logique pure (sans React Native ni stockage) : toutes les opérations renvoient un NOUVEL état.
- * Les listes restent sur le téléphone : aucune donnée personnelle de plus ne part vers un serveur.
+ * Enregistrées sur le téléphone, avec une copie serveur rattachée à l'identifiant anonyme de l'installation (voir userListsSync*).
  */
 
 export type ListKind = 'later' | 'return' | 'custom';

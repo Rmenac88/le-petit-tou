@@ -77,7 +77,7 @@ export default function MyListsSection({ addresses, onOpenSpot }: Props) {
           </Pressable>
         ))}
       </View>
-      <Text style={styles.note}>Tes listes restent sur ton téléphone.</Text>
+      <Text style={styles.note}>Tes listes sont sauvegardées avec ton profil sur cet appareil.</Text>
 
       <ListDetailModal
         list={open}

@@ -39,6 +39,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
     setIsDeleting(true);
     try {
       const res = await deleteMyData({
+        beforeDelete: () => userListsStore.quiesceSync(),
         getUserId: () => authService.getUserId(),
         rpc: (fn, args) => supabase.rpc(fn, args),
         clearLocal: async () => {
@@ -126,7 +127,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
                   • <Text style={styles.boldText}>Likes</Text> : un like par appareil et par adresse. Seul le total par adresse est public.
                 </Text>
                 <Text style={styles.bulletPoint}>
-                  • <Text style={styles.boldText}>Vos listes</Text> (« À tester plus tard », « Y retourner », listes que vous créez) : elles restent uniquement sur votre téléphone et ne sont jamais envoyées à nos serveurs.
+                  • <Text style={styles.boldText}>Vos listes</Text> (« À tester plus tard », « Y retourner », listes que vous créez) : elles sont enregistrées sur votre téléphone et sauvegardées sur nos serveurs sous votre identifiant anonyme (aucun nom, e-mail ni compte). Elles sont effacées avec le bouton « Effacer mes données » ; si vous désinstallez l'application, un nouveau profil est créé.
                 </Text>
                 <Text style={styles.bulletPoint}>
                   • <Text style={styles.boldText}>Suggestions d'adresses</Text> : le texte que vous saisissez volontairement. N'y indiquez pas de données personnelles vous concernant.

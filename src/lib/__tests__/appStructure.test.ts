@@ -50,8 +50,8 @@ test('offres : onglet du portail, aucune offre fictive affichée, aucun cache d\
   assert.match(store, /removeItem\(LEGACY_CARDS_STORAGE_KEY\)/);
 });
 
-test('listes personnelles : stockées uniquement sur le téléphone (aucun appel réseau dans leur stockage) et effacées avec « Effacer mes données »', () => {
-  const store = read('../userListsStore.ts');
-  assert.doesNotMatch(store, /supabase|fetch\(/);
+test('listes personnelles : enregistrées d\u2019abord sur le téléphone (le moteur n\u2019appelle jamais le réseau lui-même : tout passe par userListsRemote) et effacées avec « Effacer mes données »', () => {
+  assert.doesNotMatch(read('../userListsEngine.ts'), /supabase|[^.\w]fetch\(['"`]/);
+  assert.doesNotMatch(read('../userListsStore.ts'), /supabase|fetch\(/);
   assert.match(read('../../components/PrivacyPolicyModal.tsx'), /userListsStore\.resetLocal\(\)/);
 });
