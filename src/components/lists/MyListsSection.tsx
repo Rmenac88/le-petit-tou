@@ -7,6 +7,7 @@ import { loadDeviceLikedSpotIds } from '../../lib/likesStore';
 import { onAppEvent } from '../../lib/appEvents';
 import { userListsStore } from '../../lib/userListsStore';
 import { MAX_LISTS, type ListsState } from '../../lib/userListsLogic';
+import AddressPickerModal from './AddressPickerModal';
 import ListDetailModal, { type ListView } from './ListDetailModal';
 import ListEditorModal from './ListEditorModal';
 
@@ -23,6 +24,7 @@ export default function MyListsSection({ addresses, onOpenSpot }: Props) {
   const [state, setState] = useState<ListsState>(userListsStore.getState());
   const [likedIds, setLikedIds] = useState<string[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [pickerId, setPickerId] = useState<string | null>(null);
   const [editor, setEditor] = useState<{ open: boolean; listId: string | null }>({ open: false, listId: null });
 
   useEffect(() => userListsStore.subscribe(setState), []);
@@ -45,6 +47,7 @@ export default function MyListsSection({ addresses, onOpenSpot }: Props) {
     [state, likedIds]
   );
   const open = views.find((v) => v.id === openId) ?? null;
+  const picking = views.find((v) => v.id === pickerId && !v.readOnly) ?? null;
   const editing = state.lists.find((l) => l.id === editor.listId) ?? null;
   const count = (v: ListView) => v.spotIds.filter((id) => addresses.has(id)).length;
 
@@ -82,7 +85,9 @@ export default function MyListsSection({ addresses, onOpenSpot }: Props) {
         onClose={() => setOpenId(null)}
         onOpenSpot={onOpenSpot}
         onEdit={() => setEditor({ open: true, listId: open?.id ?? null })}
+        onAddSpots={() => setPickerId(open?.id ?? null)}
       />
+      <AddressPickerModal list={picking} addresses={addresses} onClose={() => setPickerId(null)} />
       <ListEditorModal
         visible={editor.open}
         list={editing}

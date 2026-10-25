@@ -2,7 +2,7 @@ import React from 'react';
 import { Alert, FlatList, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, MapPin, Pencil, Trash2, X } from 'lucide-react-native';
+import { ChevronLeft, MapPin, Pencil, Plus, Trash2, X } from 'lucide-react-native';
 
 import { Brand, Font } from '../../constants/brand';
 import { PLACEHOLDER_PHOTO } from '../../constants/placeholder';
@@ -26,6 +26,8 @@ interface Props {
   onClose: () => void;
   onOpenSpot: (address: any) => void;
   onEdit?: () => void;
+  /** Ouvre le sélecteur « Ajouter des adresses » (listes modifiables). */
+  onAddSpots?: () => void;
 }
 
 const confirm = (title: string, message: string, confirmLabel: string, onConfirm: () => void) => {
@@ -40,7 +42,7 @@ const confirm = (title: string, message: string, confirmLabel: string, onConfirm
 };
 
 /** Contenu d'une liste : les adresses, avec retrait (listes personnelles) et ouverture de la fiche. */
-export default function ListDetailModal({ list, addresses, onClose, onOpenSpot, onEdit }: Props) {
+export default function ListDetailModal({ list, addresses, onClose, onOpenSpot, onEdit, onAddSpots }: Props) {
   const spots = (list?.spotIds ?? []).map((id) => addresses.get(id)).filter(Boolean);
 
   const remove = (spot: any) => {
@@ -84,6 +86,14 @@ export default function ListDetailModal({ list, addresses, onClose, onOpenSpot, 
           keyExtractor={(s) => String(s.id)}
           contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          ListHeaderComponent={
+            !list?.readOnly && onAddSpots ? (
+              <Pressable style={styles.addBtn} onPress={onAddSpots} accessibilityRole="button" accessibilityLabel="Ajouter une adresse à la liste">
+                <Plus size={18} color={Brand.white} strokeWidth={2.6} />
+                <Text style={styles.addBtnText}>Ajouter une adresse</Text>
+              </Pressable>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.empty}>
               <Text style={styles.emptyEmoji}>{list?.emoji}</Text>
@@ -91,7 +101,7 @@ export default function ListDetailModal({ list, addresses, onClose, onOpenSpot, 
               <Text style={styles.emptySub}>
                 {list?.readOnly
                   ? 'Touche le cœur d’une adresse pour la retrouver ici.'
-                  : 'Depuis la fiche d’une adresse, touche le signet pour l’ajouter à cette liste.'}
+                  : 'Touche « Ajouter une adresse », ou le signet depuis la fiche d’une adresse.'}
               </Text>
             </View>
           }
@@ -144,7 +154,9 @@ const styles = StyleSheet.create({
   rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   rowMetaText: { flex: 1, fontSize: 12.5, fontWeight: '600', color: Brand.inkSoft },
   removeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Brand.bg, alignItems: 'center', justifyContent: 'center' },
-  empty: { alignItems: 'center', paddingTop: 70, paddingHorizontal: 36, gap: 8 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 24, backgroundColor: Brand.primaryDeep, marginBottom: 12 },
+  addBtnText: { fontSize: 15, fontWeight: '800', color: Brand.white },
+  empty: { alignItems: 'center', paddingTop: 40, paddingHorizontal: 36, gap: 8 },
   emptyEmoji: { fontSize: 44 },
   emptyTitle: { fontSize: 17, fontWeight: '800', color: Brand.ink },
   emptySub: { fontSize: 14, lineHeight: 20, fontWeight: '500', color: Brand.inkSoft, textAlign: 'center' },
