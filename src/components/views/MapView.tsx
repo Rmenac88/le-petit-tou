@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useDeferredValue } from 'react';
 import {
   StyleSheet,
   Text,
@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { withDeadline, withTimeout } from '../../lib/fetchWithTimeout';
-import { BRIDGE_BEFORE_LOAD, buildMapMessageScript } from '../../lib/mapBridge';
+import { BRIDGE_BEFORE_LOAD, buildMapMessageScript, slimSpots, spotsKey } from '../../lib/mapBridge';
 import {
   Compass,
   Navigation,
@@ -122,7 +122,8 @@ const triggerHaptic = () => {
       }
     }
   } catch (e) {}
-};import { getWebMapHtml } from './map/mapboxHtmlTemplate';
+};
+import { getWebMapHtml, MAP_BACKGROUND } from './map/mapboxHtmlTemplate';
 
 export const getMarkerColor = (category: string) => {
   switch (category || 'food') {
@@ -246,6 +247,28 @@ export default function MapView({
   const mapRef = useRef<any>(null);
   const iframeRef = useRef<any>(null);
   const webViewRef = useRef<any>(null);
+  // Relance de la carte si le système a arrêté la WebView ; au plus 3 fois en 30 s (pas de boucle qui vide la batterie)
+  const crashTimesRef = useRef<number[]>([]);
+  const reloadMapAfterCrash = () => {
+    const now = Date.now();
+    crashTimesRef.current = crashTimesRef.current.filter((t) => now - t < 30000);
+    if (crashTimesRef.current.length >= 3) return;
+    crashTimesRef.current.push(now);
+    webViewRef.current?.reload();
+  };
+  // Liste envoyée à la carte : allégée (id, position, nom, catégorie, note) et jamais renvoyée si elle n'a pas changé
+  const filteredSpotsRef = useRef<any[]>([]);
+  const lastSentSpotsKeyRef = useRef('');
+  const sendSpotsToMap = (force = false) => {
+    const list = filteredSpotsRef.current;
+    const key = spotsKey(list);
+    if (!force && key === lastSentSpotsKeyRef.current) return;
+    lastSentSpotsKeyRef.current = key;
+    iframeRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ type: 'UPDATE_SPOTS', slim: true, spots: slimSpots(list) }),
+      '*'
+    );
+  };
   // Dernier gestionnaire des messages de la carte (iframe sur le web, WebView sur téléphone)
   const mapMessageRef = useRef<((event: { data: any }) => void) | null>(null);
   // Sur téléphone, `iframeRef.current.contentWindow.postMessage(...)` est émulé par la WebView :
@@ -279,10 +302,7 @@ export default function MapView({
             handleCloseCard();
           } else if (data.type === 'MAP_READY') {
             if (iframeRef.current) {
-              iframeRef.current.contentWindow?.postMessage(
-                JSON.stringify({ type: 'UPDATE_SPOTS', spots: filteredSpots }),
-                '*'
-              );
+              sendSpotsToMap(true);
               const currentPos = userLocationRef.current || userLocation;
               if (currentPos) {
                 iframeRef.current.contentWindow?.postMessage(
@@ -357,14 +377,12 @@ export default function MapView({
     }
   }, [focusedSpotId, spots]);
 
-  // Auto-sync filtered spots to web Leaflet map
+  // Synchronise la carte avec la liste filtrée : regroupé (150 ms) et seulement si la liste a vraiment changé
+  filteredSpotsRef.current = filteredSpots;
   useEffect(() => {
-    if (USE_WEB_MAP && iframeRef.current) {
-      iframeRef.current.contentWindow?.postMessage(
-        JSON.stringify({ type: 'UPDATE_SPOTS', spots: filteredSpots }),
-        '*'
-      );
-    }
+    if (!(USE_WEB_MAP && iframeRef.current)) return;
+    const timer = setTimeout(() => sendSpotsToMap(), 150);
+    return () => clearTimeout(timer);
   }, [filteredSpots]);
 
 
@@ -417,12 +435,14 @@ export default function MapView({
     return rawSpots.map((addr: any) => placesRepository.formatRawAddress(addr));
   };
 
-  // 2. Synchronous Instant 0ms Filter Engine (Search, Category, Ambiance, Budget, SubTabs)
+  // 2. Filtre des adresses (recherche, catégorie, ambiance, budget, onglets) ; la recherche est différée pour que la
+  // saisie reste fluide.
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   useEffect(() => {
     let results = spots.filter((s: any) => {
       // A. Search Query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
+      if (deferredSearchQuery.trim()) {
+        const q = deferredSearchQuery.toLowerCase().trim();
         const matchesName = (s.name || '').toLowerCase().includes(q);
         const matchesDesc = (s.description || '').toLowerCase().includes(q);
         const matchesTag = s.tags && s.tags.some((t: string) => t.toLowerCase().includes(q));
@@ -463,7 +483,7 @@ export default function MapView({
     });
 
     setFilteredSpots(results);
-  }, [spots, searchQuery, subTab, category, ambiance, budget, openOnly]);
+  }, [spots, deferredSearchQuery, subTab, category, ambiance, budget, openOnly]);
 
   const handleSelectSpot = (spot: any, skipMapFly = false) => {
     triggerHaptic();
@@ -476,7 +496,6 @@ export default function MapView({
           lat: spot.lat,
           lng: spot.lng,
           skipFly: skipMapFly, // l'iframe ne refait pas flyTo si déjà fait par le click du marqueur
-          spots: filteredSpots,
         }),
         '*'
       );
@@ -519,7 +538,7 @@ export default function MapView({
     setIsSearchFocused(false);
     if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
-        JSON.stringify({ type: 'DESELECT_SPOT', spots: filteredSpots }),
+        JSON.stringify({ type: 'DESELECT_SPOT' }),
         '*'
       );
     }
@@ -1119,12 +1138,7 @@ export default function MapView({
           ref={iframeRef}
           srcDoc={getWebMapHtml(MAPBOX_ACCESS_TOKEN)}
           onLoad={() => {
-            setTimeout(() => {
-              iframeRef.current?.contentWindow?.postMessage(
-                JSON.stringify({ type: 'UPDATE_SPOTS', spots: filteredSpots }),
-                '*'
-              );
-            }, 200);
+            setTimeout(() => sendSpotsToMap(true), 200);
           }}
           style={{
             position: 'absolute',
@@ -1154,6 +1168,14 @@ export default function MapView({
             bounces={false}
             allowsInlineMediaPlayback
             androidLayerType="hardware"
+            cacheEnabled
+            textZoom={100}
+            setBuiltInZoomControls={false}
+            setDisplayZoomControls={false}
+            // Téléphone modeste : le système peut arrêter la WebView (mémoire). La carte repart alors toute seule
+            // et reçoit de nouveau les adresses au signal MAP_READY.
+            onRenderProcessGone={reloadMapAfterCrash}
+            onContentProcessDidTerminate={reloadMapAfterCrash}
             onError={(e: any) => console.warn('[Map] WebView error', e?.nativeEvent?.description)}
           />
         )
@@ -1740,7 +1762,7 @@ const styles = StyleSheet.create({
   },
   nativeMap: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: Brand.bg,
+    backgroundColor: MAP_BACKGROUND,
   },
   permissionContainer: {
     flex: 1,

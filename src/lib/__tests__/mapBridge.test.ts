@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMapMessageScript, slimMapMessage, BRIDGE_BEFORE_LOAD } from '../mapBridge.ts';
+import { buildMapMessageScript, slimMapMessage, slimSpot, slimSpots, spotsKey, BRIDGE_BEFORE_LOAD } from '../mapBridge.ts';
 
 test('slimMapMessage ne garde que les champs utiles à la carte et reprend title comme name', () => {
   const big = JSON.stringify({
@@ -34,4 +34,26 @@ test('le script d’amorçage redirige window.parent.postMessage vers React Nati
   win.parent.postMessage('{"type":"MAP_READY"}', '*');
   win.parent.postMessage({ type: 'MAP_CLICKED' }, '*');
   assert.deepEqual(sent, ['{"type":"MAP_READY"}', '{"type":"MAP_CLICKED"}']);
+});
+
+test('une adresse n\'est allégée qu\'une fois (mémorisé par objet) et seuls les champs de la carte sont gardés', () => {
+  const spot = { id: 'a', lat: 43.6, lng: 1.44, title: 'Chez Test', cat: 'food', rating: 4.5, description: 'x'.repeat(5000), gallery_urls: ['u'] };
+  const first = slimSpot(spot);
+  assert.equal(slimSpot(spot), first);
+  assert.deepEqual(Object.keys(first).sort(), ['cat', 'id', 'lat', 'lng', 'name', 'rating']);
+  assert.equal(slimSpots([spot, spot]).length, 2);
+});
+
+test('un message déjà allégé (slim: true) n\'est ni relu ni réécrit', () => {
+  const msg = JSON.stringify({ type: 'UPDATE_SPOTS', slim: true, spots: [{ id: 'a', description: 'garde-moi' }] });
+  assert.equal(slimMapMessage(msg), msg);
+});
+
+test('l\'empreinte d\'une liste change quand une adresse visible change, pas pour un champ invisible', () => {
+  const a = [{ id: '1', lat: 43.6, lng: 1.44, cat: 'food', name: 'A', rating: 4 }];
+  const same = [{ id: '1', lat: 43.6, lng: 1.44, cat: 'food', name: 'A', rating: 4, description: 'invisible sur la carte' }];
+  assert.equal(spotsKey(a), spotsKey(same));
+  assert.notEqual(spotsKey(a), spotsKey([{ ...a[0], lng: 1.45 }]));
+  assert.notEqual(spotsKey(a), spotsKey([]));
+  assert.equal(spotsKey([{ id: '1', title: 'A', lat: 1, lng: 2 }]), spotsKey([{ id: '1', name: 'A', lat: 1, lng: 2 }]));
 });
