@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
   noticeOk: { backgroundColor: Brand.primarySoft },
   noticeError: { backgroundColor: Brand.primarySofter },
   noticeText: { fontSize: Type.body, fontWeight: '600', color: Brand.ink },
-  noticeTextError: { color: Brand.primaryDeep },
+  noticeTextError: { color: Brand.primaryInk },
   card: { backgroundColor: Brand.white, borderRadius: Radius.lg, padding: 16, gap: 8 },
   cardTitle: { fontSize: Type.title3, fontWeight: '700', color: Brand.ink },
   searchRow: {

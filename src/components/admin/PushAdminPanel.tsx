@@ -157,6 +157,6 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
-  btn: { minHeight: 44, borderRadius: 12, backgroundColor: Brand.primary, alignItems: 'center', justifyContent: 'center' },
+  btn: { minHeight: 44, borderRadius: 12, backgroundColor: Brand.primaryDeep, alignItems: 'center', justifyContent: 'center' },
   btnText: { color: Brand.white, fontSize: 15, fontWeight: '700' },
 });

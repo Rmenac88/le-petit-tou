@@ -404,6 +404,9 @@ function DynamicIcon({ name, title, color, size = 20, strokeWidth = 2.2 }: Dynam
   return <IconComponent color={color} size={size} strokeWidth={strokeWidth} />;
 }
 
+/** Les liens « Voir tout » ne font que 17 px de haut : la zone de toucher est agrandie sans changer l'aspect. */
+const SEE_ALL_HIT_SLOP = { top: 14, bottom: 14, left: 12, right: 12 } as const;
+
 export default function HomeView({
   onChangeTab,
   onToggleDock,
@@ -1770,7 +1773,7 @@ export default function HomeView({
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Catégories populaires</Text>
                 {categories.length > 0 && (
-                  <Pressable onPress={() => setShowAllCategories(true)}>
+                  <Pressable onPress={() => setShowAllCategories(true)} hitSlop={SEE_ALL_HIT_SLOP} accessibilityRole="button">
                     <Text style={styles.seeAllText}>Voir tout</Text>
                   </Pressable>
                 )}
@@ -1915,7 +1918,7 @@ export default function HomeView({
               {/* Recommendations of the Moment (Large Cards) */}
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Les chouchous du moment</Text>
-                <Pressable onPress={() => setViewMode('see_all_recommended')}>
+                <Pressable onPress={() => setViewMode('see_all_recommended')} hitSlop={SEE_ALL_HIT_SLOP} accessibilityRole="button">
                   <Text style={styles.seeAllText}>Voir tout</Text>
                 </Pressable>
               </View>
@@ -2011,7 +2014,7 @@ export default function HomeView({
               {/* Novelties section (Smaller Cards) */}
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Fraîchement testées</Text>
-                <Pressable onPress={() => setViewMode('see_all_new')}>
+                <Pressable onPress={() => setViewMode('see_all_new')} hitSlop={SEE_ALL_HIT_SLOP} accessibilityRole="button">
                   <Text style={styles.seeAllText}>Voir tout</Text>
                 </Pressable>
               </View>
@@ -2518,7 +2521,7 @@ export default function HomeView({
                 <View style={[styles.gridIconBg, { backgroundColor: '#1E293B15' }]}>
                   <Compass color={Brand.ink} size={24} strokeWidth={2} />
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={styles.gridItemText}>
                   <Text style={[styles.gridItemLabel, selectedCategoryFilter === null && styles.gridItemLabelSelected]}>
                     Toutes les adresses
                   </Text>
@@ -2543,7 +2546,7 @@ export default function HomeView({
                     <View style={[styles.gridIconBg, { backgroundColor: `${category.color || Brand.primary}20` }]}>
                       <DynamicIcon name={category.icon_name} title={category.name} color={category.color || Brand.primary} size={24} />
                     </View>
-                    <View style={{ flex: 1 }}>
+                    <View style={styles.gridItemText}>
                       <Text style={[styles.gridItemLabel, isSelected && styles.gridItemLabelSelected]} numberOfLines={2}>
                         {category.name}
                       </Text>

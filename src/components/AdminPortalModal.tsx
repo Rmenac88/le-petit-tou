@@ -1344,7 +1344,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                 <Text style={styles.inputLabel}>Adresse postale exacte *</Text>
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                   <TextInput
-                    style={[styles.input, { flex: 1 }]}
+                    style={[styles.input, styles.inputHalf]}
                     value={formAddress}
                     onChangeText={setFormAddress}
                     placeholder="Ex: 54 Rue Peyrolières, 31000 Toulouse"
@@ -1490,12 +1490,12 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                         <View style={[styles.catIconCircle, { backgroundColor: `${cat.color || Brand.primary}20` }]}>
                           <Tag size={20} color={cat.color || Brand.primary} />
                         </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.catAdminTitle}>{cat.name}</Text>
-                          <Text style={styles.catAdminSub}>Slug: {cat.slug || cat.id} • {spotCount} adresses</Text>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.catAdminTitle} numberOfLines={2}>{cat.name}</Text>
+                          <Text style={styles.catAdminSub} numberOfLines={1}>Slug: {cat.slug || cat.id} • {spotCount} adresse{spotCount > 1 ? 's' : ''}</Text>
                         </View>
                       </View>
-                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
                         <Pressable accessibilityRole="button" accessibilityLabel="Modifier" style={styles.editActionBtn} onPress={() => handleOpenEditCategory(cat)}>
                           <Edit3 size={14} color={Brand.ink} />
                         </Pressable>
@@ -1523,7 +1523,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                   onPress={() => setEventTabFilter('all')}
                 >
                   <Calendar size={13} color={eventTabFilter === 'all' ? Brand.ink : Brand.inkSoft} style={{ marginRight: 6 }} />
-                  <Text style={[styles.eventTabPillText, eventTabFilter === 'all' && styles.eventTabPillTextActive]}>
+                  <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.eventTabPillText, eventTabFilter === 'all' && styles.eventTabPillTextActive]}>
                     Tous ({events.length})
                   </Text>
                 </Pressable>
@@ -1532,7 +1532,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                   onPress={() => setEventTabFilter('upcoming')}
                 >
                   <Clock size={13} color={eventTabFilter === 'upcoming' ? Brand.ink : Brand.inkSoft} style={{ marginRight: 6 }} />
-                  <Text style={[styles.eventTabPillText, eventTabFilter === 'upcoming' && styles.eventTabPillTextActive]}>
+                  <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.eventTabPillText, eventTabFilter === 'upcoming' && styles.eventTabPillTextActive]}>
                     À venir ({upcomingCount})
                   </Text>
                 </Pressable>
@@ -1541,7 +1541,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                   onPress={() => setEventTabFilter('archived')}
                 >
                   <Archive size={13} color={eventTabFilter === 'archived' ? Brand.ink : Brand.inkSoft} style={{ marginRight: 6 }} />
-                  <Text style={[styles.eventTabPillText, eventTabFilter === 'archived' && styles.eventTabPillTextActive]}>
+                  <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.eventTabPillText, eventTabFilter === 'archived' && styles.eventTabPillTextActive]}>
                     Archivés ({archivedCount})
                   </Text>
                 </Pressable>
@@ -1556,33 +1556,33 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                   <TextInput style={styles.input} value={eventFormDesc} onChangeText={setEventFormDesc} placeholder="Description *" placeholderTextColor={Brand.inkSoft} multiline />
                   
                   <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormDate} onChangeText={setEventFormDate} placeholder="Date (AAAA-MM-JJ ou JJ/MM/AAAA) *" placeholderTextColor={Brand.inkSoft} />
-                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormTime} onChangeText={setEventFormTime} placeholder="Heure (ex: 19:00)" placeholderTextColor={Brand.inkSoft} />
+                    <TextInput style={[styles.input, styles.inputHalf]} value={eventFormDate} onChangeText={setEventFormDate} placeholder="Date (JJ/MM/AAAA) *" placeholderTextColor={Brand.inkSoft} />
+                    <TextInput style={[styles.input, styles.inputHalf]} value={eventFormTime} onChangeText={setEventFormTime} placeholder="Heure (19:00)" placeholderTextColor={Brand.inkSoft} />
                   </View>
 
                   {/* Raccourcis date rapide */}
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8, alignItems: 'center' }}>
                     <Text style={{ fontSize: 12, color: Brand.inkSoft, marginRight: 2 }}>Raccourcis :</Text>
                     <Pressable
-                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: Brand.line }}
+                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 9, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, borderColor: Brand.line }}
                       onPress={() => setQuickDate(0)}
                     >
                       <Text style={{ fontSize: 12, fontWeight: '600', color: '#3A3A48' }}>Aujourd'hui</Text>
                     </Pressable>
                     <Pressable
-                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: Brand.line }}
+                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 9, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, borderColor: Brand.line }}
                       onPress={() => setQuickDate(1)}
                     >
                       <Text style={{ fontSize: 12, fontWeight: '600', color: '#3A3A48' }}>Demain</Text>
                     </Pressable>
                     <Pressable
-                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: Brand.line }}
+                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 9, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, borderColor: Brand.line }}
                       onPress={() => setQuickDate(7)}
                     >
                       <Text style={{ fontSize: 12, fontWeight: '600', color: '#3A3A48' }}>Dans 7 j</Text>
                     </Pressable>
                     <Pressable
-                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: Brand.line }}
+                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 9, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, borderColor: Brand.line }}
                       onPress={() => setQuickDate(30)}
                     >
                       <Text style={{ fontSize: 12, fontWeight: '600', color: '#3A3A48' }}>Dans 1 mois</Text>
@@ -1592,9 +1592,9 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                   <TextInput style={styles.input} value={eventFormLocation} onChangeText={setEventFormLocation} placeholder="Lieu *" placeholderTextColor={Brand.inkSoft} />
 
                   <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormPrice} onChangeText={setEventFormPrice} keyboardType="numeric" placeholder="Tarif (€)" placeholderTextColor={Brand.inkSoft} />
+                    <TextInput style={[styles.input, styles.inputHalf]} value={eventFormPrice} onChangeText={setEventFormPrice} keyboardType="numeric" placeholder="Tarif (€)" placeholderTextColor={Brand.inkSoft} />
                     <TextInput
-                      style={[styles.input, { flex: 1 }]}
+                      style={[styles.input, styles.inputHalf]}
                       value={eventFormMaxPlaces}
                       onChangeText={setEventFormMaxPlaces}
                       keyboardType="numeric"
@@ -1630,7 +1630,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
 
                 {/* Events List */}
                 <Text style={{ fontSize: 14, fontWeight: '800', color: Brand.ink, marginTop: 12 }}>
-                  {filteredEvents.length} événements {eventTabFilter === 'all' ? 'au total' : eventTabFilter === 'upcoming' ? 'à venir' : 'passés (archivés)'}
+                  {filteredEvents.length} {filteredEvents.length > 1 ? 'événements' : 'événement'} {eventTabFilter === 'all' ? 'au total' : eventTabFilter === 'upcoming' ? 'à venir' : filteredEvents.length > 1 ? 'passés (archivés)' : 'passé (archivé)'}
                 </Text>
 
                 {filteredEvents.map(evt => (
@@ -1717,7 +1717,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                     style={{
                       flex: 1,
                       fontSize: 14,
-                      color: partnerFormSpotId ? Brand.ink : Brand.inkMute,
+                      color: partnerFormSpotId ? Brand.ink : Brand.inkSoft,
                       fontWeight: partnerFormSpotId ? '700' : '400',
                     }}
                     numberOfLines={1}
@@ -1969,7 +1969,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                   style={styles.input}
                 />
 
-                <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-end' }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.inputLabel}>Rang Top (1..10)</Text>
                     <TextInput
@@ -1982,7 +1982,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Montant payé (€) · interne, jamais affiché</Text>
+                    <Text style={styles.inputLabel}>Montant payé (€)</Text>
                     <TextInput
                       placeholder="150"
                       keyboardType="numeric"
@@ -1993,8 +1993,9 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                     />
                   </View>
                 </View>
+                <Text style={styles.fieldNote}>Le montant payé est interne : il n'est jamais affiché aux utilisateurs.</Text>
 
-                <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-end' }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.inputLabel}>Durée (jours)</Text>
                     <TextInput
@@ -2007,7 +2008,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Fréquence notifs (heures)</Text>
+                    <Text style={styles.inputLabel}>Notifs (toutes les… h)</Text>
                     <TextInput
                       placeholder="24"
                       keyboardType="numeric"
@@ -2226,7 +2227,7 @@ const styles = StyleSheet.create({
   },
   tabBtn: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 11,
     borderRadius: 12,
     backgroundColor: Brand.bg,
     flexDirection: 'row',
@@ -2283,7 +2284,7 @@ const styles = StyleSheet.create({
   },
   catPill: {
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 10,
     borderRadius: 24,
     backgroundColor: Brand.white,
     shadowColor: '#24242E',
@@ -2322,11 +2323,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#1FA67A',
+    backgroundColor: Brand.successDeep, // le blanc dessus atteint 4,9:1 (3,1:1 avec l'ancien vert)
     borderRadius: 14,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    shadowColor: '#1FA67A',
+    paddingVertical: 10,
+    shadowColor: Brand.successDeep,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -2411,23 +2412,23 @@ const styles = StyleSheet.create({
   spotCardRating: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#D97706',
+    color: Brand.ratingInk,
   },
   spotCardActions: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
   },
   actionBtnEdit: {
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     backgroundColor: '#F5F0F2',
     justifyContent: 'center',
     alignItems: 'center',
   },
   actionBtnDelete: {
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     backgroundColor: Brand.primarySoft,
     justifyContent: 'center',
@@ -2455,6 +2456,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#4A4A58',
     marginTop: 4,
+  },
+  fieldNote: {
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: Brand.inkSoft,
+    marginTop: -4,
+  },
+  // deux champs côte à côte : minWidth 0, sinon sur le web le second dépasse de la carte
+  inputHalf: {
+    flex: 1,
+    minWidth: 0,
   },
   input: {
     backgroundColor: Brand.bg,
@@ -2704,6 +2716,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
     backgroundColor: Brand.white,
     borderRadius: 18,
     padding: 14,
@@ -2759,16 +2772,16 @@ const styles = StyleSheet.create({
     color: Brand.white,
   },
   editActionBtn: {
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     backgroundColor: '#F5F0F2',
     justifyContent: 'center',
     alignItems: 'center',
   },
   deleteActionBtn: {
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     backgroundColor: Brand.primarySoft,
     justifyContent: 'center',

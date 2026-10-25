@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, Pressable, Image, StyleSheet, Platform } from 'react-native';
+import { View, Text, TextInput, Pressable, Image, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { Search } from 'lucide-react-native';
 import { Image as ExpoImage } from 'expo-image';
 import Stars from '../../Stars';
@@ -25,6 +25,9 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   backgroundUri,
 }) => {
   const searchInputRef = useRef<TextInput>(null);
+  // Sur un petit écran (320-340 px) l'accroche complète est coupée en plein mot : version courte
+  const { width: screenWidth } = useWindowDimensions();
+  const searchPlaceholder = screenWidth < 350 ? 'Un resto, un bar…' : 'Un resto, un bar, une pépite…';
   // Le fond personnalisé ne remplace Galaxy qu'une fois chargé ; en cas d'échec, Galaxy reste affiché
   const [bgLoaded, setBgLoaded] = useState(false);
   const [bgFailed, setBgFailed] = useState(false);
@@ -76,7 +79,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
           <Search color={Brand.primary} size={20} strokeWidth={2} style={{ marginRight: 10 }} />
           <TextInput
             ref={searchInputRef}
-            placeholder="Un resto, un bar, une pépite…"
+            placeholder={searchPlaceholder}
             placeholderTextColor={Brand.inkSoft}
             value={searchQuery}
             onChangeText={onSearchChange}

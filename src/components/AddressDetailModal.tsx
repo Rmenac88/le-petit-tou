@@ -36,6 +36,7 @@ import { discoveryStore } from '../lib/discoveryStore';
 
 import { formatRating } from '../lib/formatRating';
 import { Brand } from '../constants/brand';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const { width, height } = Dimensions.get('window');
 
 export interface SpotDetail {
@@ -91,6 +92,7 @@ export default function AddressDetailModal({
   likesCount = 0,
   onToggleFavorite,
 }: AddressDetailModalProps) {
+  const insets = useSafeAreaInsets();
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [internalFavorite, setInternalFavorite] = useState(false);
   const isFavorite = isFavoriteProp !== undefined ? isFavoriteProp : internalFavorite;
@@ -449,7 +451,7 @@ export default function AddressDetailModal({
         </ScrollView>
 
         {/* Barre d'actions flottante (une main) */}
-        <View style={styles.floatingBar}>
+        <View style={[styles.floatingBar, { paddingBottom: Math.max(insets.bottom, 12) + 14 }]}>
             <View style={styles.ctaRow}>
               <Pressable
                 style={styles.primaryCtaBtn}
@@ -504,7 +506,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 26,
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    backgroundColor: Brand.white, // opaque : le texte qui défile dessous ne doit pas transparaître
     borderTopWidth: 1,
     borderTopColor: Brand.line,
   },

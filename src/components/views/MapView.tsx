@@ -76,6 +76,9 @@ const USE_WEB_MAP = true;
 const TOULOUSE_LAT = 43.6047;
 const TOULOUSE_LNG = 1.4442;
 const MAPBOX_ACCESS_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
+
+/** Libellés des onglets de la recherche (avec leurs accents). */
+const SUBTAB_LABELS = { tout: 'Tout', adresses: 'Adresses', evenements: 'Événements', articles: 'Articles' } as const;
 const { height } = Dimensions.get('window');
 
 
@@ -124,6 +127,7 @@ const triggerHaptic = () => {
   } catch (e) {}
 };
 import { getWebMapHtml, MAP_BACKGROUND } from './map/mapboxHtmlTemplate';
+import BrandSwitch from '../BrandSwitch';
 
 export const getMarkerColor = (category: string) => {
   switch (category || 'food') {
@@ -219,6 +223,12 @@ export default function MapView({
 
   // Real-time Database loaded/filtered spots list
   const [spots, setSpots] = useState<any[]>(PT_SPOTS);
+  // Nombre d'adresses par catégorie, calculé sur la liste réelle (les puces affichaient des nombres figés)
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of spots) counts[s.cat] = (counts[s.cat] ?? 0) + 1;
+    return counts;
+  }, [spots]);
   const [filteredSpots, setFilteredSpots] = useState<any[]>(PT_SPOTS);
 
   // Filters State Properties (Matching your design screenshot!)
@@ -559,7 +569,7 @@ export default function MapView({
     setFilterSheetVisible(true);
     Animated.spring(filterAnim, {
       toValue: FILTER_SNAP_HALF,
-      useNativeDriver: true,
+      useNativeDriver: false,
       tension: 40,
       friction: 8,
     }).start();
@@ -569,7 +579,7 @@ export default function MapView({
     Animated.timing(filterAnim, {
       toValue: Dimensions.get('window').height,
       duration: 250,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start(() => {
       setFilterSheetVisible(false);
       if (onToggleDock) onToggleDock(true);
@@ -602,7 +612,7 @@ export default function MapView({
             } else {
               Animated.spring(filterAnim, {
                 toValue: FILTER_SNAP_HALF,
-                useNativeDriver: true,
+                useNativeDriver: false,
                 tension: 50,
                 friction: 8,
               }).start();
@@ -610,7 +620,7 @@ export default function MapView({
           } else if (vy < -0.5) {
             Animated.spring(filterAnim, {
               toValue: FILTER_SNAP_FULL,
-              useNativeDriver: true,
+              useNativeDriver: false,
               tension: 50,
               friction: 8,
             }).start();
@@ -619,14 +629,14 @@ export default function MapView({
             if (curY < mid) {
               Animated.spring(filterAnim, {
                 toValue: FILTER_SNAP_FULL,
-                useNativeDriver: true,
+                useNativeDriver: false,
                 tension: 50,
                 friction: 8,
               }).start();
             } else if (curY < FILTER_SNAP_HALF + height * 0.15) {
               Animated.spring(filterAnim, {
                 toValue: FILTER_SNAP_HALF,
-                useNativeDriver: true,
+                useNativeDriver: false,
                 tension: 50,
                 friction: 8,
               }).start();
@@ -1374,13 +1384,13 @@ export default function MapView({
           contentContainerStyle={styles.categoryScrollContent}
         >
           {[
-            { label: 'Tous (790)', value: null, icon: Compass, color: Brand.ink },
-            { label: 'Restos (286)', value: 'food', icon: Utensils, color: Brand.primaryDeep },
-            { label: 'Shopping (231)', value: 'shopping', icon: ShoppingBag, color: Brand.violet },
-            { label: 'Bars & Cafés (141)', value: 'drinks', icon: Wine, color: Brand.chouchou },
-            { label: 'Beauté (71)', value: 'beauty', icon: Scissors, color: Brand.primary },
-            { label: 'Culture (43)', value: 'culture', icon: Landmark, color: '#1FA67A' },
-            { label: 'Sport (17)', value: 'sport', icon: Dumbbell, color: Brand.violet },
+            { label: `Tous (${spots.length})`, value: null, icon: Compass, color: Brand.ink },
+            { label: `Restos (${categoryCounts.food ?? 0})`, value: 'food', icon: Utensils, color: Brand.primaryDeep },
+            { label: `Shopping (${categoryCounts.shopping ?? 0})`, value: 'shopping', icon: ShoppingBag, color: Brand.violet },
+            { label: `Bars & Cafés (${categoryCounts.drinks ?? 0})`, value: 'drinks', icon: Wine, color: Brand.chouchou },
+            { label: `Beauté (${categoryCounts.beauty ?? 0})`, value: 'beauty', icon: Scissors, color: Brand.primary },
+            { label: `Culture (${categoryCounts.culture ?? 0})`, value: 'culture', icon: Landmark, color: '#1FA67A' },
+            { label: `Sport (${categoryCounts.sport ?? 0})`, value: 'sport', icon: Dumbbell, color: Brand.violet },
           ].map((catItem) => {
             const isSelected = category === catItem.value;
             const IconComp = catItem.icon;
@@ -1519,9 +1529,17 @@ export default function MapView({
       {/* --- Filter Drawer (Slide-up Sheet) calqué exactement sur la capture --- */}
       {filterSheetVisible && (
         <Animated.View
+          // Hauteur animée (le bas reste collé au bas de l'écran) et non plus déplacement : à mi-hauteur, la partie
+          // basse de la fenêtre dépassait de l'écran et le bouton « Voir les résultats » restait introuvable.
           style={[
             styles.filterDrawer,
-            { transform: [{ translateY: filterAnim }] }
+            {
+              height: filterAnim.interpolate({
+                inputRange: [0, FILTER_DRAWER_HEIGHT],
+                outputRange: [FILTER_DRAWER_HEIGHT, 0],
+                extrapolate: 'clamp',
+              }),
+            },
           ]}
         >
           <View {...filterPanResponder.panHandlers} style={styles.drawerDragZone}>
@@ -1558,7 +1576,7 @@ export default function MapView({
                   style={[styles.subTabItem, subTab === tab && styles.subTabItemActive]}
                 >
                   <Text style={[styles.subTabText, subTab === tab && styles.subTabTextActive]}>
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    {SUBTAB_LABELS[tab]}
                   </Text>
                 </Pressable>
               ))}
@@ -1717,12 +1735,7 @@ export default function MapView({
             {/* Open Now Toggle */}
             <View style={styles.toggleRow}>
               <Text style={styles.toggleLabel}>Ouvert actuellement</Text>
-              <Pressable
-                style={[styles.customSwitch, openOnly ? styles.switchActive : styles.switchInactive]}
-                onPress={() => setOpenOnly(!openOnly)}
-              >
-                <View style={[styles.switchThumb, openOnly ? styles.thumbActive : styles.thumbInactive]} />
-              </Pressable>
+              <BrandSwitch value={openOnly} onValueChange={setOpenOnly} accessibilityLabel="Ouvert actuellement" />
             </View>
 
             {/* Submit Button CTA */}
@@ -2135,15 +2148,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 89,
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 4,
   },
+  // Pas de justifyContent: 'center' ici : dans une liste qui défile, le contenu centré dépasse des deux côtés et le
+  // début de la liste (« Tous », moitié de « Restos ») était coupé et inaccessible.
   categoryScrollContent: {
     paddingHorizontal: 20,
     gap: 8,
     alignItems: 'center',
-    justifyContent: 'center',
     flexDirection: 'row',
   },
   categoryPill: {
@@ -2451,7 +2463,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 3,
     borderColor: Brand.ink,
     zIndex: 100,
-    height: '92%',
+    overflow: 'hidden',
     shadowColor: Brand.ink,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
@@ -2482,7 +2494,7 @@ const styles = StyleSheet.create({
   },
   drawerScrollContent: {
     padding: 20,
-    paddingBottom: 160,
+    paddingBottom: 48,
   },
   searchBarRow: {
     flexDirection: 'row',
@@ -2700,37 +2712,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Brand.ink,
   },
-  customSwitch: {
-    width: 50,
-    height: 28,
-    borderRadius: 18,
-    padding: 3,
-    justifyContent: 'center',
-  },
-  switchActive: {
-    backgroundColor: Brand.ink,
-  },
-  switchInactive: {
-    backgroundColor: Brand.line,
-    borderWidth: 2,
-    borderColor: '#E3DCE0',
-  },
-  switchThumb: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: Brand.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-  },
-  thumbActive: {
-    alignSelf: 'flex-end',
-  },
-  thumbInactive: {
-    alignSelf: 'flex-start',
-  },
 
   // Submit Button CTA
   submitFilterBtn: {
@@ -2753,13 +2734,11 @@ const styles = StyleSheet.create({
     transform: [{ translateX: 2 }, { translateY: 2 }],
     shadowOffset: { width: 0, height: 0 },
   },
+  // Texte sombre sur le jaune : le blanc ne ressortait presque pas (contraste ≈ 1,8:1 ; ici ≈ 9:1)
   submitFilterBtnText: {
     fontSize: 16,
     fontWeight: '800',
-    color: Brand.white,
-    textShadowColor: 'rgba(0,0,0,0.15)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 1,
+    color: Brand.ink,
   },
 
   // Modal Login Requirement Styles
