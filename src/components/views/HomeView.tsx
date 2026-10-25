@@ -3,6 +3,8 @@ import { onAppEvent } from '../../lib/appEvents';
 import ErrorBoundary from '../ErrorBoundary';
 import NotificationSettingsModal from '../NotificationSettingsModal';
 import NotificationWelcomeModal from '../NotificationWelcomeModal';
+import HomeAgendaSection from './home/HomeAgendaSection';
+import { rankChouchous } from '../../lib/homeLogic';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet,
@@ -465,7 +467,7 @@ export default function HomeView({
   });
   
   // View Mode for Home vs See All pages
-  const [viewMode, setViewMode] = useState<'home' | 'see_all_recommended' | 'see_all_new'>('home');
+  const [viewMode, setViewMode] = useState<'home' | 'see_all_recommended'>('home');
 
   // User Gamified Discovery & Points State
   const [discoveryStats, setDiscoveryStats] = useState<DiscoveryStats>(discoveryStore.getStats());
@@ -1154,22 +1156,11 @@ export default function HomeView({
     selectedSort !== 'likes'
   );
 
-  const recommendedAddresses = useMemo(() => {
-    return categoryBaseAddresses
-      .filter(addr => addr.is_recommended)
-      .sort((a, b) => {
-        const likesA = likesMap[a.id] ?? (Number((a as any).likes_count) || 0);
-        const likesB = likesMap[b.id] ?? (Number((b as any).likes_count) || 0);
-        if (likesB !== likesA) {
-          return likesB - likesA;
-        }
-        return (b.rating || 0) - (a.rating || 0);
-      });
-  }, [categoryBaseAddresses, likesMap]);
-
-  const newAddresses = useMemo(() => {
-    return categoryBaseAddresses.filter(addr => addr.is_new);
-  }, [categoryBaseAddresses]);
+  // Chouchous du moment : plus une adresse a de likes, plus elle est mise en avant (cf. rankChouchous)
+  const recommendedAddresses = useMemo(
+    () => rankChouchous(categoryBaseAddresses as any[], likesMap, 50) as typeof categoryBaseAddresses,
+    [categoryBaseAddresses, likesMap]
+  );
 
   // Memoized ordered popular categories & spot counts (calculated once per dataset change)
   const orderedPopularCategories = useMemo(() => {
@@ -1231,12 +1222,15 @@ export default function HomeView({
             onTitlePress={handleTitlePress}
             labelStyle={labelStyle}
             backgroundUri={homeBackgroundUri}
+            totalSpots={addresses.length}
+            onOpenFilters={() => setShowFilterModal(true)}
+            onOpenProfile={() => onChangeTab?.('profile')}
           />
 
           {/* Personal Progression & Discovery Bar */}
           <ProgressionBanner
             discoveryStats={discoveryStats}
-            onOpenWallet={() => onChangeTab?.('cards')}
+            onOpenWallet={() => onChangeTab?.('profile')}
           />
 
           {/* Config Alert Banner (Visible only if Supabase environment variables are missing) */}
@@ -1689,83 +1683,6 @@ export default function HomeView({
                 })}
               </View>
             </View>
-          ) : viewMode === 'see_all_new' ? (
-            /* ── 3. SEE ALL NEWEST VIEW (CAPPED AT 50) ── */
-            <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40 }}>
-              <View style={styles.seeAllHeaderRow}>
-                <Pressable style={styles.backBtn} onPress={() => setViewMode('home')}>
-                  <ArrowLeft size={18} color={Brand.ink} strokeWidth={2} style={{ marginRight: 6 }} />
-                  <Text style={styles.backBtnText}>Retour</Text>
-                </Pressable>
-                <Text style={styles.seeAllTitle}>Nouveautés toulousaines ({Math.min(50, newAddresses.length)})</Text>
-              </View>
-
-              <View style={styles.verticalGridContainer}>
-                {newAddresses.slice(0, 50).map(addr => {
-                  const isFav = favorites.includes(addr.id);
-                  const likesCount = likesMap[addr.id] ?? (Number((addr as any).likes_count) || 0);
-                  return (
-                    <Pressable
-                      key={addr.id}
-                      style={styles.gridCardItem}
-                      onPress={() => {
-                        const gallery = (addr as any).gallery_urls || [];
-                        const allPhotos = addr.image_url ? [addr.image_url, ...gallery] : gallery;
-                        setSelectedSpotDetail({
-                          id: addr.id,
-                          title: addr.title,
-                          description: (addr as any).full_description || addr.description,
-                          full_description: (addr as any).full_description || addr.description,
-                          breadcrumbs: (addr as any).breadcrumbs || [],
-                          tags: (addr as any).tags || [],
-                          image_url: addr.image_url,
-                          photos: allPhotos,
-                          rating: addr.rating,
-                          category: categories.find(c => c.id === addr.category_id)?.name || ((addr as any).tags ? (addr as any).tags[0] : 'Lieu'),
-                          price_level: addr.price_level,
-                          location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
-                          address: (addr as any).address || addr.location || 'Toulouse',
-                          phone: (addr as any).telephone || (addr as any).phone || '',
-                          website: (addr as any).site_web || (addr as any).website || '',
-                          hours: (addr as any).horaires || (addr as any).hours || '',
-                        });
-                      }}
-                    >
-                      <Image source={{ uri: getOptimizedImageUrl(addr.image_url, 400) }} style={styles.gridCardImage} contentFit="cover" transition={150} cachePolicy="memory-disk" />
-                      <View style={styles.ratingBadgeGrid}>
-                        <Star color={Brand.chouchou} size={11} fill={Brand.chouchou} />
-                        <Text style={styles.ratingTextSmall}>{formatRating(addr.rating)}</Text>
-                      </View>
-                      <View style={styles.gridCardBody}>
-                        <Text style={styles.gridCardCategory}>
-                          {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'} • {addr.price_level}
-                        </Text>
-                        <Text style={styles.gridCardTitle} numberOfLines={1}>{addr.title}</Text>
-                        <View style={styles.cardFooterRow}>
-                          <View style={styles.locationRow}>
-                            <MapPin color={Brand.inkSoft} size={12} strokeWidth={2} />
-                            <Text style={styles.locationTextSmall}>{addr.location}</Text>
-                          </View>
-                          <Pressable onPress={() => toggleFavorite(addr.id)} accessibilityLabel={favorites.includes(addr.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'} style={styles.favoriteButtonSmall}>
-                            <Heart
-                              color={isFav ? Brand.primary : Brand.inkMute}
-                              fill={isFav ? Brand.primary : 'transparent'}
-                              size={15}
-                              strokeWidth={2}
-                            />
-                            {likesCount > 0 && (
-                              <Text style={[styles.likeCountTextSmall, isFav && styles.likeCountTextActive]}>
-                                {likesCount}
-                              </Text>
-                            )}
-                          </Pressable>
-                        </View>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
           ) : (
             /* ── 4. INITIAL HOME PAGE LAYOUT ── */
             <>
@@ -2011,170 +1928,7 @@ export default function HomeView({
                 </ScrollView>
               )}
 
-              {/* Novelties section (Smaller Cards) */}
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Fraîchement testées</Text>
-                <Pressable onPress={() => setViewMode('see_all_new')} hitSlop={SEE_ALL_HIT_SLOP} accessibilityRole="button">
-                  <Text style={styles.seeAllText}>Voir tout</Text>
-                </Pressable>
-              </View>
-
-              {loading ? (
-                /* Novelties Skeleton Pulse */
-                <Animated.View style={[styles.cardsScroll, pulseStyle, { flexDirection: 'row' }]}>
-                  {Array.from({ length: 3 }).map((_, idx) => (
-                    <View key={idx} style={styles.smallCardSkeleton} />
-                  ))}
-                </Animated.View>
-              ) : newAddresses.length === 0 ? (
-                <Text style={styles.emptyText}>Aucune nouveauté pour l'instant</Text>
-              ) : (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.cardsScroll}
-                >
-                  {newAddresses.slice(0, 12).map(addr => {
-                    const isFav = favorites.includes(addr.id);
-                    const likesCount = likesMap[addr.id] ?? (Number((addr as any).likes_count) || 0);
-                    return (
-                      <Pressable
-                        key={addr.id}
-                        style={styles.smallCard}
-                        onPress={() => {
-                          const gallery = (addr as any).gallery_urls || [];
-                          const allPhotos = addr.image_url ? [addr.image_url, ...gallery] : gallery;
-                          setSelectedSpotDetail({
-                            id: addr.id,
-                            title: addr.title,
-                            description: (addr as any).full_description || addr.description,
-                            full_description: (addr as any).full_description || addr.description,
-                            breadcrumbs: (addr as any).breadcrumbs || [],
-                            tags: (addr as any).tags || [],
-                            image_url: addr.image_url,
-                            photos: allPhotos,
-                            rating: addr.rating,
-                            category: categories.find(c => c.id === addr.category_id)?.name || ((addr as any).tags ? (addr as any).tags[0] : 'Lieu'),
-                            price_level: addr.price_level,
-                            location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
-                            address: (addr as any).address || addr.location || 'Toulouse',
-                            phone: (addr as any).telephone || (addr as any).phone || '',
-                            website: (addr as any).site_web || (addr as any).website || '',
-                            hours: (addr as any).horaires || (addr as any).hours || '',
-                          });
-                        }}
-                      >
-                        <Image source={{ uri: getOptimizedImageUrl(addr.image_url, 360) }} style={styles.smallCardImage} contentFit="cover" transition={150} cachePolicy="memory-disk" />
-                        <View style={styles.carouselPaginatorBadgeSmall}>
-                          <View style={[styles.paginatorDotSmall, styles.paginatorDotActive]} />
-                          <View style={styles.paginatorDotSmall} />
-                          <View style={styles.paginatorDotSmall} />
-                        </View>
-                        <View style={styles.ratingBadge}>
-                          <Star color={Brand.chouchou} size={11} fill={Brand.chouchou} />
-                          <Text style={styles.ratingTextSmall}>{formatRating(addr.rating)}</Text>
-                        </View>
-                        <View style={styles.smallCardInfo}>
-                          <Text style={styles.smallCardCategory}>
-                            {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'} • {addr.price_level}
-                          </Text>
-                          <Text style={styles.smallCardTitle} numberOfLines={1}>{addr.title}</Text>
-                          <View style={styles.cardFooterRow}>
-                            <View style={styles.locationRow}>
-                              <MapPin color={Brand.inkSoft} size={12} strokeWidth={2} />
-                              <Text style={styles.locationTextSmall}>{addr.location}</Text>
-                            </View>
-                            <Pressable onPress={() => toggleFavorite(addr.id)} accessibilityLabel={favorites.includes(addr.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'} style={styles.favoriteButtonSmall}>
-                              <Heart
-                                color={isFav ? Brand.primary : Brand.inkMute}
-                                fill={isFav ? Brand.primary : 'transparent'}
-                                size={15}
-                                strokeWidth={2}
-                              />
-                              {likesCount > 0 && (
-                                <Text style={[styles.likeCountTextSmall, isFav && styles.likeCountTextActive]}>
-                                  {likesCount}
-                                </Text>
-                              )}
-                            </Pressable>
-                          </View>
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              )}
-
-              {/* Association Events Section */}
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Événements de l'association</Text>
-              </View>
-
-              {!eventsReady ? (
-                <ActivityIndicator size="small" color={Brand.primaryDeep} style={{ marginVertical: 20 }} />
-              ) : upcomingEvents(events, todayIso()).length === 0 ? (
-                <Text style={styles.emptyText}>Aucun événement pour l'instant</Text>
-              ) : (
-                <View style={styles.eventsContainer}>
-                  {upcomingEvents(events, todayIso()).map((event) => {
-                    const months = ['JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC'];
-                    let day: number | string = 1;
-                    let monthStr = 'JAN';
-                    const rawParts = (event.event_date || '').split('-');
-                    if (rawParts.length === 3) {
-                      const mIdx = parseInt(rawParts[1], 10) - 1;
-                      day = parseInt(rawParts[2], 10) || 1;
-                      monthStr = months[mIdx >= 0 && mIdx < 12 ? mIdx : 0];
-                    } else {
-                      const d = new Date(event.event_date);
-                      if (!isNaN(d.getTime())) {
-                        day = d.getDate();
-                        monthStr = months[d.getMonth()];
-                      }
-                    }
-
-                    const priceNum = parseFloat(event.price || '0');
-                    const displayPrice = isNaN(priceNum) || priceNum === 0 ? 'Gratuit' : `${priceNum.toFixed(2)} €`;
-
-                    return (
-                      <View key={event.id} style={styles.eventCard}>
-                        <View style={styles.eventDateBlock}>
-                          <Text style={styles.eventDateDay}>{day}</Text>
-                          <Text style={styles.eventDateMonth}>{monthStr}</Text>
-                        </View>
-                        <View style={styles.eventDetails}>
-                          <Text style={styles.eventTitle} numberOfLines={1}>{event.title}</Text>
-                          <Text style={styles.eventMeta}>{event.event_time || '19:00'} • {event.location || 'Toulouse'}</Text>
-                          <Text style={styles.eventDesc} numberOfLines={2}>{event.description}</Text>
-                          <View style={styles.eventFooter}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, flexWrap: 'wrap' }}>
-                              <Text style={styles.eventPrice}>{displayPrice}</Text>
-                              {event.max_places ? (
-                                <View style={styles.eventPlacesBadge}>
-                                  <Text style={styles.eventPlacesBadgeText}>
-                                    {event.max_places} places disponibles
-                                  </Text>
-                                </View>
-                              ) : null}
-                            </View>
-                            <Pressable 
-                              style={({ pressed }) => [
-                                styles.bookBtn,
-                                pressed && styles.bookBtnPressed,
-                              ]}
-                              onPress={() => handleBookEvent(event)}
-                            >
-                              <Text style={styles.bookBtnText}>Réserver</Text>
-                            </Pressable>
-                          </View>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-
-              {/* Les chouchous du Petit Tou : sélection éditoriale, tout en bas (gérée depuis le portail admin) */}
+              {/* Les chouchous du Petit Tou : sélection éditoriale, juste après les chouchous du moment (gérée depuis le portail admin) */}
               {featuredCards.length > 0 && (
                 <>
                   <View style={styles.sectionHeader}>
@@ -2253,6 +2007,83 @@ export default function HomeView({
                   </ScrollView>
                 </>
               )}
+
+              {/* Agenda des partenaires : les prochaines dates (aperçu de l'onglet Agenda) */}
+              <HomeAgendaSection
+                addresses={addresses as any[]}
+                onSeeAll={() => onChangeTab?.('agenda')}
+                onOpenSpot={openAddressDetail}
+              />
+
+              {/* Association Events Section */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Événements de l'association</Text>
+              </View>
+
+              {!eventsReady ? (
+                <ActivityIndicator size="small" color={Brand.primaryDeep} style={{ marginVertical: 20 }} />
+              ) : upcomingEvents(events, todayIso()).length === 0 ? (
+                <Text style={styles.emptyText}>Aucun événement pour l'instant</Text>
+              ) : (
+                <View style={styles.eventsContainer}>
+                  {upcomingEvents(events, todayIso()).map((event) => {
+                    const months = ['JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC'];
+                    let day: number | string = 1;
+                    let monthStr = 'JAN';
+                    const rawParts = (event.event_date || '').split('-');
+                    if (rawParts.length === 3) {
+                      const mIdx = parseInt(rawParts[1], 10) - 1;
+                      day = parseInt(rawParts[2], 10) || 1;
+                      monthStr = months[mIdx >= 0 && mIdx < 12 ? mIdx : 0];
+                    } else {
+                      const d = new Date(event.event_date);
+                      if (!isNaN(d.getTime())) {
+                        day = d.getDate();
+                        monthStr = months[d.getMonth()];
+                      }
+                    }
+
+                    const priceNum = parseFloat(event.price || '0');
+                    const displayPrice = isNaN(priceNum) || priceNum === 0 ? 'Gratuit' : `${priceNum.toFixed(2)} €`;
+
+                    return (
+                      <View key={event.id} style={styles.eventCard}>
+                        <View style={styles.eventDateBlock}>
+                          <Text style={styles.eventDateDay}>{day}</Text>
+                          <Text style={styles.eventDateMonth}>{monthStr}</Text>
+                        </View>
+                        <View style={styles.eventDetails}>
+                          <Text style={styles.eventTitle} numberOfLines={1}>{event.title}</Text>
+                          <Text style={styles.eventMeta}>{event.event_time || '19:00'} • {event.location || 'Toulouse'}</Text>
+                          <Text style={styles.eventDesc} numberOfLines={2}>{event.description}</Text>
+                          <View style={styles.eventFooter}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, flexWrap: 'wrap' }}>
+                              <Text style={styles.eventPrice}>{displayPrice}</Text>
+                              {event.max_places ? (
+                                <View style={styles.eventPlacesBadge}>
+                                  <Text style={styles.eventPlacesBadgeText}>
+                                    {event.max_places} places disponibles
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
+                            <Pressable 
+                              style={({ pressed }) => [
+                                styles.bookBtn,
+                                pressed && styles.bookBtnPressed,
+                              ]}
+                              onPress={() => handleBookEvent(event)}
+                            >
+                              <Text style={styles.bookBtnText}>Réserver</Text>
+                            </Pressable>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
             </>
           )}
 

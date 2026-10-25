@@ -19,6 +19,7 @@ import {
 } from '../../lib/agendaOccurrences.ts';
 import { AgendaError, fetchPublicPartnerEvents } from '../../lib/partnerEventsStore';
 import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
+import ProfileButton from '../ProfileButton';
 import DayStrip from './agenda/DayStrip';
 
 const DAYS_SHOWN = 14;
@@ -38,9 +39,10 @@ function capitalizeFirst(text: string): string {
 interface AgendaViewProps {
   onToggleDock?: (visible: boolean) => void;
   onSelectSpot?: (spotId: string) => void;
+  onOpenProfile?: () => void;
 }
 
-export default function AgendaView({ onToggleDock, onSelectSpot }: AgendaViewProps) {
+export default function AgendaView({ onToggleDock, onSelectSpot, onOpenProfile }: AgendaViewProps) {
   const [today, setToday] = useState(localTodayIso);
   const todayRef = useRef(today);
   todayRef.current = today;
@@ -185,8 +187,11 @@ export default function AgendaView({ onToggleDock, onSelectSpot }: AgendaViewPro
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.title}>Agenda</Text>
-          <Text style={styles.subtitle}>Les dates des adresses partenaires.</Text>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Agenda</Text>
+            <Text style={styles.subtitle}>Les dates des adresses partenaires.</Text>
+          </View>
+          {onOpenProfile && <ProfileButton onPress={onOpenProfile} />}
         </View>
 
         <DayStrip days={days} selected={selectedDay} markedDays={markedDays} onSelect={setSelectedDay} />
@@ -259,7 +264,8 @@ export default function AgendaView({ onToggleDock, onSelectSpot }: AgendaViewPro
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Brand.bg },
   scroll: { paddingTop: 12, paddingBottom: 150 },
-  header: { paddingHorizontal: 20, marginBottom: 16 },
+  header: { paddingHorizontal: 20, marginBottom: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  headerText: { flex: 1, minWidth: 0 },
   title: { fontSize: Type.title2, fontWeight: '800', color: Brand.ink },
   subtitle: { fontSize: Type.body, fontWeight: '500', color: Brand.inkSoft, marginTop: 4 },
   chips: { paddingHorizontal: 20, gap: 8, paddingTop: 16 },

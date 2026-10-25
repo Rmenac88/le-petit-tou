@@ -21,6 +21,7 @@ import { discoveryStore } from '../lib/discoveryStore';
 import { discountCardsStore } from '../lib/discountCardsStore';
 import { clearDeviceLikedSpotIds } from '../lib/likesStore';
 import { clearLocalPushState } from '../lib/pushNotifications';
+import { userListsStore } from '../lib/userListsStore';
 interface PrivacyPolicyModalProps {
   visible: boolean;
   onClose: () => void;
@@ -45,6 +46,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
           await discountCardsStore.resetLocal();
           await clearDeviceLikedSpotIds();
           await clearLocalPushState();
+          await userListsStore.resetLocal();
           await authService.clearSessionAfterDeletion();
         },
       });
@@ -55,7 +57,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
   };
 
   const confirmDeletion = () => {
-    const text = 'Cette action efface définitivement votre progression, vos cartes utilisées, vos suggestions et vos likes.';
+    const text = 'Cette action efface définitivement votre progression, vos cartes utilisées, vos suggestions, vos likes et vos listes.';
     if (Platform.OS === 'web') {
       if (window.confirm(`Effacer mes données ?\n\n${text}`)) runDeletion();
       return;
@@ -122,6 +124,9 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
                 </Text>
                 <Text style={styles.bulletPoint}>
                   • <Text style={styles.boldText}>Likes</Text> : un like par appareil et par adresse. Seul le total par adresse est public.
+                </Text>
+                <Text style={styles.bulletPoint}>
+                  • <Text style={styles.boldText}>Vos listes</Text> (« À tester plus tard », « Y retourner », listes que vous créez) : elles restent uniquement sur votre téléphone et ne sont jamais envoyées à nos serveurs.
                 </Text>
                 <Text style={styles.bulletPoint}>
                   • <Text style={styles.boldText}>Suggestions d'adresses</Text> : le texte que vous saisissez volontairement. N'y indiquez pas de données personnelles vous concernant.
@@ -195,7 +200,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
                   Vous disposez des droits d'accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité. Vous pouvez aussi introduire une réclamation auprès de la CNIL (cnil.fr).
                 </Text>
                 <Text style={styles.paragraph}>
-                  Le bouton ci-dessous efface immédiatement de nos serveurs et de cet appareil votre progression, vos cartes utilisées, vos suggestions, vos likes et vos réglages de notifications. Cette action est définitive.
+                  Le bouton ci-dessous efface immédiatement de nos serveurs et de cet appareil votre progression, vos cartes utilisées, vos suggestions, vos likes, vos listes et vos réglages de notifications. Cette action est définitive.
                 </Text>
                 <Pressable
                   style={[styles.deleteBtn, isDeleting && { opacity: 0.6 }]}

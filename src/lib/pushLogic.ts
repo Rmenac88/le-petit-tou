@@ -2,7 +2,7 @@
  * Logique pure des notifications (sans React Native) : testable avec node:test.
  */
 
-export type AppTab = 'home' | 'search' | 'map' | 'cards' | 'agenda';
+export type AppTab = 'home' | 'search' | 'map' | 'offers' | 'agenda' | 'profile';
 
 /** Couleur d'accent des notifications Android (même valeur que le plugin expo-notifications dans app.json). */
 export const NOTIFICATION_ACCENT = '#E84A5F';

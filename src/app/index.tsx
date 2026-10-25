@@ -5,7 +5,8 @@ import FloatingDock, { TabType } from '@/components/FloatingDock';
 import HomeView from '@/components/views/HomeView';
 import SearchView from '@/components/views/SearchView';
 import MapView from '@/components/views/MapView';
-import CardsView from '@/components/views/CardsView';
+import OffersView from '@/components/views/OffersView';
+import ProfileView from '@/components/views/ProfileView';
 import AgendaView from '@/components/views/AgendaView';
 
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -19,14 +20,18 @@ export default function HomeScreen() {
   const [isDockVisible, setIsDockVisible] = useState(true);
   const [hasVisitedMap, setHasVisitedMap] = useState(false);
   const [hasVisitedSearch, setHasVisitedSearch] = useState(false);
-  const [hasVisitedCards, setHasVisitedCards] = useState(false);
+  const [hasVisitedOffers, setHasVisitedOffers] = useState(false);
+  const [hasVisitedProfile, setHasVisitedProfile] = useState(false);
+  // Le profil s'ouvre depuis le bouton en haut à droite : « Retour » ramène à l'onglet d'où l'on vient
+  const [tabBeforeProfile, setTabBeforeProfile] = useState<TabType>('home');
   const [hasVisitedAgenda, setHasVisitedAgenda] = useState(false);
 
   React.useEffect(() => {
     setIsDockVisible(true);
     if (activeTab === 'map') setHasVisitedMap(true);
     if (activeTab === 'search') setHasVisitedSearch(true);
-    if (activeTab === 'cards') setHasVisitedCards(true);
+    if (activeTab === 'offers') setHasVisitedOffers(true);
+    if (activeTab === 'profile') setHasVisitedProfile(true);
     if (activeTab === 'agenda') setHasVisitedAgenda(true);
   }, [activeTab]);
 
@@ -41,6 +46,11 @@ export default function HomeScreen() {
     }
     setActiveTab(target.tab);
   });
+
+  const openProfile = () => {
+    setTabBeforeProfile(activeTab === 'profile' ? tabBeforeProfile : activeTab);
+    setActiveTab('profile');
+  };
 
   const handleSelectSpotForMap = (id: string) => {
     setFocusedSpotId(id);
@@ -62,7 +72,7 @@ export default function HomeScreen() {
         >
           <View style={styles.column}>
             <ErrorBoundary scope="HomeView" compact><HomeView
-              onChangeTab={setActiveTab}
+              onChangeTab={(tab: TabType) => (tab === 'profile' ? openProfile() : setActiveTab(tab))}
               onToggleDock={setIsDockVisible}
               onSelectSpot={handleSelectSpotForMap}
             /></ErrorBoundary>
@@ -79,7 +89,7 @@ export default function HomeScreen() {
             ]}
           >
             <View style={styles.column}>
-              <ErrorBoundary scope="SearchView" compact><SearchView onSelectSpot={handleSelectSpotForMap} onToggleDock={setIsDockVisible} /></ErrorBoundary>
+              <ErrorBoundary scope="SearchView" compact><SearchView onSelectSpot={handleSelectSpotForMap} onToggleDock={setIsDockVisible} onOpenProfile={openProfile} /></ErrorBoundary>
             </View>
           </View>
         )}
@@ -102,17 +112,38 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Cards Tab (Mounted on first visit, then kept in memory for 0ms switch) */}
-        {hasVisitedCards && (
+        {/* Offers Tab (« - % » : offres et réductions) */}
+        {hasVisitedOffers && (
           <View
-            pointerEvents={activeTab === 'cards' ? 'auto' : 'none'}
+            pointerEvents={activeTab === 'offers' ? 'auto' : 'none'}
             style={[
               styles.tabViewWrapper,
-              activeTab === 'cards' ? styles.tabViewActive : styles.tabViewHidden,
+              activeTab === 'offers' ? styles.tabViewActive : styles.tabViewHidden,
             ]}
           >
             <View style={styles.column}>
-              <ErrorBoundary scope="CardsView" compact><CardsView /></ErrorBoundary>
+              <ErrorBoundary scope="OffersView" compact><OffersView onSelectSpot={handleSelectSpotForMap} onOpenProfile={openProfile} onToggleDock={setIsDockVisible} /></ErrorBoundary>
+            </View>
+          </View>
+        )}
+
+        {/* Profile (bouton en haut à droite) : niveau, carte, listes, réglages */}
+        {hasVisitedProfile && (
+          <View
+            pointerEvents={activeTab === 'profile' ? 'auto' : 'none'}
+            style={[
+              styles.tabViewWrapper,
+              activeTab === 'profile' ? styles.tabViewActive : styles.tabViewHidden,
+            ]}
+          >
+            <View style={styles.column}>
+              <ErrorBoundary scope="ProfileView" compact>
+                <ProfileView
+                  onBack={() => setActiveTab(tabBeforeProfile)}
+                  onSelectSpot={handleSelectSpotForMap}
+                  onToggleDock={activeTab === 'profile' ? setIsDockVisible : undefined}
+                />
+              </ErrorBoundary>
             </View>
           </View>
         )}
@@ -127,7 +158,7 @@ export default function HomeScreen() {
             ]}
           >
             <View style={styles.column}>
-              <ErrorBoundary scope="AgendaView" compact><AgendaView onToggleDock={setIsDockVisible} onSelectSpot={handleSelectSpotForMap} /></ErrorBoundary>
+              <ErrorBoundary scope="AgendaView" compact><AgendaView onToggleDock={setIsDockVisible} onSelectSpot={handleSelectSpotForMap} onOpenProfile={openProfile} /></ErrorBoundary>
             </View>
           </View>
         )}

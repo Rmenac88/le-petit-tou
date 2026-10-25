@@ -51,7 +51,8 @@ test('catégories : deux colonnes dont le nom a toute la largeur de la carte (av
 
 test('accueil : zones de toucher agrandies (liens « Voir tout », boutons du pied de page, réservation)', () => {
   assert.match(home, /SEE_ALL_HIT_SLOP/);
-  assert.equal((home.match(/hitSlop=\{SEE_ALL_HIT_SLOP\}/g) ?? []).length, 3);
+  // « Fraîchement testées » a été retiré de l'accueil : il reste deux liens « Voir tout »
+  assert.equal((home.match(/hitSlop=\{SEE_ALL_HIT_SLOP\}/g) ?? []).length, 2);
   assert.match(block(homeStyles, 'privacyPolicyFooterBtn: {', 200), /minHeight: 44/);
   assert.match(block(homeStyles, 'bookBtn: {', 250), /minHeight: 40/);
 });

@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, Pressable, Image, StyleSheet, Platform, useWindowDimensions } from 'react-native';
-import { Search } from 'lucide-react-native';
+import { View, Text, TextInput, Pressable, Image, StyleSheet } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import Stars from '../../Stars';
+import SearchPill from '../../SearchPill';
+import ProfileButton from '../../ProfileButton';
 
 import { Brand } from '../../../constants/brand';
 export interface HomeHeaderProps {
@@ -14,6 +15,12 @@ export interface HomeHeaderProps {
   labelStyle?: any;
   /** Image de fond choisie dans le portail ; absente ou illisible : thème Galaxy d'origine. */
   backgroundUri?: string | null;
+  /** Nombre d'adresses du guide (affiché dans la barre de recherche, comme sur la carte). */
+  totalSpots?: number;
+  /** Bouton « filtres » de la barre de recherche. */
+  onOpenFilters?: () => void;
+  /** Bouton « profil » en haut à droite. */
+  onOpenProfile?: () => void;
 }
 
 export const HomeHeader: React.FC<HomeHeaderProps> = ({
@@ -23,11 +30,12 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   onSearchBlur,
   onTitlePress,
   backgroundUri,
+  totalSpots,
+  onOpenFilters,
+  onOpenProfile,
 }) => {
   const searchInputRef = useRef<TextInput>(null);
-  // Sur un petit écran (320-340 px) l'accroche complète est coupée en plein mot : version courte
-  const { width: screenWidth } = useWindowDimensions();
-  const searchPlaceholder = screenWidth < 350 ? 'Un resto, un bar…' : 'Un resto, un bar, une pépite…';
+  const searchPlaceholder = totalSpots && totalSpots > 0 ? `Rechercher (${totalSpots} adresses)...` : 'Rechercher une adresse...';
   // Le fond personnalisé ne remplace Galaxy qu'une fois chargé ; en cas d'échec, Galaxy reste affiché
   const [bgLoaded, setBgLoaded] = useState(false);
   const [bgFailed, setBgFailed] = useState(false);
@@ -39,18 +47,21 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
 
   return (
     <>
-      {/* Marque : logo + descripteur statutaire (accès discret au portail membres : 7 appuis) */}
-      <Pressable onPress={onTitlePress} hitSlop={14} accessibilityLabel="Le Petit Tou" style={styles.brandRow}>
-        <Image
-          source={require('../../../../assets/images/logo-transparent.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <View>
-          <Text style={styles.brandKicker}>Votre city-guide gratuit</Text>
-          <Text style={styles.brandCity}>Toulouse · par des étudiants</Text>
-        </View>
-      </Pressable>
+      {/* Marque : logo + descripteur statutaire (accès discret au portail membres : 7 appuis) ; profil à droite */}
+      <View style={styles.topRow}>
+        <Pressable onPress={onTitlePress} hitSlop={14} accessibilityLabel="Le Petit Tou" style={styles.brandRow}>
+          <Image
+            source={require('../../../../assets/images/logo-transparent.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <View style={styles.brandText}>
+            <Text style={styles.brandKicker} numberOfLines={1}>Votre city-guide gratuit</Text>
+            <Text style={styles.brandCity} numberOfLines={1}>Toulouse · par des étudiants</Text>
+          </View>
+        </Pressable>
+        {onOpenProfile && <ProfileButton onPress={onOpenProfile} style={styles.profileBtn} />}
+      </View>
 
       {/* Hero violet sidéral */}
       <View style={styles.hero}>
@@ -75,26 +86,30 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
         <Text style={[styles.heroTitle, styles.heroTitleAccent]}>en rose.</Text>
         <Text style={styles.heroSub}>Les bonnes adresses, testées pour de vrai.</Text>
 
-        <Pressable style={styles.search} onPress={() => searchInputRef.current?.focus()}>
-          <Search color={Brand.primary} size={20} strokeWidth={2} style={{ marginRight: 10 }} />
-          <TextInput
-            ref={searchInputRef}
-            placeholder={searchPlaceholder}
-            placeholderTextColor={Brand.inkSoft}
-            value={searchQuery}
-            onChangeText={onSearchChange}
-            onFocus={onSearchFocus}
-            onBlur={onSearchBlur}
-            style={[styles.searchInput, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null]}
-          />
-        </Pressable>
+        <SearchPill
+          style={styles.search}
+          inputRef={searchInputRef}
+          value={searchQuery}
+          placeholder={searchPlaceholder}
+          onChangeText={onSearchChange}
+          onFocus={onSearchFocus}
+          onBlur={onSearchBlur}
+          onOpenFilters={onOpenFilters}
+        />
       </View>
     </>
   );
 };
 
 const styles = StyleSheet.create({
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 16,
+  },
   brandRow: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -102,6 +117,8 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 14,
   },
+  brandText: { flex: 1, minWidth: 0 },
+  profileBtn: { marginLeft: 8 },
   logo: { width: 46, height: 48 },
   brandKicker: {
     fontSize: 12,
@@ -160,19 +177,6 @@ const styles = StyleSheet.create({
   },
   search: {
     marginTop: 20,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: Brand.white,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: Brand.ink,
-    height: '100%',
   },
 });
 

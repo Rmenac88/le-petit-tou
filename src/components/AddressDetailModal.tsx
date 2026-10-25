@@ -30,6 +30,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Bookmark,
 } from 'lucide-react-native';
 import { getOptimizedImageUrl } from '../lib/imageOptimizer';
 import { discoveryStore } from '../lib/discoveryStore';
@@ -37,6 +38,9 @@ import { discoveryStore } from '../lib/discoveryStore';
 import { formatRating } from '../lib/formatRating';
 import { Brand } from '../constants/brand';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AddToListSheet from './lists/AddToListSheet';
+import { userListsStore } from '../lib/userListsStore';
+import { listsContaining } from '../lib/userListsLogic';
 const { width, height } = Dimensions.get('window');
 
 export interface SpotDetail {
@@ -94,6 +98,13 @@ export default function AddressDetailModal({
 }: AddressDetailModalProps) {
   const insets = useSafeAreaInsets();
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  // Listes personnelles : le signet se remplit dès que l'adresse est dans au moins une liste
+  const [showListSheet, setShowListSheet] = useState(false);
+  const [inLists, setInLists] = useState(false);
+  useEffect(() => {
+    if (!spot?.id) return;
+    return userListsStore.subscribe((state) => setInLists(listsContaining(state, String(spot.id)).length > 0));
+  }, [spot?.id]);
   const [internalFavorite, setInternalFavorite] = useState(false);
   const isFavorite = isFavoriteProp !== undefined ? isFavoriteProp : internalFavorite;
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -203,6 +214,20 @@ export default function AddressDetailModal({
               <Pressable style={styles.iconCircleBtn} onPress={onClose} accessibilityLabel="Retour">
                 <ArrowLeft size={22} color={Brand.ink} strokeWidth={2} />
               </Pressable>
+              <View style={styles.topActionsRight}>
+              <Pressable
+                style={styles.iconCircleBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Ajouter à une liste"
+                onPress={() => setShowListSheet(true)}
+              >
+                <Bookmark
+                  size={20}
+                  color={inLists ? Brand.primary : Brand.ink}
+                  fill={inLists ? Brand.primary : 'transparent'}
+                  strokeWidth={2}
+                />
+              </Pressable>
               <Pressable
                 style={[
                   styles.iconCircleBtn,
@@ -229,6 +254,7 @@ export default function AddressDetailModal({
                   </Text>
                 )}
               </Pressable>
+              </View>
             </View>
           </View>
 
@@ -492,12 +518,24 @@ export default function AddressDetailModal({
             </View>
 
         </View>
+
+        <AddToListSheet
+          visible={showListSheet}
+          spotId={spot?.id ? String(spot.id) : null}
+          spotTitle={spot?.title}
+          onClose={() => setShowListSheet(false)}
+        />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  topActionsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   floatingBar: {
     position: 'absolute',
     left: 0,

@@ -8,7 +8,8 @@ with allowed(fn) as (values
   ('get_my_discoveries'), ('get_push_preferences'), ('increment_spot_like'), ('register_push_token'),
   ('unregister_push_token'), ('update_push_preferences'), ('use_discount_card'), ('verify_admin_access'),
   ('admin_list_featured'), ('admin_save_featured'), ('admin_delete_featured'), ('_lpt_today'),
-  ('admin_request_upload'), ('admin_set_home_background'), ('_upload_ticket_ok')
+  ('admin_request_upload'), ('admin_set_home_background'), ('_upload_ticket_ok'),
+  ('admin_list_offers'), ('admin_save_offer'), ('admin_delete_offer')
 ),
 exposed as (
   select p.proname as fn, r.rolname as role

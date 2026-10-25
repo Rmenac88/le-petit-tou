@@ -128,6 +128,7 @@ const triggerHaptic = () => {
 };
 import { getWebMapHtml, MAP_BACKGROUND } from './map/mapboxHtmlTemplate';
 import BrandSwitch from '../BrandSwitch';
+import SearchPill from '../SearchPill';
 
 export const getMarkerColor = (category: string) => {
   switch (category || 'food') {
@@ -1191,63 +1192,24 @@ export default function MapView({
         )
       )}
 
-      {/* Real Neo-Brutalist Search Bar with Live TextInput */}
-      <View style={styles.searchBarContainer}>
-        <View style={styles.searchIconBadge}>
-          <Search size={16} color={Brand.white} strokeWidth={2} />
-        </View>
-
-        <TextInput
-          style={styles.searchInput}
-          placeholder={
-            filteredSpots && filteredSpots.length > 0
-              ? `Rechercher (${filteredSpots.length} adresses)...`
-              : "Rechercher une adresse..."
-          }
-          placeholderTextColor={Brand.inkSoft}
-          value={searchQuery}
-          onChangeText={(text) => {
-            setSearchQuery(text);
-            setIsSearchFocused(true);
-          }}
-          onFocus={() => setIsSearchFocused(true)}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-        />
-
-        {searchQuery.trim().length > 0 && (
-          <Pressable
-            style={styles.searchClearBtn}
-            onPress={() => {
-              setSearchQuery('');
-              setIsSearchFocused(false);
-            }}
-            accessibilityLabel="Effacer la recherche"
-          >
-            <X size={15} color={Brand.inkSoft} strokeWidth={2} />
-          </Pressable>
-        )}
-
-        <View style={styles.searchDivider} />
-
-        {/* Bouton Filtres distinct */}
-        <Pressable
-          style={({ pressed }) => [
-            styles.searchFilterBtn,
-            pressed && styles.searchFilterBtnPressed,
-            filterSheetVisible && styles.searchFilterBtnActive,
-          ]}
-          onPress={handleOpenFilters}
-          accessibilityLabel="Ouvrir les filtres avancés"
-        >
-          <SlidersHorizontal
-            size={17}
-            color={filterSheetVisible ? Brand.primary : Brand.ink}
-            strokeWidth={2}
-          />
-        </Pressable>
-      </View>
+      {/* Barre de recherche : la même que celle de l'accueil (composant partagé) */}
+      <SearchPill
+        style={styles.searchBarContainer}
+        value={searchQuery}
+        placeholder={
+          filteredSpots && filteredSpots.length > 0
+            ? `Rechercher (${filteredSpots.length} adresses)...`
+            : 'Rechercher une adresse...'
+        }
+        onChangeText={(text) => {
+          setSearchQuery(text);
+          setIsSearchFocused(true);
+        }}
+        onFocus={() => setIsSearchFocused(true)}
+        onClear={() => setIsSearchFocused(false)}
+        onOpenFilters={handleOpenFilters}
+        filtersActive={filterSheetVisible}
+      />
 
       {/* Instant Autocomplete Suggestions Card (when typing) */}
       {isSearchFocused && searchQuery.trim().length > 0 && (
@@ -1864,72 +1826,14 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   // Dynamic Island Search Pill
+  // Positionnement seul : l'aspect de la barre vient du composant partagé SearchPill
   searchBarContainer: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 52 : 36,
     alignSelf: 'center',
     width: '90%',
     maxWidth: 440,
-    height: 52,
-    borderRadius: 20,
-    backgroundColor: Brand.bg,
-    borderWidth: 1,
-    borderColor: Brand.line,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    shadowColor: Brand.night,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 18,
-    elevation: 3,
     zIndex: 99,
-  },
-  searchIconBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 12,
-    backgroundColor: Brand.primaryDeep,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    height: '100%',
-    fontSize: 13,
-    fontWeight: '700',
-    color: Brand.ink,
-    paddingVertical: 0,
-  },
-  searchClearBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0, 0, 0, 0.06)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 6,
-  },
-  searchDivider: {
-    width: 1.5,
-    height: 24,
-    backgroundColor: '#E3DCE0',
-    marginRight: 6,
-  },
-  searchFilterBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  searchFilterBtnPressed: {
-    transform: [{ scale: 0.92 }],
-  },
-  searchFilterBtnActive: {
-    backgroundColor: Brand.primarySoft,
   },
 
   // Autocomplete Suggestions Dropdown Card
