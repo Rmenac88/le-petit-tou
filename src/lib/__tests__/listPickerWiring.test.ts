@@ -33,3 +33,10 @@ test('zones de toucher du sélecteur : bouton « Terminé » et pastille d’ajo
   assert.match(picker, /doneBtn: \{ minHeight: 44/);
   assert.match(picker, /toggle: \{ width: 40, height: 40/);
 });
+
+test('dans une liste, « retirer » est à côté du bouton d’ouverture de la fiche, jamais à l’intérieur (HTML invalide sur le web)', () => {
+  const open = detail.indexOf('style={styles.rowMain}');
+  const close = detail.indexOf('</Pressable>', open);
+  const remove = detail.indexOf('Retirer ${item.title} de la liste');
+  assert.ok(open > 0 && close > open && remove > close, 'le bouton « retirer » doit venir après la fermeture du bouton de la ligne');
+});

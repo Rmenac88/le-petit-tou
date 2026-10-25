@@ -106,20 +106,24 @@ export default function ListDetailModal({ list, addresses, onClose, onOpenSpot, 
             </View>
           }
           renderItem={({ item }) => (
-            <Pressable style={styles.row} onPress={() => onOpenSpot(item)} accessibilityRole="button" accessibilityLabel={item.title}>
-              <Image
-                source={{ uri: item.image_url ? getOptimizedImageUrl(item.image_url, 200) : PLACEHOLDER_PHOTO }}
-                style={styles.thumb}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-              />
-              <View style={styles.rowBody}>
-                <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
-                <View style={styles.rowMeta}>
-                  <MapPin size={12} color={Brand.inkSoft} strokeWidth={2} />
-                  <Text style={styles.rowMetaText} numberOfLines={1}>{item.location || item.address || 'Toulouse'}</Text>
+            // Deux boutons côte à côte (ouvrir la fiche / retirer), jamais l'un dans l'autre : sur le web, un bouton
+            // imbriqué dans un bouton est du HTML invalide.
+            <View style={styles.row}>
+              <Pressable style={styles.rowMain} onPress={() => onOpenSpot(item)} accessibilityRole="button" accessibilityLabel={item.title}>
+                <Image
+                  source={{ uri: item.image_url ? getOptimizedImageUrl(item.image_url, 200) : PLACEHOLDER_PHOTO }}
+                  style={styles.thumb}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
+                <View style={styles.rowBody}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
+                  <View style={styles.rowMeta}>
+                    <MapPin size={12} color={Brand.inkSoft} strokeWidth={2} />
+                    <Text style={styles.rowMetaText} numberOfLines={1}>{item.location || item.address || 'Toulouse'}</Text>
+                  </View>
                 </View>
-              </View>
+              </Pressable>
               {!list?.readOnly && (
                 <Pressable
                   onPress={() => remove(item)}
@@ -131,7 +135,7 @@ export default function ListDetailModal({ list, addresses, onClose, onOpenSpot, 
                   <X size={16} color={Brand.inkSoft} />
                 </Pressable>
               )}
-            </Pressable>
+            </View>
           )}
         />
       </SafeAreaView>
@@ -147,7 +151,8 @@ const styles = StyleSheet.create({
   title: { fontFamily: Font.display, fontSize: 19, lineHeight: 23, color: Brand.ink },
   count: { fontSize: 12, fontWeight: '700', color: Brand.inkSoft, marginTop: 1 },
   listContent: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 40, flexGrow: 1 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Brand.white, borderRadius: 18, padding: 10, minHeight: 84 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Brand.white, borderRadius: 18, padding: 10, minHeight: 84 },
+  rowMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
   thumb: { width: 64, height: 64, borderRadius: 14, backgroundColor: Brand.line },
   rowBody: { flex: 1, minWidth: 0, gap: 4 },
   rowTitle: { fontSize: 15, fontWeight: '800', color: Brand.ink },
