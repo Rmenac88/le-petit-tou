@@ -12,7 +12,7 @@ export interface ProgressionBannerProps {
     totalPoints: number;
     levelName?: string;
   };
-  onOpenCard?: () => void;
+  onOpenWallet?: () => void;
 }
 
 const triggerHaptic = () => {
@@ -27,7 +27,7 @@ const triggerHaptic = () => {
 
 export const ProgressionBanner: React.FC<ProgressionBannerProps> = ({
   discoveryStats,
-  onOpenCard,
+  onOpenWallet,
 }) => {
   const getBadgeTitle = () => {
     if (discoveryStats.levelName) return discoveryStats.levelName;
@@ -68,7 +68,7 @@ export const ProgressionBanner: React.FC<ProgressionBannerProps> = ({
       </View>
 
       {/* Accès rapide à la carte membre */}
-      {onOpenCard && (
+      {onOpenWallet && (
         <Pressable
           style={({ pressed }) => [
             styles.privilegeShortcutBtn,
@@ -76,7 +76,7 @@ export const ProgressionBanner: React.FC<ProgressionBannerProps> = ({
           ]}
           onPress={() => {
             triggerHaptic();
-            onOpenCard();
+            onOpenWallet();
           }}
           accessibilityLabel="Ouvrir ma carte Le Petit Tou"
         >

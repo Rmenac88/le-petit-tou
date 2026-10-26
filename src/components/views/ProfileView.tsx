@@ -8,7 +8,7 @@ import dataset from '../../constants/dataset.json';
 import { appCache } from '../../lib/dataCache';
 import { discoveryStore, type DiscoveryStats } from '../../lib/discoveryStore';
 import { userListsStore } from '../../lib/userListsStore';
-import AppleWalletCard from '../AppleWalletCard';
+import MemberCard from '../MemberCard';
 import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
 import MyListsSection from '../lists/MyListsSection';
 import NotificationSettingsModal from '../NotificationSettingsModal';
@@ -76,7 +76,7 @@ export default function ProfileView({ onBack, onSelectSpot, onToggleDock }: Prop
         </View>
 
         <View style={styles.cardBlock}>
-          <AppleWalletCard activeSkin="sidereal" onFlipChange={setIsFlipped} />
+          <MemberCard activeSkin="sidereal" onFlipChange={setIsFlipped} />
           <View style={styles.hint}>
             <RotateCcw size={13} color={Brand.inkSoft} style={{ marginRight: 5 }} />
             <Text style={styles.hintText}>{isFlipped ? 'Toucher pour voir le recto' : 'Toucher pour retourner la carte'}</Text>

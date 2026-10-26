@@ -1766,9 +1766,9 @@ export default function HomeView({
               {sponsoredPartners.length > 0 && (
                 <View style={styles.netflixSection}>
                   <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Top Partenaires Le Petit Tou</Text>
+                    <Text style={styles.sectionTitle}>Nos partenaires</Text>
                     <View style={styles.netflixOfficialPill}>
-                      <Text style={styles.netflixOfficialText}>OFFICIEL</Text>
+                      <Text style={styles.netflixOfficialText}>SPONSORISÉ</Text>
                     </View>
                   </View>
 
@@ -1778,7 +1778,6 @@ export default function HomeView({
                     contentContainerStyle={styles.netflixScroll}
                   >
                     {sponsoredPartners.map((partner, idx) => {
-                      const rankNum = partner.rank_position || idx + 1;
                       return (
                         <Pressable
                           key={partner.id || idx}
@@ -1826,9 +1825,6 @@ export default function HomeView({
                             });
                           }}
                         >
-                          {/* Giant Netflix Style Number */}
-                          <Text style={styles.netflixRankNumber}>{rankNum}</Text>
-
                           {/* Card Body */}
                           <View style={styles.netflixCardBody}>
                             <Image
@@ -1839,7 +1835,7 @@ export default function HomeView({
                               cachePolicy="memory-disk"
                             />
                             <View style={styles.netflixBadgePill}>
-                              <Text style={styles.netflixBadgeText}>{partner.badge_text || `TOP #${rankNum}`}</Text>
+                              <Text style={styles.netflixBadgeText}>SPONSORISÉ</Text>
                             </View>
                             <View style={styles.netflixCardInfo}>
                               <Text style={styles.netflixPartnerTitle} numberOfLines={1}>
