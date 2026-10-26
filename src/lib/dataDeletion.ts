@@ -4,6 +4,8 @@
  */
 
 export interface DataDeletionDeps {
+  /** Avant tout appel serveur : arrête les envois en attente (sinon une sauvegarde tardive recréerait des données). */
+  beforeDelete?: () => Promise<void>;
   /** Identifiant de l'appareil / de la session, tel qu'envoyé aux fonctions serveur. */
   getUserId: () => Promise<string>;
   /** Appel de la fonction serveur delete_my_data. */
@@ -19,6 +21,10 @@ export interface DataDeletionResult {
 }
 
 export async function deleteMyData(deps: DataDeletionDeps): Promise<DataDeletionResult> {
+  try {
+    await deps.beforeDelete?.();
+  } catch {}
+
   let userId: string;
   try {
     userId = await deps.getUserId();

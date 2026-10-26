@@ -2,6 +2,9 @@ import { safeWebUrl } from '../../lib/safeLinks';
 import { onAppEvent } from '../../lib/appEvents';
 import ErrorBoundary from '../ErrorBoundary';
 import NotificationSettingsModal from '../NotificationSettingsModal';
+import NotificationWelcomeModal from '../NotificationWelcomeModal';
+import HomeAgendaSection from './home/HomeAgendaSection';
+import { rankChouchous } from '../../lib/homeLogic';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet,
@@ -14,6 +17,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  AppState,
   PanResponder,
   Linking,
   Modal,
@@ -117,6 +121,17 @@ import {
 import { discoveryStore, DiscoveryStats } from '../../lib/discoveryStore';
 import { formatRating } from '../../lib/formatRating';
 import { todayIso, upcomingEvents } from '../../lib/upcomingEvents';
+import { mark, startupReport } from '../../lib/startupTrace';
+import { FEATURED_CHANGED_EVENT, fetchFeatured, loadStoredFeatured } from '../../lib/featuredStore';
+import { resolveFeatured, type FeaturedRow } from '../../lib/featuredLogic';
+import { HOME_BACKGROUND_CHANGED_EVENT, fetchHomeBackground, loadStoredHomeBackground } from '../../lib/homeBackgroundStore';
+import { GALAXY, backgroundImageUrl, type HomeBackground } from '../../lib/homeBackgroundLogic';
+import { HOME_THEME_CHANGED_EVENT, fetchHomeTheme, loadStoredHomeTheme } from '../../lib/homeThemeStore';
+import { DEFAULT_THEME, resolveTheme, type HomeTheme } from '../../lib/homeThemeLogic';
+import { SUPABASE_URL } from '../../lib/supabase';
+import { PUSH_PROMPTED_KEY, getPushState, isPushSupported } from '../../lib/pushNotifications';
+import { shouldOfferPushWelcome } from '../../lib/pushLogic';
+import { appStorage } from '../../lib/storage';
 import {
   isAddressInCategory,
   getCategorySpotCount,
@@ -138,7 +153,6 @@ import {
 } from '../../lib/categoryResolver';
 
 import { Brand } from '../../constants/brand';
-import { Features } from '../../constants/features';
 const ALL_EXPANDED_CATEGORIES = [
   { id: 'all', name: 'Toutes les adresses', icon_name: 'Compass', color: Brand.ink },
   { id: 'gourmand-gourmet', name: 'Gourmand & Restauration', icon_name: 'Utensils', color: Brand.primaryDeep },
@@ -394,6 +408,9 @@ function DynamicIcon({ name, title, color, size = 20, strokeWidth = 2.2 }: Dynam
   return <IconComponent color={color} size={size} strokeWidth={strokeWidth} />;
 }
 
+/** Les liens « Voir tout » ne font que 17 px de haut : la zone de toucher est agrandie sans changer l'aspect. */
+const SEE_ALL_HIT_SLOP = { top: 14, bottom: 14, left: 12, right: 12 } as const;
+
 export default function HomeView({
   onChangeTab,
   onToggleDock,
@@ -403,6 +420,7 @@ export default function HomeView({
   onToggleDock?: (visible: boolean) => void;
   onSelectSpot?: (spotId: string) => void;
 }) {
+  mark('home-view-render');
   const [selectedSpotDetail, setSelectedSpotDetail] = useState<SpotDetail | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAllCategories, setShowAllCategories] = useState(false);
@@ -451,7 +469,7 @@ export default function HomeView({
   });
   
   // View Mode for Home vs See All pages
-  const [viewMode, setViewMode] = useState<'home' | 'see_all_recommended' | 'see_all_new'>('home');
+  const [viewMode, setViewMode] = useState<'home' | 'see_all_recommended'>('home');
 
   // User Gamified Discovery & Points State
   const [discoveryStats, setDiscoveryStats] = useState<DiscoveryStats>(discoveryStore.getStats());
@@ -528,6 +546,8 @@ export default function HomeView({
   const [events, setEvents] = useState<any[]>([]);
   const [sponsoredPartners, setSponsoredPartners] = useState<any[]>(() => getStoredPartners());
   const [loading, setLoading] = useState(true);
+  // La section événements attend sa propre réponse : les autres sections s'affichent aussitôt avec les données embarquées
+  const [eventsReady, setEventsReady] = useState(false);
   const [isConfigured, setIsConfigured] = useState(true);
 
   const [bookingEvent, setBookingEvent] = useState<any | null>(null);
@@ -535,15 +555,133 @@ export default function HomeView({
   const [infoAlert, setInfoAlert] = useState<{ title: string; message: string; type?: 'info' | 'warning' | 'error' } | null>(null);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const adminCodeRef = useRef('');
+  // Le portail n'envoie plus les données à l'accueil à chaque ouverture : un rafraîchissement unique, à la
+  // fermeture, et seulement si une écriture du catalogue a réussi pendant la session.
+  const catalogChangedRef = useRef(false);
+  const closeAdminPortal = () => {
+    adminCodeRef.current = '';
+    setShowAdminModal(false);
+    if (catalogChangedRef.current) {
+      catalogChangedRef.current = false;
+      loadSupabaseData(true);
+    }
+  };
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showNotifSettings, setShowNotifSettings] = useState(false);
+  const [showNotifWelcome, setShowNotifWelcome] = useState(false);
+  const anyModalOpenRef = useRef(false);
+
+  // Fond du bandeau d'accueil : dernier réglage connu tout de suite, puis réglage frais de la base (Galaxy par défaut)
+  const [homeBg, setHomeBg] = useState<HomeBackground>(GALAXY);
+  useEffect(() => {
+    let alive = true;
+    const refresh = async () => {
+      const fresh = await fetchHomeBackground();
+      if (alive && fresh) setHomeBg(fresh);
+    };
+    loadStoredHomeBackground().then((bg) => {
+      if (alive) setHomeBg(bg);
+    });
+    refresh();
+    const off = onAppEvent(HOME_BACKGROUND_CHANGED_EVENT, refresh);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
+    });
+    return () => {
+      alive = false;
+      off();
+      sub.remove();
+    };
+  }, []);
+  const homeBackgroundUri = useMemo(() => backgroundImageUrl(SUPABASE_URL, homeBg), [homeBg]);
+
+  // Thème de l'année (couleurs, étoiles, phrases du bandeau) : même principe que le fond, thème d'origine par défaut
+  const [homeTheme, setHomeTheme] = useState<HomeTheme>(DEFAULT_THEME);
+  useEffect(() => {
+    let alive = true;
+    const refresh = async () => {
+      const fresh = await fetchHomeTheme();
+      if (alive && fresh) setHomeTheme(fresh);
+    };
+    loadStoredHomeTheme().then((theme) => {
+      if (alive) setHomeTheme(theme);
+    });
+    refresh();
+    const off = onAppEvent(HOME_THEME_CHANGED_EVENT, refresh);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
+    });
+    return () => {
+      alive = false;
+      off();
+      sub.remove();
+    };
+  }, []);
+  const resolvedHomeTheme = useMemo(() => resolveTheme(homeTheme), [homeTheme]);
+
+  // « Les chouchous du Petit Tou » : dernière liste connue tout de suite, puis liste fraîche de la base
+  const [featuredRows, setFeaturedRows] = useState<FeaturedRow[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const refresh = async () => {
+      const fresh = await fetchFeatured();
+      if (alive && fresh) setFeaturedRows(fresh);
+    };
+    loadStoredFeatured().then((rows) => {
+      if (alive) setFeaturedRows(rows);
+    });
+    refresh();
+    const off = onAppEvent(FEATURED_CHANGED_EVENT, refresh);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
+    });
+    return () => {
+      alive = false;
+      off();
+      sub.remove();
+    };
+  }, []);
+
+  // Premier lancement : le choix des notifications est proposé UNE seule fois par téléphone, juste après l'arrivée
+  // sur l'accueil (la demande d'autorisation du système ne vient qu'après le choix de l'utilisateur). Pas pour un
+  // téléphone déjà inscrit (état relu : même après une réinstallation) ni si le système les a bloquées. Si un autre
+  // écran est ouvert à ce moment-là, on réessaie quelques secondes plus tard.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+    let attempts = 0;
+    const offerWhenFree = () => {
+      if (cancelled) return;
+      if (anyModalOpenRef.current && attempts++ < 6) {
+        timer = setTimeout(offerWhenFree, 3000);
+        return;
+      }
+      if (anyModalOpenRef.current) return;
+      setShowNotifWelcome(true);
+      appStorage.setItem(PUSH_PROMPTED_KEY, '1').catch(() => {});
+    };
+    (async () => {
+      try {
+        if (!isPushSupported()) return;
+        const prompted = (await appStorage.getItem(PUSH_PROMPTED_KEY)) === '1';
+        const state = await getPushState();
+        if (cancelled) return;
+        if (shouldOfferPushWelcome({ supported: state.supported, prompted, enabled: state.enabled, permission: state.permission })) {
+          timer = setTimeout(offerWhenFree, 1500);
+        }
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
   const adminTapCountRef = React.useRef(0);
   const adminTapTimerRef = React.useRef<any>(null);
 
   const handleTitlePress = () => {
-    if (!Features.adminPortal) return;
     triggerHaptic();
     adminTapCountRef.current += 1;
     if (adminTapTimerRef.current) {
@@ -618,11 +756,13 @@ export default function HomeView({
 
   // Load Categories & Addresses dynamically from Supabase
   const loadSupabaseData = async (forceRefresh: boolean = false) => {
+    mark('home-load-start');
     try {
       // Sync stored partners immediately (0ms instant response)
       const currentStoredPartners = getStoredPartners();
       setSponsoredPartners(currentStoredPartners);
 
+      let cacheShown = false;
       if (!forceRefresh) {
         // Check in-memory SWR cache first (0ms instant response)
         const cachedCat = appCache.get<Category[]>('categories');
@@ -632,16 +772,26 @@ export default function HomeView({
           setCategories(cachedCat);
           setAddresses(cachedAddr);
           setEvents(cachedEvt);
+          setEventsReady(true);
           setLoading(false);
+          cacheShown = true;
           // Continuer en arrière-plan pour récupérer les données fraîches de Supabase
         }
       }
 
-      setLoading(true);
+      // Pas de cache : on affiche tout de suite les 790 adresses embarquées dans l'appli ; la base les
+      // complète ensuite en arrière-plan. Un réseau lent ou coupé ne bloque donc jamais l'écran d'accueil.
+      if (!cacheShown && !forceRefresh) {
+        setCategories(dataset.categories as any);
+        setAddresses(dataset.addresses as any);
+        setLoading(false);
+        mark('home-local-data-shown');
+      }
       
       // Check if keys are set
       if (!isSupabaseConfigured || !supabase) {
         setIsConfigured(false);
+        setEventsReady(true);
         setLoading(false);
         return;
       }
@@ -653,6 +803,7 @@ export default function HomeView({
         .from('categories')
         .select('*')
         .order('name', { ascending: true });
+      mark('net-categories');
       if (catError) throw catError;
 
       // Fetch Addresses with explicit projection (Lean DTO)
@@ -660,6 +811,7 @@ export default function HomeView({
         .from('addresses')
         .select('id, title, category_id, location, address, image_url, rating, price_level, is_recommended, is_new, lat, lng, tags, telephone, site_web, horaires, description')
         .order('created_at', { ascending: false });
+      mark('net-addresses');
       if (addrError) throw addrError;
 
       const finalCategories = catData && catData.length > 0 ? catData : (dataset.categories as any);
@@ -694,10 +846,12 @@ export default function HomeView({
             booking_url: getEventBookingUrl(ev),
           }));
         }
-        setEvents(finalEvents);
+        if (!eventsError) setEvents(finalEvents);
       } catch (e) {
-        setEvents([]);
+        // panne isolée des événements : on conserve la liste déjà affichée
       }
+      setEventsReady(true);
+      mark('net-events');
 
       // Fetch & Sync Sponsored Partners (Top Netflix) in background
       try {
@@ -715,13 +869,15 @@ export default function HomeView({
       appCache.set('events', finalEvents);
 
       setLoading(false);
+      mark('home-remote-done');
     } catch (err: any) {
       console.warn('loadSupabaseData failed:', err);
       // Fallback
       setCategories(dataset.categories as any);
       setAddresses(dataset.addresses as any);
-      setEvents([]);
-      setIsConfigured(false);
+      // Réseau coupé ou serveur en panne : on garde les données embarquées. La bannière « configuration »
+      // est réservée au cas où les clés manquent réellement (plus haut), pas à une panne passagère.
+      setEventsReady(true);
       setLoading(false);
     }
   };
@@ -794,7 +950,8 @@ export default function HomeView({
     };
   }, []);
 
-  const isAnyModalOpen = showAllCategories || showFilterModal || !!bookingEvent || !!successEvent || !!infoAlert || !!selectedSpotDetail || showAdminModal || showPasswordModal || showPrivacyPolicy || showNotifSettings;
+  const isAnyModalOpen = showAllCategories || showFilterModal || !!bookingEvent || !!successEvent || !!infoAlert || !!selectedSpotDetail || showAdminModal || showPasswordModal || showPrivacyPolicy || showNotifSettings || showNotifWelcome;
+  anyModalOpenRef.current = isAnyModalOpen;
 
   const orderedModalCategories = useMemo(() => {
     return getOrderedPopularCategories(categories, addresses, true);
@@ -1025,22 +1182,11 @@ export default function HomeView({
     selectedSort !== 'likes'
   );
 
-  const recommendedAddresses = useMemo(() => {
-    return categoryBaseAddresses
-      .filter(addr => addr.is_recommended)
-      .sort((a, b) => {
-        const likesA = likesMap[a.id] ?? (Number((a as any).likes_count) || 0);
-        const likesB = likesMap[b.id] ?? (Number((b as any).likes_count) || 0);
-        if (likesB !== likesA) {
-          return likesB - likesA;
-        }
-        return (b.rating || 0) - (a.rating || 0);
-      });
-  }, [categoryBaseAddresses, likesMap]);
-
-  const newAddresses = useMemo(() => {
-    return categoryBaseAddresses.filter(addr => addr.is_new);
-  }, [categoryBaseAddresses]);
+  // Chouchous du moment : plus une adresse a de likes, plus elle est mise en avant (cf. rankChouchous)
+  const recommendedAddresses = useMemo(
+    () => rankChouchous(categoryBaseAddresses as any[], likesMap, 50) as typeof categoryBaseAddresses,
+    [categoryBaseAddresses, likesMap]
+  );
 
   // Memoized ordered popular categories & spot counts (calculated once per dataset change)
   const orderedPopularCategories = useMemo(() => {
@@ -1055,6 +1201,35 @@ export default function HomeView({
     return counts;
   }, [categories, addresses]);
 
+  const featuredCards = useMemo(
+    () => resolveFeatured(featuredRows, addresses as any[], todayIso()),
+    [featuredRows, addresses]
+  );
+
+  // Ouvre la fiche d'une adresse (même contenu que les autres cartes de l'accueil)
+  const openAddressDetail = (addr: any) => {
+    const gallery = addr.gallery_urls || [];
+    const allPhotos = addr.image_url ? [addr.image_url, ...gallery] : gallery;
+    setSelectedSpotDetail({
+      id: addr.id,
+      title: addr.title,
+      description: addr.full_description || addr.description,
+      full_description: addr.full_description || addr.description,
+      breadcrumbs: addr.breadcrumbs || [],
+      tags: addr.tags || [],
+      image_url: addr.image_url,
+      photos: allPhotos,
+      rating: addr.rating,
+      category: categories.find((c) => c.id === addr.category_id)?.name || (addr.tags ? addr.tags[0] : 'Lieu'),
+      price_level: addr.price_level,
+      location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
+      address: addr.address || addr.location || 'Toulouse',
+      phone: addr.telephone || addr.phone || '',
+      website: addr.site_web || addr.website || '',
+      hours: addr.horaires || addr.hours || '',
+    });
+  };
+
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -1062,6 +1237,7 @@ export default function HomeView({
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Header Row & Brutalist Search Bar */}
           <HomeHeader
@@ -1070,14 +1246,18 @@ export default function HomeView({
             onSearchFocus={() => setIsSearchFocused(true)}
             onSearchBlur={() => setIsSearchFocused(false)}
             onTitlePress={handleTitlePress}
-            onOpenNotifications={() => setShowNotifSettings(true)}
             labelStyle={labelStyle}
+            backgroundUri={homeBackgroundUri}
+            theme={resolvedHomeTheme}
+            totalSpots={addresses.length}
+            onOpenFilters={() => setShowFilterModal(true)}
+            onOpenProfile={() => onChangeTab?.('profile')}
           />
 
           {/* Personal Progression & Discovery Bar */}
           <ProgressionBanner
             discoveryStats={discoveryStats}
-            onOpenCard={() => onChangeTab?.('cards')}
+            onOpenWallet={() => onChangeTab?.('profile')}
           />
 
           {/* Config Alert Banner (Visible only if Supabase environment variables are missing) */}
@@ -1392,14 +1572,12 @@ export default function HomeView({
                           transition={150}
                           cachePolicy="memory-disk"
                         />
-                        {Features.externalRatings && (
-                          <View style={styles.ratingBadgeGrid}>
+                        <View style={styles.ratingBadgeGrid}>
                           <Star color={Brand.chouchou} size={11} fill={Brand.chouchou} />
                           <Text style={styles.ratingTextSmall}>
                             {formatRating(addr.rating)}
                           </Text>
                         </View>
-                        )}
                         <View style={styles.gridCardBody}>
                           <View style={styles.cardHeaderMetaRow}>
                             <Text style={styles.gridCardCategory}>
@@ -1498,91 +1676,10 @@ export default function HomeView({
                       }}
                     >
                       <Image source={{ uri: getOptimizedImageUrl(addr.image_url, 400) }} style={styles.gridCardImage} contentFit="cover" transition={150} cachePolicy="memory-disk" />
-                      {Features.externalRatings && (
-                        <View style={styles.ratingBadgeGrid}>
+                      <View style={styles.ratingBadgeGrid}>
                         <Star color={Brand.chouchou} size={11} fill={Brand.chouchou} />
                         <Text style={styles.ratingTextSmall}>{formatRating(addr.rating)}</Text>
                       </View>
-                      )}
-                      <View style={styles.gridCardBody}>
-                        <Text style={styles.gridCardCategory}>
-                          {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'} • {addr.price_level}
-                        </Text>
-                        <Text style={styles.gridCardTitle} numberOfLines={1}>{addr.title}</Text>
-                        <View style={styles.cardFooterRow}>
-                          <View style={styles.locationRow}>
-                            <MapPin color={Brand.inkSoft} size={12} strokeWidth={2} />
-                            <Text style={styles.locationTextSmall}>{addr.location}</Text>
-                          </View>
-                          <Pressable onPress={() => toggleFavorite(addr.id)} accessibilityLabel={favorites.includes(addr.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'} style={styles.favoriteButtonSmall}>
-                            <Heart
-                              color={isFav ? Brand.primary : Brand.inkMute}
-                              fill={isFav ? Brand.primary : 'transparent'}
-                              size={15}
-                              strokeWidth={2}
-                            />
-                            {likesCount > 0 && (
-                              <Text style={[styles.likeCountTextSmall, isFav && styles.likeCountTextActive]}>
-                                {likesCount}
-                              </Text>
-                            )}
-                          </Pressable>
-                        </View>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          ) : viewMode === 'see_all_new' ? (
-            /* ── 3. SEE ALL NEWEST VIEW (CAPPED AT 50) ── */
-            <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40 }}>
-              <View style={styles.seeAllHeaderRow}>
-                <Pressable style={styles.backBtn} onPress={() => setViewMode('home')}>
-                  <ArrowLeft size={18} color={Brand.ink} strokeWidth={2} style={{ marginRight: 6 }} />
-                  <Text style={styles.backBtnText}>Retour</Text>
-                </Pressable>
-                <Text style={styles.seeAllTitle}>Nouveautés toulousaines ({Math.min(50, newAddresses.length)})</Text>
-              </View>
-
-              <View style={styles.verticalGridContainer}>
-                {newAddresses.slice(0, 50).map(addr => {
-                  const isFav = favorites.includes(addr.id);
-                  const likesCount = likesMap[addr.id] ?? (Number((addr as any).likes_count) || 0);
-                  return (
-                    <Pressable
-                      key={addr.id}
-                      style={styles.gridCardItem}
-                      onPress={() => {
-                        const gallery = (addr as any).gallery_urls || [];
-                        const allPhotos = addr.image_url ? [addr.image_url, ...gallery] : gallery;
-                        setSelectedSpotDetail({
-                          id: addr.id,
-                          title: addr.title,
-                          description: (addr as any).full_description || addr.description,
-                          full_description: (addr as any).full_description || addr.description,
-                          breadcrumbs: (addr as any).breadcrumbs || [],
-                          tags: (addr as any).tags || [],
-                          image_url: addr.image_url,
-                          photos: allPhotos,
-                          rating: addr.rating,
-                          category: categories.find(c => c.id === addr.category_id)?.name || ((addr as any).tags ? (addr as any).tags[0] : 'Lieu'),
-                          price_level: addr.price_level,
-                          location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
-                          address: (addr as any).address || addr.location || 'Toulouse',
-                          phone: (addr as any).telephone || (addr as any).phone || '',
-                          website: (addr as any).site_web || (addr as any).website || '',
-                          hours: (addr as any).horaires || (addr as any).hours || '',
-                        });
-                      }}
-                    >
-                      <Image source={{ uri: getOptimizedImageUrl(addr.image_url, 400) }} style={styles.gridCardImage} contentFit="cover" transition={150} cachePolicy="memory-disk" />
-                      {Features.externalRatings && (
-                        <View style={styles.ratingBadgeGrid}>
-                        <Star color={Brand.chouchou} size={11} fill={Brand.chouchou} />
-                        <Text style={styles.ratingTextSmall}>{formatRating(addr.rating)}</Text>
-                      </View>
-                      )}
                       <View style={styles.gridCardBody}>
                         <Text style={styles.gridCardCategory}>
                           {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'} • {addr.price_level}
@@ -1620,7 +1717,7 @@ export default function HomeView({
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Catégories populaires</Text>
                 {categories.length > 0 && (
-                  <Pressable onPress={() => setShowAllCategories(true)}>
+                  <Pressable onPress={() => setShowAllCategories(true)} hitSlop={SEE_ALL_HIT_SLOP} accessibilityRole="button">
                     <Text style={styles.seeAllText}>Voir tout</Text>
                   </Pressable>
                 )}
@@ -1669,9 +1766,9 @@ export default function HomeView({
               {sponsoredPartners.length > 0 && (
                 <View style={styles.netflixSection}>
                   <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Nos partenaires</Text>
+                    <Text style={styles.sectionTitle}>Top Partenaires Le Petit Tou</Text>
                     <View style={styles.netflixOfficialPill}>
-                      <Text style={styles.netflixOfficialText}>SPONSORISÉ</Text>
+                      <Text style={styles.netflixOfficialText}>OFFICIEL</Text>
                     </View>
                   </View>
 
@@ -1681,6 +1778,7 @@ export default function HomeView({
                     contentContainerStyle={styles.netflixScroll}
                   >
                     {sponsoredPartners.map((partner, idx) => {
+                      const rankNum = partner.rank_position || idx + 1;
                       return (
                         <Pressable
                           key={partner.id || idx}
@@ -1722,12 +1820,14 @@ export default function HomeView({
                               full_description: publicPartnerText(partner.subtitle),
                               image_url: partner.image_url,
                               photos: partner.image_url ? [partner.image_url] : [],
-                              category: 'Partenaire',
+                              category: 'Partenaire Officiel',
                               rating: 5.0,
                               location: 'Toulouse',
                             });
                           }}
                         >
+                          {/* Giant Netflix Style Number */}
+                          <Text style={styles.netflixRankNumber}>{rankNum}</Text>
 
                           {/* Card Body */}
                           <View style={styles.netflixCardBody}>
@@ -1739,7 +1839,7 @@ export default function HomeView({
                               cachePolicy="memory-disk"
                             />
                             <View style={styles.netflixBadgePill}>
-                              <Text style={styles.netflixBadgeText}>SPONSORISÉ</Text>
+                              <Text style={styles.netflixBadgeText}>{partner.badge_text || `TOP #${rankNum}`}</Text>
                             </View>
                             <View style={styles.netflixCardInfo}>
                               <Text style={styles.netflixPartnerTitle} numberOfLines={1}>
@@ -1762,7 +1862,7 @@ export default function HomeView({
               {/* Recommendations of the Moment (Large Cards) */}
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Les chouchous du moment</Text>
-                <Pressable onPress={() => setViewMode('see_all_recommended')}>
+                <Pressable onPress={() => setViewMode('see_all_recommended')} hitSlop={SEE_ALL_HIT_SLOP} accessibilityRole="button">
                   <Text style={styles.seeAllText}>Voir tout</Text>
                 </Pressable>
               </View>
@@ -1817,12 +1917,10 @@ export default function HomeView({
                           <Star size={12} color={Brand.ink} fill={Brand.ink} strokeWidth={2} />
                           <Text style={styles.chouchouBadgeText}>CHOUCHOU</Text>
                         </View>
-                        {Features.externalRatings && (
-                          <View style={styles.ratingBadge}>
+                        <View style={styles.ratingBadge}>
                           <Star color={Brand.chouchou} size={13} fill={Brand.chouchou} />
                           <Text style={styles.ratingText}>{formatRating(addr.rating)}</Text>
                         </View>
-                        )}
                         <View style={styles.largeCardInfo}>
                           <View style={styles.cardHeaderRow}>
                             <Text style={styles.cardCategoryText}>
@@ -1857,108 +1955,99 @@ export default function HomeView({
                 </ScrollView>
               )}
 
-              {/* Novelties section (Smaller Cards) */}
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Fraîchement testées</Text>
-                <Pressable onPress={() => setViewMode('see_all_new')}>
-                  <Text style={styles.seeAllText}>Voir tout</Text>
-                </Pressable>
-              </View>
-
-              {loading ? (
-                /* Novelties Skeleton Pulse */
-                <Animated.View style={[styles.cardsScroll, pulseStyle, { flexDirection: 'row' }]}>
-                  {Array.from({ length: 3 }).map((_, idx) => (
-                    <View key={idx} style={styles.smallCardSkeleton} />
-                  ))}
-                </Animated.View>
-              ) : newAddresses.length === 0 ? (
-                <Text style={styles.emptyText}>Aucune nouveauté pour l'instant</Text>
-              ) : (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.cardsScroll}
-                >
-                  {newAddresses.slice(0, 12).map(addr => {
-                    const isFav = favorites.includes(addr.id);
-                    const likesCount = likesMap[addr.id] ?? (Number((addr as any).likes_count) || 0);
-                    return (
-                      <Pressable
-                        key={addr.id}
-                        style={styles.smallCard}
-                        onPress={() => {
-                          const gallery = (addr as any).gallery_urls || [];
-                          const allPhotos = addr.image_url ? [addr.image_url, ...gallery] : gallery;
-                          setSelectedSpotDetail({
-                            id: addr.id,
-                            title: addr.title,
-                            description: (addr as any).full_description || addr.description,
-                            full_description: (addr as any).full_description || addr.description,
-                            breadcrumbs: (addr as any).breadcrumbs || [],
-                            tags: (addr as any).tags || [],
-                            image_url: addr.image_url,
-                            photos: allPhotos,
-                            rating: addr.rating,
-                            category: categories.find(c => c.id === addr.category_id)?.name || ((addr as any).tags ? (addr as any).tags[0] : 'Lieu'),
-                            price_level: addr.price_level,
-                            location: addr.location && addr.location !== 'Toulouse' ? addr.location : 'Toulouse Centre',
-                            address: (addr as any).address || addr.location || 'Toulouse',
-                            phone: (addr as any).telephone || (addr as any).phone || '',
-                            website: (addr as any).site_web || (addr as any).website || '',
-                            hours: (addr as any).horaires || (addr as any).hours || '',
-                          });
-                        }}
-                      >
-                        <Image source={{ uri: getOptimizedImageUrl(addr.image_url, 360) }} style={styles.smallCardImage} contentFit="cover" transition={150} cachePolicy="memory-disk" />
-                        <View style={styles.carouselPaginatorBadgeSmall}>
-                          <View style={[styles.paginatorDotSmall, styles.paginatorDotActive]} />
-                          <View style={styles.paginatorDotSmall} />
-                          <View style={styles.paginatorDotSmall} />
-                        </View>
-                        {Features.externalRatings && (
-                          <View style={styles.ratingBadge}>
-                          <Star color={Brand.chouchou} size={11} fill={Brand.chouchou} />
-                          <Text style={styles.ratingTextSmall}>{formatRating(addr.rating)}</Text>
-                        </View>
-                        )}
-                        <View style={styles.smallCardInfo}>
-                          <Text style={styles.smallCardCategory}>
-                            {categories.find(c => c.id === addr.category_id)?.name || 'Lieu'} • {addr.price_level}
-                          </Text>
-                          <Text style={styles.smallCardTitle} numberOfLines={1}>{addr.title}</Text>
-                          <View style={styles.cardFooterRow}>
-                            <View style={styles.locationRow}>
-                              <MapPin color={Brand.inkSoft} size={12} strokeWidth={2} />
-                              <Text style={styles.locationTextSmall}>{addr.location}</Text>
-                            </View>
-                            <Pressable onPress={() => toggleFavorite(addr.id)} accessibilityLabel={favorites.includes(addr.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'} style={styles.favoriteButtonSmall}>
-                              <Heart
-                                color={isFav ? Brand.primary : Brand.inkMute}
-                                fill={isFav ? Brand.primary : 'transparent'}
-                                size={15}
-                                strokeWidth={2}
-                              />
-                              {likesCount > 0 && (
-                                <Text style={[styles.likeCountTextSmall, isFav && styles.likeCountTextActive]}>
-                                  {likesCount}
-                                </Text>
-                              )}
-                            </Pressable>
+              {/* Les chouchous du Petit Tou : sélection éditoriale, juste après les chouchous du moment (gérée depuis le portail admin) */}
+              {featuredCards.length > 0 && (
+                <>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Les chouchous du Petit Tou</Text>
+                  </View>
+                  <Text style={styles.featuredIntro}>Notre sélection du moment, choisie par l’équipe.</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.cardsScroll}
+                  >
+                    {featuredCards.map(({ row, address: addr }) => {
+                      const isFav = favorites.includes(addr.id);
+                      const likesCount = likesMap[addr.id] ?? (Number((addr as any).likes_count) || 0);
+                      return (
+                        <Pressable
+                          key={row.id}
+                          style={styles.largeCard}
+                          onPress={() => openAddressDetail(addr)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Chouchou du Petit Tou : ${addr.title}`}
+                        >
+                          <Image
+                            source={{ uri: getOptimizedImageUrl((addr as any).image_url, 600) }}
+                            style={styles.largeCardImage}
+                            contentFit="cover"
+                            transition={200}
+                          />
+                          <View style={styles.featuredBadge}>
+                            <Heart size={12} color={Brand.white} fill={Brand.white} strokeWidth={2} />
+                            <Text style={styles.featuredBadgeText}>CHOUCHOU DU PETIT TOU</Text>
                           </View>
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
+                          <View style={styles.ratingBadge}>
+                            <Star color={Brand.chouchou} size={13} fill={Brand.chouchou} />
+                            <Text style={styles.ratingText}>{formatRating((addr as any).rating)}</Text>
+                          </View>
+                          <View style={styles.largeCardInfo}>
+                            <View style={styles.cardHeaderRow}>
+                              <Text style={styles.cardCategoryText}>
+                                {categories.find((c) => c.id === (addr as any).category_id)?.name || 'Lieu'}
+                              </Text>
+                              <Text style={styles.cardPriceText}>{(addr as any).price_level}</Text>
+                            </View>
+                            <Text style={styles.cardTitle} numberOfLines={1}>{addr.title}</Text>
+                            {row.label ? (
+                              <View style={styles.featuredLabelPill}>
+                                <Text style={styles.featuredLabelText} numberOfLines={1}>{row.label}</Text>
+                              </View>
+                            ) : null}
+                            <View style={styles.cardFooterRow}>
+                              <View style={styles.locationRow}>
+                                <MapPin color={Brand.inkSoft} size={14} strokeWidth={2} />
+                                <Text style={styles.locationText}>{(addr as any).location}</Text>
+                              </View>
+                              <Pressable
+                                onPress={() => toggleFavorite(addr.id)}
+                                accessibilityLabel={isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                              >
+                                <Heart
+                                  color={isFav ? Brand.primary : Brand.inkMute}
+                                  fill={isFav ? Brand.primary : 'transparent'}
+                                  size={17}
+                                  strokeWidth={2}
+                                />
+                                {likesCount > 0 && (
+                                  <Text style={[styles.likeCountText, isFav && styles.likeCountTextActive]}>
+                                    {likesCount}
+                                  </Text>
+                                )}
+                              </Pressable>
+                            </View>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </>
               )}
+
+              {/* Agenda des partenaires : les prochaines dates (aperçu de l'onglet Agenda) */}
+              <HomeAgendaSection
+                addresses={addresses as any[]}
+                onSeeAll={() => onChangeTab?.('agenda')}
+                onOpenSpot={openAddressDetail}
+              />
 
               {/* Association Events Section */}
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Événements de l'association</Text>
               </View>
 
-              {loading ? (
+              {!eventsReady ? (
                 <ActivityIndicator size="small" color={Brand.primaryDeep} style={{ marginVertical: 20 }} />
               ) : upcomingEvents(events, todayIso()).length === 0 ? (
                 <Text style={styles.emptyText}>Aucun événement pour l'instant</Text>
@@ -2021,12 +2110,18 @@ export default function HomeView({
                   })}
                 </View>
               )}
+
             </>
           )}
 
           {/* Brand & RGPD Footer */}
           <View style={styles.homeFooterContainer}>
-            <Text style={styles.homeFooterBrand}>LE PETIT TOU</Text>
+            <Pressable
+              delayLongPress={1500}
+              onLongPress={() => Alert.alert('Chronométrage du démarrage', startupReport())}
+            >
+              <Text style={styles.homeFooterBrand}>LE PETIT TOU</Text>
+            </Pressable>
             <Text style={styles.homeFooterDesc}>
               Le guide des meilleures adresses de Toulouse
             </Text>
@@ -2284,7 +2379,7 @@ export default function HomeView({
                 <View style={[styles.gridIconBg, { backgroundColor: '#1E293B15' }]}>
                   <Compass color={Brand.ink} size={24} strokeWidth={2} />
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={styles.gridItemText}>
                   <Text style={[styles.gridItemLabel, selectedCategoryFilter === null && styles.gridItemLabelSelected]}>
                     Toutes les adresses
                   </Text>
@@ -2309,7 +2404,7 @@ export default function HomeView({
                     <View style={[styles.gridIconBg, { backgroundColor: `${category.color || Brand.primary}20` }]}>
                       <DynamicIcon name={category.icon_name} title={category.name} color={category.color || Brand.primary} size={24} />
                     </View>
-                    <View style={{ flex: 1 }}>
+                    <View style={styles.gridItemText}>
                       <Text style={[styles.gridItemLabel, isSelected && styles.gridItemLabelSelected]} numberOfLines={2}>
                         {category.name}
                       </Text>
@@ -2471,8 +2566,8 @@ export default function HomeView({
                     { id: 'likes', label: 'Plus aimés', desc: 'Classés selon les likes réels de la communauté Le Petit Tou' },
                     { id: 'rating', label: 'Mieux notés', desc: 'Les meilleures notes Google & Petit Tou en premier' },
                     { id: 'recommended', label: 'Coups de cœur', desc: 'La sélection officielle recommandée par nos rédacteurs' },
-                    { id: 'new', label: 'Nouveautés', desc: 'Les adresses les plus récentes de notre guide' },
-                  ].filter(s => Features.externalRatings || s.id !== 'rating').map(s => {
+                    { id: 'new', label: '🆕 Nouveautés', desc: 'Les adresses les plus récentes de notre guide' },
+                  ].map(s => {
                     const isSelected = selectedSort === s.id;
                     return (
                       <Pressable
@@ -2564,24 +2659,19 @@ export default function HomeView({
         <AdminPortalModal
           visible={showAdminModal}
           adminCode={adminCodeRef.current}
-          onClose={() => {
-            adminCodeRef.current = '';
-            setShowAdminModal(false);
-            loadSupabaseData(true);
+          onCatalogChanged={() => {
+            catalogChangedRef.current = true;
           }}
-          onLogout={() => {
-            adminCodeRef.current = '';
-            setShowAdminModal(false);
-            loadSupabaseData(true);
-          }}
+          onClose={closeAdminPortal}
+          onLogout={closeAdminPortal}
         />
         </ErrorBoundary>
       )}
 
       <NotificationSettingsModal visible={showNotifSettings} onClose={() => setShowNotifSettings(false)} />
+      <NotificationWelcomeModal visible={showNotifWelcome} onClose={() => setShowNotifWelcome(false)} />
 
       {/* Privacy Policy Modal */}
-
       <PrivacyPolicyModal
         visible={showPrivacyPolicy}
         onClose={() => setShowPrivacyPolicy(false)}

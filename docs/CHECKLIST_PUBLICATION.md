@@ -5,8 +5,8 @@ Référence détaillée : `docs/audit/` (audit de sécurité, juridique et bouti
 ## 1. Base de données (Supabase → SQL Editor)
 Ordre : `002` → `003` → `004` → `005` (avec ton code admin) → `006` → `007` → `008` → `009`. Ne jamais rejouer un script plus ancien après `006`.
 - [x] 006, 007, 008 : déjà lancés en production (21/10).
-- [ ] `009_hide_partner_price.sql` : ferme la lecture publique de `sponsored_partners` (le prix payé était lisible) et crée la vue publique. **À lancer en même temps que la mise à jour de l'appli** : une ancienne version de l'appli ne verrait plus les partenaires.
-- [ ] Vérifier après 009 : `scripts/audit-prod-check.sh`.
+- [ ] `016_hide_partner_price.sql` : ferme la lecture publique de `sponsored_partners` (le prix payé était lisible) et crée la vue publique. **À lancer en même temps que la mise à jour de l'appli** : une ancienne version de l'appli ne verrait plus les partenaires.
+- [ ] Vérifier après 016 : `scripts/audit-prod-check.sh`.
 
 ## 2. Décisions ouvertes (voir `docs/audit/04-SUIVI-2026-10-21.md`)
 - [ ] N-09 : verrouillage anti force brute global (10 mauvais codes bloquent tout le monde 15 min).

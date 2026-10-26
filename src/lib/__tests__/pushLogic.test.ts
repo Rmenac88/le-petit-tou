@@ -47,3 +47,23 @@ test('valeurs par défaut prudentes et messages d’erreur en français pour cha
     assert.ok(ENABLE_FAILURE_MESSAGES[k].length > 20);
   }
 });
+
+test('choix des notifications au premier lancement : une seule fois, jamais si déjà actif ou bloqué par le système', async () => {
+  const { shouldOfferPushWelcome } = await import('../pushLogic.ts');
+  const base = { supported: true, prompted: false, enabled: false, permission: 'can_ask' as const };
+  assert.equal(shouldOfferPushWelcome(base), true);
+  assert.equal(shouldOfferPushWelcome({ ...base, permission: 'granted' }), true); // autorisé par le système mais pas encore choisi dans l'appli
+  assert.equal(shouldOfferPushWelcome({ ...base, prompted: true }), false); // déjà proposé
+  assert.equal(shouldOfferPushWelcome({ ...base, enabled: true, permission: 'granted' }), false); // déjà inscrit
+  assert.equal(shouldOfferPushWelcome({ ...base, permission: 'blocked' }), false); // bloqué : les réglages expliquent comment faire
+  assert.equal(shouldOfferPushWelcome({ ...base, supported: false }), false); // web, simulateur
+});
+
+test('les trois familles de messages proposées correspondent aux préférences enregistrées côté serveur', async () => {
+  const { PUSH_OPTIONS, DEFAULT_PUSH_PREFERENCES, hasAnyPushChoice } = await import('../pushLogic.ts');
+  assert.deepEqual(PUSH_OPTIONS.map((o) => o.key).sort(), Object.keys(DEFAULT_PUSH_PREFERENCES).sort());
+  for (const o of PUSH_OPTIONS) assert.ok(o.emoji && o.label && o.hint.length > 10, o.key);
+  assert.equal(hasAnyPushChoice(DEFAULT_PUSH_PREFERENCES), true);
+  assert.equal(hasAnyPushChoice({ notify_events: false, notify_agenda: false, notify_new_spots: false }), false);
+  assert.equal(hasAnyPushChoice({ notify_events: false, notify_agenda: false, notify_new_spots: true }), true);
+});

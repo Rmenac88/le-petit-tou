@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -30,6 +30,17 @@ export default function AdminPasswordModal({
   const [errorMsg, setErrorMsg] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isSlow, setIsSlow] = useState(false);
+
+  // Ouvre la connexion (DNS + TLS) pendant que le code se saisit : sur un réseau mobile, la première requête
+  // coûte plusieurs centaines de millisecondes que « Déverrouiller » n'a plus à payer. Requête publique minuscule.
+  useEffect(() => {
+    if (!visible) return;
+    Promise.resolve(supabase.from('categories').select('id', { head: true }).limit(1)).then(
+      () => {},
+      () => {}
+    );
+  }, [visible]);
 
   if (!visible) return null;
 
@@ -41,19 +52,19 @@ export default function AdminPasswordModal({
     }
 
     setIsVerifying(true);
+    setIsSlow(false);
     setErrorMsg('');
+    // Réseau lent : on le dit au lieu de laisser un rond qui tourne sans explication
+    const slowTimer = setTimeout(() => setIsSlow(true), 3000);
 
     try {
       // Vérification uniquement côté serveur (fonction Supabase) : plus aucun contrôle local de secours.
       const { data, error } = await supabase.rpc('verify_admin_access', { access_code: cleanPass });
       if (!error && data === true) {
-        setIsSuccess(true);
-        setTimeout(() => {
-          setPassword('');
-          setIsSuccess(false);
-          setIsVerifying(false);
-          onSuccess(cleanPass);
-        }, 350);
+        // Accès immédiat : plus d'attente artificielle entre la réponse du serveur et l'ouverture du portail
+        setPassword('');
+        setIsVerifying(false);
+        onSuccess(cleanPass);
       } else {
         setIsVerifying(false);
         setErrorMsg(error ? 'Connexion impossible. Réessaie dans un instant.' : "Clé d'accès incorrecte.");
@@ -61,6 +72,9 @@ export default function AdminPasswordModal({
     } catch {
       setIsVerifying(false);
       setErrorMsg('Connexion impossible. Réessaie dans un instant.');
+    } finally {
+      clearTimeout(slowTimer);
+      setIsSlow(false);
     }
   };
 
@@ -171,6 +185,8 @@ export default function AdminPasswordModal({
               )}
             </Pressable>
           </View>
+
+          {isSlow ? <Text style={styles.securityHint}>Connexion lente… patiente un instant.</Text> : null}
 
           <Text style={styles.securityHint}>
             Connexion chiffrée réservée au bureau de l'association.

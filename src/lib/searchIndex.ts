@@ -1,4 +1,9 @@
 import dataset from "../constants/dataset.json";
+import { categoryText } from "./searchCategory";
+
+const CATEGORY_NAMES: Record<string, string> = Object.fromEntries(
+  ((dataset as any).categories || []).map((c: any) => [c.id, c.name || c.title || ""])
+);
 
 // Inverted Search Index for 0.1ms instant lookups across all 790 Toulouse venues
 interface IndexedSpot {
@@ -34,9 +39,7 @@ class FastSearchIndex {
   private tokenMap: Map<string, Set<number>> = new Map();
   private initialized = false;
 
-  constructor() {
-    this.init();
-  }
+  // Index construit à la première recherche (et non à l'import) : le démarrage n'attend pas ce travail.
 
   private init() {
     if (this.initialized) return;
@@ -45,7 +48,7 @@ class FastSearchIndex {
     this.indexedSpots = rawAddresses.map((a, idx) => {
       const normalizedTitle = normalize(a.title || a.name || "");
       const normalizedDesc = normalize(a.description || a.full_description || "");
-      const normalizedCat = normalize(a.category || "");
+      const normalizedCat = categoryText(a, CATEGORY_NAMES);
       const normalizedLocation = normalize(a.location || a.quartier || "");
       const normalizedTags = (a.tags || []).map(normalize).join(" ");
       
@@ -98,7 +101,7 @@ class FastSearchIndex {
     this.indexedSpots = rawAddresses.map((a, idx) => {
       const normalizedTitle = normalize(a.title || a.name || "");
       const normalizedDesc = normalize(a.description || a.full_description || "");
-      const normalizedCat = normalize(a.category || "");
+      const normalizedCat = categoryText(a, CATEGORY_NAMES);
       const normalizedLocation = normalize(a.location || a.quartier || a.address || "");
       const normalizedTags = (a.tags || []).map(normalize).join(" ");
       

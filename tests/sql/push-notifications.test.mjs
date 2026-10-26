@@ -12,6 +12,7 @@ const here = new URL('.', import.meta.url);
 const baseline = readFileSync(new URL('baseline.sql', here), 'utf8');
 const m006 = readFileSync(new URL('../../src/scripts/006_security_lockdown.sql', here), 'utf8');
 const m007 = readFileSync(new URL('../../src/scripts/007_push_notifications.sql', here), 'utf8');
+const m010 = readFileSync(new URL('../../src/scripts/010_push_style.sql', here), 'utf8');
 
 const GOOD_CODE = 'Code-De-Test-Synthetique-01';
 const DEV_A = '11111111-1111-4111-8111-111111111111';
@@ -43,6 +44,7 @@ async function newDb() {
   await db.exec(m006);
   await db.exec(NET_STUB);
   await db.exec(m007);
+  await db.exec(m010);
   return db;
 }
 
@@ -117,7 +119,7 @@ describe('détection des événements métier (triggers)', () => {
     await db.exec(`insert into public.addresses (id, title, is_new) values ('aaaaaaaa-0000-4000-8000-000000000002', 'Café neuf', true)`);
     const o = await rows(db, `select kind, title, body, data from public.push_outbox order by id`);
     assert.deepEqual(o.map((r) => r.kind), ['event', 'agenda', 'new_spot']);
-    assert.equal(o[0].body, 'Soirée jazz');
+    assert.equal(o[0].body, 'Soirée jazz — le 01/08');
     assert.equal(o[1].body, 'Karaoké — 03/09');
     assert.equal(o[2].body, 'Café neuf');
     assert.equal(o[0].data.kind, 'event');
@@ -238,9 +240,10 @@ describe('envoi, tickets, reprises, reçus (réponses Expo SIMULÉES)', () => {
     assert.equal(req.body.length, 2);
     assert.deepEqual(req.body.map((m) => m.to).sort(), [TOK_A, TOK_B]);
     const m = req.body[0];
-    assert.equal(m.title, 'Nouvel événement');
-    assert.equal(m.body, 'Soirée');
-    assert.deepEqual(Object.keys(m).sort(), ['body', 'channelId', 'data', 'sound', 'title', 'to', 'ttl']);
+    assert.equal(m.title, '🎉 Nouvel événement');
+    assert.equal(m.body, 'Soirée — le 01/08');
+    assert.deepEqual(Object.keys(m).sort(),
+      ['body', 'channelId', 'data', 'interruptionLevel', 'priority', 'sound', 'subtitle', 'threadId', 'title', 'to', 'ttl']);
     assert.ok(!JSON.stringify(req.body).includes(DEV_A), "l'identifiant d'appareil ne part jamais chez le fournisseur");
     assert.deepEqual((await rows(db, `select distinct status from public.push_deliveries`)).map((r) => r.status), ['queued']);
   });

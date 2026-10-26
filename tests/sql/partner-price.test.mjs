@@ -1,4 +1,4 @@
-// 009 : le montant payé par les partenaires reste interne. PostgreSQL réel (PGlite).
+// 016 : le montant payé par les partenaires reste interne. PostgreSQL réel (PGlite).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -9,7 +9,7 @@ const here = new URL('.', import.meta.url);
 const read = (p) => readFileSync(new URL(p, here), 'utf8');
 const baseline = read('baseline.sql');
 const m006 = read('../../src/scripts/006_security_lockdown.sql');
-const m009 = read('../../src/scripts/009_hide_partner_price.sql');
+const m009 = read('../../src/scripts/016_hide_partner_price.sql');
 
 const GOOD_CODE = 'Code-De-Test-Synthetique-01';
 
@@ -26,7 +26,7 @@ async function as(db, role, sql, params = []) {
   try { return await db.query(sql, params); } finally { await db.exec('reset role'); }
 }
 
-describe('009 : prix des partenaires', () => {
+describe('016 : prix des partenaires', () => {
   test("la clé publique ne peut plus lire la table des partenaires", async () => {
     const db = await newDb();
     for (const role of ['anon', 'authenticated']) {

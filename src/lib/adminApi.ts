@@ -101,7 +101,7 @@ export function createAdminDb(code: string, client: RpcClient) {
 
 /**
  * Lecture admin des partenaires, montant payé compris. La table n'est plus lisible avec la clé publique
- * (voir scripts/009_hide_partner_price.sql) : seule admin_read la renvoie, après vérification du code.
+ * (voir scripts/016_hide_partner_price.sql) : seule admin_read la renvoie, après vérification du code.
  */
 export async function readAdminPartners(code: string, client: RpcClient): Promise<AdminResult> {
   if (!code || !code.trim()) {

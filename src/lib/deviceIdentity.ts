@@ -19,7 +19,7 @@ const generateUUID = (): string => {
  * - Sur iOS/Android : Stockage matériel sécurisé via Expo SecureStore (Keychain / Keystore).
  * - Sur Web : Stockage local persistant via window.localStorage.
  */
-export const getOrCreateDeviceId = async (): Promise<string> => {
+const loadOrCreateDeviceId = async (): Promise<string> => {
   try {
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined' && window.localStorage) {
@@ -46,4 +46,15 @@ export const getOrCreateDeviceId = async (): Promise<string> => {
     console.warn('[DeviceIdentity] Fallback generate device ID:', error);
     return generateUUID();
   }
+};
+
+let cachedDeviceId: string | null = null;
+
+/**
+ * Identifiant d'appareil, mémorisé pour toute la session : si le stockage sécurisé est indisponible, l'identifiant
+ * de secours reste le même (sinon chaque like ou action compterait comme un nouvel appareil).
+ */
+export const getOrCreateDeviceId = async (): Promise<string> => {
+  if (!cachedDeviceId) cachedDeviceId = await loadOrCreateDeviceId();
+  return cachedDeviceId;
 };

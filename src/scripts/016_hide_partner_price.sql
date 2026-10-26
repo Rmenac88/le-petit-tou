@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- LE PETIT TOU — 009 : le montant payé par les partenaires reste interne
 --
--- À lancer APRÈS 006, 007 et 008. Dans Supabase -> SQL Editor -> New query -> Run.
+-- À lancer APRÈS 006 à 015. Dans Supabase -> SQL Editor -> New query -> Run.
 -- Résultat attendu : "Success. No rows returned". Relançable sans danger. Aucun secret à remplacer.
 --
 -- Pourquoi : 006 donne la lecture publique des 4 tables du catalogue, ce qui rend

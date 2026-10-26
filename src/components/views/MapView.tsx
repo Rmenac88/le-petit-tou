@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useDeferredValue } from 'react';
 import {
   StyleSheet,
   Text,
@@ -15,6 +15,8 @@ import {
   PanResponder,
 } from 'react-native';
 import * as Location from 'expo-location';
+import { withDeadline, withTimeout } from '../../lib/fetchWithTimeout';
+import { BRIDGE_BEFORE_LOAD, buildMapMessageScript, slimSpots, spotsKey } from '../../lib/mapBridge';
 import {
   Compass,
   Navigation,
@@ -55,28 +57,33 @@ import { discoveryStore } from '../../lib/discoveryStore';
 import { formatRating } from '../../lib/formatRating';
 import { onAppEvent } from '../../lib/appEvents';
 import { Brand } from '../../constants/brand';
-import { Features } from '../../constants/features';
-// Conditional dynamic imports to prevent native modules breaking the web bundle
-let NativeMapView: any = null;
-let NativeMarker: any = null;
-let NativePolyline: any = null;
+// Carte Mapbox GL : une page HTML unique, affichée dans une iframe sur le web et dans une WebView sur téléphone.
+// (chargement conditionnel pour ne pas casser le bundle web)
+let NativeWebView: any = null;
 if (Platform.OS !== 'web') {
   try {
-    const Maps = require('react-native-maps');
-    NativeMapView = Maps.default;
-    NativeMarker = Maps.Marker;
-    NativePolyline = Maps.Polyline;
+    NativeWebView = require('react-native-webview').WebView;
   } catch (e) {
-    console.warn('Native maps not loaded', e);
+    console.warn('WebView non chargée', e);
   }
 }
+
+// La carte est la même page Mapbox GL partout (iframe sur le web, WebView sur téléphone) :
+// tout le dialogue avec elle passe par `iframeRef.current.contentWindow.postMessage` (émulé sur téléphone).
+const USE_WEB_MAP = true;
 
 // Toulouse Default Center Coordinates
 const TOULOUSE_LAT = 43.6047;
 const TOULOUSE_LNG = 1.4442;
 const MAPBOX_ACCESS_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
+
+/** Libellés des onglets de la recherche (avec leurs accents). */
+const SUBTAB_LABELS = { tout: 'Tout', adresses: 'Adresses', evenements: 'Événements', articles: 'Articles' } as const;
 const { height } = Dimensions.get('window');
 
+
+/** Paliers de budget proposés en un appui sur la carte (€ par personne). */
+const QUICK_BUDGETS = [10, 20, 30] as const;
 
 export const estimateSpotBudget = (addr: any) => getBudgetInfo(addr);
 
@@ -121,7 +128,10 @@ const triggerHaptic = () => {
       }
     }
   } catch (e) {}
-};import { getWebMapHtml } from './map/mapboxHtmlTemplate';
+};
+import { getWebMapHtml, MAP_BACKGROUND } from './map/mapboxHtmlTemplate';
+import BrandSwitch from '../BrandSwitch';
+import SearchPill from '../SearchPill';
 
 export const getMarkerColor = (category: string) => {
   switch (category || 'food') {
@@ -217,6 +227,12 @@ export default function MapView({
 
   // Real-time Database loaded/filtered spots list
   const [spots, setSpots] = useState<any[]>(PT_SPOTS);
+  // Nombre d'adresses par catégorie, calculé sur la liste réelle (les puces affichaient des nombres figés)
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of spots) counts[s.cat] = (counts[s.cat] ?? 0) + 1;
+    return counts;
+  }, [spots]);
   const [filteredSpots, setFilteredSpots] = useState<any[]>(PT_SPOTS);
 
   // Filters State Properties (Matching your design screenshot!)
@@ -244,12 +260,50 @@ export default function MapView({
 
   const mapRef = useRef<any>(null);
   const iframeRef = useRef<any>(null);
+  const webViewRef = useRef<any>(null);
+  // Relance de la carte si le système a arrêté la WebView ; au plus 3 fois en 30 s (pas de boucle qui vide la batterie)
+  const crashTimesRef = useRef<number[]>([]);
+  const reloadMapAfterCrash = () => {
+    const now = Date.now();
+    crashTimesRef.current = crashTimesRef.current.filter((t) => now - t < 30000);
+    if (crashTimesRef.current.length >= 3) return;
+    crashTimesRef.current.push(now);
+    webViewRef.current?.reload();
+  };
+  // Liste envoyée à la carte : allégée (id, position, nom, catégorie, note) et jamais renvoyée si elle n'a pas changé
+  const filteredSpotsRef = useRef<any[]>([]);
+  const lastSentSpotsKeyRef = useRef('');
+  const sendSpotsToMap = (force = false) => {
+    const list = filteredSpotsRef.current;
+    const key = spotsKey(list);
+    if (!force && key === lastSentSpotsKeyRef.current) return;
+    lastSentSpotsKeyRef.current = key;
+    iframeRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ type: 'UPDATE_SPOTS', slim: true, spots: slimSpots(list) }),
+      '*'
+    );
+  };
+  // Dernier gestionnaire des messages de la carte (iframe sur le web, WebView sur téléphone)
+  const mapMessageRef = useRef<((event: { data: any }) => void) | null>(null);
+  // Sur téléphone, `iframeRef.current.contentWindow.postMessage(...)` est émulé par la WebView :
+  // tout le code de la carte web s'applique alors tel quel.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    iframeRef.current = {
+      contentWindow: {
+        postMessage: (data: string) => webViewRef.current?.injectJavaScript(buildMapMessageScript(data)),
+      },
+    };
+  }, []);
 
+  // Une seule vérification de la permission de localisation (et non à chaque changement de `spots`)
   useEffect(() => {
     checkPermission();
+  }, []);
 
-    // Listen to Leaflet marker clicks on Web
-      const handleWebMessage = (event: MessageEvent) => {
+  // Messages de l'iframe Mapbox : web uniquement (`window.addEventListener` n'existe pas sur téléphone)
+  useEffect(() => {
+      const handleWebMessage = (event: { data: any }) => {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'SPOT_CLICKED') {
@@ -262,10 +316,7 @@ export default function MapView({
             handleCloseCard();
           } else if (data.type === 'MAP_READY') {
             if (iframeRef.current) {
-              iframeRef.current.contentWindow?.postMessage(
-                JSON.stringify({ type: 'UPDATE_SPOTS', spots: filteredSpots }),
-                '*'
-              );
+              sendSpotsToMap(true);
               const currentPos = userLocationRef.current || userLocation;
               if (currentPos) {
                 iframeRef.current.contentWindow?.postMessage(
@@ -299,10 +350,13 @@ export default function MapView({
           }
         } catch (e) {}
       };
-      window.addEventListener('message', handleWebMessage);
+      mapMessageRef.current = handleWebMessage;
+      // `window.addEventListener` n'existe que sur le web ; sur téléphone la WebView appelle `mapMessageRef`
+      if (Platform.OS !== 'web') return;
+      window.addEventListener('message', handleWebMessage as any);
 
       return () => {
-        window.removeEventListener('message', handleWebMessage);
+        window.removeEventListener('message', handleWebMessage as any);
       };
   }, [spots]);
 
@@ -313,7 +367,7 @@ export default function MapView({
       if (spot) {
         handleSelectSpot(spot);
 
-        if (Platform.OS === 'web') {
+        if (USE_WEB_MAP) {
           setTimeout(() => {
             if (iframeRef.current) {
               iframeRef.current.contentWindow?.postMessage(
@@ -337,14 +391,12 @@ export default function MapView({
     }
   }, [focusedSpotId, spots]);
 
-  // Auto-sync filtered spots to web Leaflet map
+  // Synchronise la carte avec la liste filtrée : regroupé (150 ms) et seulement si la liste a vraiment changé
+  filteredSpotsRef.current = filteredSpots;
   useEffect(() => {
-    if (Platform.OS === 'web' && iframeRef.current) {
-      iframeRef.current.contentWindow?.postMessage(
-        JSON.stringify({ type: 'UPDATE_SPOTS', spots: filteredSpots }),
-        '*'
-      );
-    }
+    if (!(USE_WEB_MAP && iframeRef.current)) return;
+    const timer = setTimeout(() => sendSpotsToMap(), 150);
+    return () => clearTimeout(timer);
   }, [filteredSpots]);
 
 
@@ -397,12 +449,14 @@ export default function MapView({
     return rawSpots.map((addr: any) => placesRepository.formatRawAddress(addr));
   };
 
-  // 2. Synchronous Instant 0ms Filter Engine (Search, Category, Ambiance, Budget, SubTabs)
+  // 2. Filtre des adresses (recherche, catégorie, ambiance, budget, onglets) ; la recherche est différée pour que la
+  // saisie reste fluide.
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   useEffect(() => {
     let results = spots.filter((s: any) => {
       // A. Search Query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
+      if (deferredSearchQuery.trim()) {
+        const q = deferredSearchQuery.toLowerCase().trim();
         const matchesName = (s.name || '').toLowerCase().includes(q);
         const matchesDesc = (s.description || '').toLowerCase().includes(q);
         const matchesTag = s.tags && s.tags.some((t: string) => t.toLowerCase().includes(q));
@@ -443,12 +497,12 @@ export default function MapView({
     });
 
     setFilteredSpots(results);
-  }, [spots, searchQuery, subTab, category, ambiance, budget, openOnly]);
+  }, [spots, deferredSearchQuery, subTab, category, ambiance, budget, openOnly]);
 
   const handleSelectSpot = (spot: any, skipMapFly = false) => {
     triggerHaptic();
     setSelectedSpot(spot);
-    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+    if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({
           type: 'SELECT_SPOT',
@@ -456,7 +510,6 @@ export default function MapView({
           lat: spot.lat,
           lng: spot.lng,
           skipFly: skipMapFly, // l'iframe ne refait pas flyTo si déjà fait par le click du marqueur
-          spots: filteredSpots,
         }),
         '*'
       );
@@ -480,7 +533,7 @@ export default function MapView({
   const handleResetToulouseView = () => {
     triggerHaptic();
     handleCloseCard();
-    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+    if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({ type: 'RESET_TOULOUSE' }),
         '*'
@@ -497,9 +550,9 @@ export default function MapView({
 
   const handleCloseCard = () => {
     setIsSearchFocused(false);
-    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+    if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
-        JSON.stringify({ type: 'DESELECT_SPOT', spots: filteredSpots }),
+        JSON.stringify({ type: 'DESELECT_SPOT' }),
         '*'
       );
     }
@@ -520,7 +573,7 @@ export default function MapView({
     setFilterSheetVisible(true);
     Animated.spring(filterAnim, {
       toValue: FILTER_SNAP_HALF,
-      useNativeDriver: true,
+      useNativeDriver: false,
       tension: 40,
       friction: 8,
     }).start();
@@ -530,7 +583,7 @@ export default function MapView({
     Animated.timing(filterAnim, {
       toValue: Dimensions.get('window').height,
       duration: 250,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start(() => {
       setFilterSheetVisible(false);
       if (onToggleDock) onToggleDock(true);
@@ -563,7 +616,7 @@ export default function MapView({
             } else {
               Animated.spring(filterAnim, {
                 toValue: FILTER_SNAP_HALF,
-                useNativeDriver: true,
+                useNativeDriver: false,
                 tension: 50,
                 friction: 8,
               }).start();
@@ -571,7 +624,7 @@ export default function MapView({
           } else if (vy < -0.5) {
             Animated.spring(filterAnim, {
               toValue: FILTER_SNAP_FULL,
-              useNativeDriver: true,
+              useNativeDriver: false,
               tension: 50,
               friction: 8,
             }).start();
@@ -580,14 +633,14 @@ export default function MapView({
             if (curY < mid) {
               Animated.spring(filterAnim, {
                 toValue: FILTER_SNAP_FULL,
-                useNativeDriver: true,
+                useNativeDriver: false,
                 tension: 50,
                 friction: 8,
               }).start();
             } else if (curY < FILTER_SNAP_HALF + height * 0.15) {
               Animated.spring(filterAnim, {
                 toValue: FILTER_SNAP_HALF,
-                useNativeDriver: true,
+                useNativeDriver: false,
                 tension: 50,
                 friction: 8,
               }).start();
@@ -672,16 +725,19 @@ export default function MapView({
 
       if (status === 'granted') {
         setLocationPermission('granted');
-        const pos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
+        // expo-location n'a pas de délai propre : sans GPS (intérieur, mode économie) la promesse resterait suspendue
+        const pos = await withDeadline(
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+          timeoutMs,
+          'Position indisponible'
+        );
         const coords = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
         };
         userLocationRef.current = coords;
         setUserLocation(coords);
-        if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+        if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
           iframeRef.current.contentWindow.postMessage(
             JSON.stringify({ type: 'USER_LOCATION', ...coords, center: false }),
             '*'
@@ -750,7 +806,7 @@ export default function MapView({
     try {
       const coords = await getPreciseUserLocation(6000);
       if (coords && centerMap) {
-        if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+        if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
           iframeRef.current.contentWindow.postMessage(
             JSON.stringify({ type: 'USER_LOCATION', ...coords, center: true }),
             '*'
@@ -770,7 +826,7 @@ export default function MapView({
   };
 
   const handleResetToToulouse = () => {
-    if (Platform.OS === 'web') {
+    if (USE_WEB_MAP) {
       if (iframeRef.current) {
         iframeRef.current.contentWindow?.postMessage(
           JSON.stringify({ type: 'RESET_TOULOUSE' }),
@@ -796,7 +852,7 @@ export default function MapView({
     }
 
     if (coords) {
-      if (Platform.OS === 'web') {
+      if (USE_WEB_MAP) {
         if (iframeRef.current?.contentWindow) {
           iframeRef.current.contentWindow.postMessage(
             JSON.stringify({ type: 'USER_LOCATION', ...coords, center: true }),
@@ -824,7 +880,7 @@ export default function MapView({
     triggerHaptic();
     const next = !is3dMode;
     setIs3dMode(next);
-    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+    if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({ type: 'SET_3D_MODE', enabled: next }),
         '*'
@@ -890,7 +946,7 @@ export default function MapView({
     setRouteLoading(true);
     const endCoord = { lat: spot.lat, lng: spot.lng };
 
-    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+    if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
       // Mettre à jour le point de position utilisateur sur la carte web
       if (isFromUser) {
         iframeRef.current.contentWindow.postMessage(
@@ -913,11 +969,12 @@ export default function MapView({
         }),
         '*'
       );
-      // setRouteLoading sera remis à false par ROUTE_READY ou ROUTE_ERROR
+      // setRouteLoading sera remis à false par ROUTE_READY ou ROUTE_ERROR ; filet de sécurité si la page ne répond jamais
+      setTimeout(() => setRouteLoading(false), 15000);
     } else {
       // Sur mobile natif (iOS / Android), fetch Mapbox direct
       try {
-        const res = await fetch(
+        const res = await withTimeout(fetch, 10_000)(
           `https://api.mapbox.com/directions/v5/mapbox/walking/${startCoord.lng},${startCoord.lat};${endCoord.lng},${endCoord.lat}?geometries=geojson&overview=full&access_token=${MAPBOX_ACCESS_TOKEN}`
         );
         if (!res.ok) throw new Error('Route request failed');
@@ -959,7 +1016,7 @@ export default function MapView({
   const handleClearRoute = () => {
     triggerHaptic();
     setActiveRoute(null);
-    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+    if (USE_WEB_MAP && iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({ type: 'CLEAR_ROUTE' }),
         '*'
@@ -1095,12 +1152,7 @@ export default function MapView({
           ref={iframeRef}
           srcDoc={getWebMapHtml(MAPBOX_ACCESS_TOKEN)}
           onLoad={() => {
-            setTimeout(() => {
-              iframeRef.current?.contentWindow?.postMessage(
-                JSON.stringify({ type: 'UPDATE_SPOTS', spots: filteredSpots }),
-                '*'
-              );
-            }, 200);
+            setTimeout(() => sendSpotsToMap(true), 200);
           }}
           style={{
             position: 'absolute',
@@ -1114,125 +1166,53 @@ export default function MapView({
           tabIndex={-1}
         />
       ) : (
-        NativeMapView && (
-          <NativeMapView
-            ref={mapRef}
+        NativeWebView && (
+          <NativeWebView
+            ref={webViewRef}
             style={styles.nativeMap}
-            customMapStyle={customGoogleMapStyle}
-            initialRegion={{
-              latitude: userLocation?.lat || TOULOUSE_LAT,
-              longitude: userLocation?.lng || TOULOUSE_LNG,
-              latitudeDelta: 0.02,
-              longitudeDelta: 0.02,
-            }}
-            showsUserLocation={true}
-            showsMyLocationButton={false}
-            onPress={handleCloseCard}
-          >
-            {/* Render custom filtered spots */}
-            {filteredSpots.map((s) => {
-              const isSelected = selectedSpot?.id === s.id;
-              return (
-                <NativeMarker
-                  key={s.id}
-                  coordinate={{ latitude: s.lat, longitude: s.lng }}
-                  onPress={() => handleSelectSpot(s)}
-                  zIndex={isSelected ? 99 : 1}
-                  tracksViewChanges={isSelected}
-                >
-                  <View
-                    style={[
-                      styles.nativeMarker,
-                      { backgroundColor: getMarkerColor(s.cat || s.category) },
-                      visitedSpotIds.includes(s.id) && styles.nativeMarkerDiscovered,
-                      isSelected && styles.nativeMarkerSelected,
-                    ]}
-                  >
-                    {renderCategoryIcon(s.cat || s.category)}
-                    {visitedSpotIds.includes(s.id) && (
-                      <View style={styles.discoveredBadgeDot} />
-                    )}
-                  </View>
-                </NativeMarker>
-              );
-            })}
-
-            {/* Tracé de l'itinéraire piéton sur carte native */}
-            {NativePolyline && activeRoute?.routeCoordinates && activeRoute.routeCoordinates.length > 0 && (
-              <>
-                <NativePolyline
-                  coordinates={activeRoute.routeCoordinates}
-                  strokeColor={Brand.ink}
-                  strokeWidth={7}
-                />
-                <NativePolyline
-                  coordinates={activeRoute.routeCoordinates}
-                  strokeColor={Brand.primary}
-                  strokeWidth={4.5}
-                />
-              </>
-            )}
-          </NativeMapView>
+            originWhitelist={['*']}
+            source={{ html: getWebMapHtml(MAPBOX_ACCESS_TOKEN), baseUrl: 'https://localhost' }}
+            injectedJavaScriptBeforeContentLoaded={BRIDGE_BEFORE_LOAD}
+            onMessage={(e: any) => mapMessageRef.current?.({ data: e.nativeEvent.data })}
+            javaScriptEnabled
+            domStorageEnabled
+            setSupportMultipleWindows={false}
+            overScrollMode="never"
+            scrollEnabled={false}
+            bounces={false}
+            allowsInlineMediaPlayback
+            androidLayerType="hardware"
+            cacheEnabled
+            textZoom={100}
+            setBuiltInZoomControls={false}
+            setDisplayZoomControls={false}
+            // Téléphone modeste : le système peut arrêter la WebView (mémoire). La carte repart alors toute seule
+            // et reçoit de nouveau les adresses au signal MAP_READY.
+            onRenderProcessGone={reloadMapAfterCrash}
+            onContentProcessDidTerminate={reloadMapAfterCrash}
+            onError={(e: any) => console.warn('[Map] WebView error', e?.nativeEvent?.description)}
+          />
         )
       )}
 
-      {/* Real Neo-Brutalist Search Bar with Live TextInput */}
-      <View style={styles.searchBarContainer}>
-        <View style={styles.searchIconBadge}>
-          <Search size={16} color={Brand.white} strokeWidth={2} />
-        </View>
-
-        <TextInput
-          style={styles.searchInput}
-          placeholder={
-            filteredSpots && filteredSpots.length > 0
-              ? `Rechercher (${filteredSpots.length} adresses)...`
-              : "Rechercher une adresse..."
-          }
-          placeholderTextColor={Brand.inkSoft}
-          value={searchQuery}
-          onChangeText={(text) => {
-            setSearchQuery(text);
-            setIsSearchFocused(true);
-          }}
-          onFocus={() => setIsSearchFocused(true)}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-        />
-
-        {searchQuery.trim().length > 0 && (
-          <Pressable
-            style={styles.searchClearBtn}
-            onPress={() => {
-              setSearchQuery('');
-              setIsSearchFocused(false);
-            }}
-            accessibilityLabel="Effacer la recherche"
-          >
-            <X size={15} color={Brand.inkSoft} strokeWidth={2} />
-          </Pressable>
-        )}
-
-        <View style={styles.searchDivider} />
-
-        {/* Bouton Filtres distinct */}
-        <Pressable
-          style={({ pressed }) => [
-            styles.searchFilterBtn,
-            pressed && styles.searchFilterBtnPressed,
-            filterSheetVisible && styles.searchFilterBtnActive,
-          ]}
-          onPress={handleOpenFilters}
-          accessibilityLabel="Ouvrir les filtres avancés"
-        >
-          <SlidersHorizontal
-            size={17}
-            color={filterSheetVisible ? Brand.primary : Brand.ink}
-            strokeWidth={2}
-          />
-        </Pressable>
-      </View>
+      {/* Barre de recherche : la même que celle de l'accueil (composant partagé) */}
+      <SearchPill
+        style={styles.searchBarContainer}
+        value={searchQuery}
+        placeholder={
+          filteredSpots && filteredSpots.length > 0
+            ? `Rechercher (${filteredSpots.length} adresses)...`
+            : 'Rechercher une adresse...'
+        }
+        onChangeText={(text) => {
+          setSearchQuery(text);
+          setIsSearchFocused(true);
+        }}
+        onFocus={() => setIsSearchFocused(true)}
+        onClear={() => setIsSearchFocused(false)}
+        onOpenFilters={handleOpenFilters}
+        filtersActive={filterSheetVisible}
+      />
 
       {/* Instant Autocomplete Suggestions Card (when typing) */}
       {isSearchFocused && searchQuery.trim().length > 0 && (
@@ -1268,11 +1248,9 @@ export default function MapView({
                     {spot.address || spot.location || 'Toulouse'}
                   </Text>
                 </View>
-                {Features.externalRatings && (
-                  <View style={styles.suggestionRating}>
-                    <Text style={styles.suggestionRatingText}>{formatRating(spot.rating)}</Text>
-                  </View>
-                )}
+                <View style={styles.suggestionRating}>
+                  <Text style={styles.suggestionRatingText}>{formatRating(spot.rating)}</Text>
+                </View>
               </Pressable>
             ))}
 
@@ -1360,6 +1338,7 @@ export default function MapView({
 
       {/* Floating Category Filter Pills Row (Instant 1-tap filtering directly on the map!) */}
       <View
+        pointerEvents="box-none"
         style={[
           styles.floatingCategoryBar,
           activeRoute && { top: Platform.OS === 'ios' ? 180 : 160 },
@@ -1371,13 +1350,13 @@ export default function MapView({
           contentContainerStyle={styles.categoryScrollContent}
         >
           {[
-            { label: 'Tous (790)', value: null, icon: Compass, color: Brand.ink },
-            { label: 'Restos (286)', value: 'food', icon: Utensils, color: Brand.primaryDeep },
-            { label: 'Shopping (231)', value: 'shopping', icon: ShoppingBag, color: Brand.violet },
-            { label: 'Bars & Cafés (141)', value: 'drinks', icon: Wine, color: Brand.chouchou },
-            { label: 'Beauté (71)', value: 'beauty', icon: Scissors, color: Brand.primary },
-            { label: 'Culture (43)', value: 'culture', icon: Landmark, color: '#1FA67A' },
-            { label: 'Sport (17)', value: 'sport', icon: Dumbbell, color: Brand.violet },
+            { label: `Tous (${spots.length})`, value: null, icon: Compass, color: Brand.ink },
+            { label: `Restos (${categoryCounts.food ?? 0})`, value: 'food', icon: Utensils, color: Brand.primaryDeep },
+            { label: `Shopping (${categoryCounts.shopping ?? 0})`, value: 'shopping', icon: ShoppingBag, color: Brand.violet },
+            { label: `Bars & Cafés (${categoryCounts.drinks ?? 0})`, value: 'drinks', icon: Wine, color: Brand.chouchou },
+            { label: `Beauté (${categoryCounts.beauty ?? 0})`, value: 'beauty', icon: Scissors, color: Brand.primary },
+            { label: `Culture (${categoryCounts.culture ?? 0})`, value: 'culture', icon: Landmark, color: '#1FA67A' },
+            { label: `Sport (${categoryCounts.sport ?? 0})`, value: 'sport', icon: Dumbbell, color: Brand.violet },
           ].map((catItem) => {
             const isSelected = category === catItem.value;
             const IconComp = catItem.icon;
@@ -1408,6 +1387,35 @@ export default function MapView({
               </Pressable>
             );
           })}
+
+        </ScrollView>
+
+        {/* Budget en un appui : mêmes paliers que le curseur des filtres ; un second appui retire la limite */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryScrollContent}
+          style={styles.budgetRow}
+          keyboardShouldPersistTaps="handled"
+        >
+          {QUICK_BUDGETS.map((val) => {
+            const isSelected = budget === val;
+            return (
+              <Pressable
+                key={`budget-${val}`}
+                style={[styles.categoryPill, isSelected && styles.budgetPillActive]}
+                onPress={() => {
+                  triggerHaptic();
+                  setBudget(isSelected ? 50 : val);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSelected }}
+                accessibilityLabel={`Budget jusqu'à ${val} euros par personne`}
+              >
+                <Text style={[styles.categoryPillText, isSelected && styles.categoryPillTextSelected]}>{`Jusqu'à ${val} €`}</Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -1419,7 +1427,10 @@ export default function MapView({
           setSelectedSpot(null);
         }}
         onOpenItinerary={(spot) => {
-          handleCalculateRoute(spot);
+          // Téléphone : ouverture immédiate de l'appli de navigation (Google Maps, Plans…).
+          // Web : tracé de l'itinéraire directement sur la carte.
+          if (Platform.OS === 'web') handleCalculateRoute(spot);
+          else handleOpenItinerary(spot);
         }}
         isFavorite={selectedSpot ? likedSpotIds.includes(selectedSpot.id) : false}
         likesCount={selectedSpot ? (likesMap[selectedSpot.id] ?? (Number(selectedSpot.likes_count) || 0)) : 0}
@@ -1513,9 +1524,17 @@ export default function MapView({
       {/* --- Filter Drawer (Slide-up Sheet) calqué exactement sur la capture --- */}
       {filterSheetVisible && (
         <Animated.View
+          // Hauteur animée (le bas reste collé au bas de l'écran) et non plus déplacement : à mi-hauteur, la partie
+          // basse de la fenêtre dépassait de l'écran et le bouton « Voir les résultats » restait introuvable.
           style={[
             styles.filterDrawer,
-            { transform: [{ translateY: filterAnim }] }
+            {
+              height: filterAnim.interpolate({
+                inputRange: [0, FILTER_DRAWER_HEIGHT],
+                outputRange: [FILTER_DRAWER_HEIGHT, 0],
+                extrapolate: 'clamp',
+              }),
+            },
           ]}
         >
           <View {...filterPanResponder.panHandlers} style={styles.drawerDragZone}>
@@ -1552,7 +1571,7 @@ export default function MapView({
                   style={[styles.subTabItem, subTab === tab && styles.subTabItemActive]}
                 >
                   <Text style={[styles.subTabText, subTab === tab && styles.subTabTextActive]}>
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    {SUBTAB_LABELS[tab]}
                   </Text>
                 </Pressable>
               ))}
@@ -1711,12 +1730,7 @@ export default function MapView({
             {/* Open Now Toggle */}
             <View style={styles.toggleRow}>
               <Text style={styles.toggleLabel}>Ouvert actuellement</Text>
-              <Pressable
-                style={[styles.customSwitch, openOnly ? styles.switchActive : styles.switchInactive]}
-                onPress={() => setOpenOnly(!openOnly)}
-              >
-                <View style={[styles.switchThumb, openOnly ? styles.thumbActive : styles.thumbInactive]} />
-              </Pressable>
+              <BrandSwitch value={openOnly} onValueChange={setOpenOnly} accessibilityLabel="Ouvert actuellement" />
             </View>
 
             {/* Submit Button CTA */}
@@ -1756,6 +1770,7 @@ const styles = StyleSheet.create({
   },
   nativeMap: {
     ...StyleSheet.absoluteFill,
+    backgroundColor: MAP_BACKGROUND,
   },
   permissionContainer: {
     flex: 1,
@@ -1844,72 +1859,14 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   // Dynamic Island Search Pill
+  // Positionnement seul : l'aspect de la barre vient du composant partagé SearchPill
   searchBarContainer: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 52 : 36,
     alignSelf: 'center',
     width: '90%',
     maxWidth: 440,
-    height: 52,
-    borderRadius: 20,
-    backgroundColor: Brand.bg,
-    borderWidth: 1,
-    borderColor: Brand.line,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    shadowColor: Brand.night,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 18,
-    elevation: 3,
     zIndex: 99,
-  },
-  searchIconBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 12,
-    backgroundColor: Brand.primaryDeep,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    height: '100%',
-    fontSize: 13,
-    fontWeight: '700',
-    color: Brand.ink,
-    paddingVertical: 0,
-  },
-  searchClearBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0, 0, 0, 0.06)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 6,
-  },
-  searchDivider: {
-    width: 1.5,
-    height: 24,
-    backgroundColor: '#E3DCE0',
-    marginRight: 6,
-  },
-  searchFilterBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  searchFilterBtnPressed: {
-    transform: [{ scale: 0.92 }],
-  },
-  searchFilterBtnActive: {
-    backgroundColor: Brand.primarySoft,
   },
 
   // Autocomplete Suggestions Dropdown Card
@@ -2128,9 +2085,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 89,
-    alignItems: 'stretch',
     paddingVertical: 4,
   },
+  // Pas de justifyContent: 'center' ici : dans une liste qui défile, le contenu centré dépasse des deux côtés et le
+  // début de la liste (« Tous », moitié de « Restos ») était coupé et inaccessible.
   categoryScrollContent: {
     paddingHorizontal: 20,
     gap: 8,
@@ -2165,6 +2123,8 @@ const styles = StyleSheet.create({
   categoryPillTextSelected: {
     color: Brand.white,
   },
+  budgetRow: { marginTop: 8 },
+  budgetPillActive: { backgroundColor: Brand.ink, borderColor: Brand.ink },
   
   // Floating Action Buttons — colonne verticale à droite
   actionsRow: {
@@ -2442,7 +2402,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 3,
     borderColor: Brand.ink,
     zIndex: 100,
-    height: '92%',
+    overflow: 'hidden',
     shadowColor: Brand.ink,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
@@ -2473,7 +2433,7 @@ const styles = StyleSheet.create({
   },
   drawerScrollContent: {
     padding: 20,
-    paddingBottom: 160,
+    paddingBottom: 48,
   },
   searchBarRow: {
     flexDirection: 'row',
@@ -2691,37 +2651,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Brand.ink,
   },
-  customSwitch: {
-    width: 50,
-    height: 28,
-    borderRadius: 18,
-    padding: 3,
-    justifyContent: 'center',
-  },
-  switchActive: {
-    backgroundColor: Brand.ink,
-  },
-  switchInactive: {
-    backgroundColor: Brand.line,
-    borderWidth: 2,
-    borderColor: '#E3DCE0',
-  },
-  switchThumb: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: Brand.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-  },
-  thumbActive: {
-    alignSelf: 'flex-end',
-  },
-  thumbInactive: {
-    alignSelf: 'flex-start',
-  },
 
   // Submit Button CTA
   submitFilterBtn: {
@@ -2744,13 +2673,11 @@ const styles = StyleSheet.create({
     transform: [{ translateX: 2 }, { translateY: 2 }],
     shadowOffset: { width: 0, height: 0 },
   },
+  // Texte sombre sur le jaune : le blanc ne ressortait presque pas (contraste ≈ 1,8:1 ; ici ≈ 9:1)
   submitFilterBtnText: {
     fontSize: 16,
     fontWeight: '800',
-    color: Brand.white,
-    textShadowColor: 'rgba(0,0,0,0.15)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 1,
+    color: Brand.ink,
   },
 
   // Modal Login Requirement Styles

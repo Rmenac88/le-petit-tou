@@ -15,12 +15,15 @@ import { applyBrandTypography } from '@/lib/typography';
 import IntroScreen from '@/components/IntroScreen';
 import { appStorage } from '@/lib/storage';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { mark } from '@/lib/startupTrace';
 
 const INTRO_SEEN_KEY = 'pt_intro_seen_v1';
 
+mark('layout-module');
 applyBrandTypography();
 
 export default function RootLayout() {
+  mark('layout-render');
   const colorScheme = useColorScheme();
   const [introFinished, setIntroFinished] = useState(false);
   const [introChecked, setIntroChecked] = useState(false);
@@ -34,10 +37,11 @@ export default function RootLayout() {
   }, []);
 
   const handleIntroFinish = () => {
+    mark('intro-finished');
     setIntroFinished(true);
     appStorage.setItem(INTRO_SEEN_KEY, '1');
   };
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     BricolageGrotesque_700Bold,
     BricolageGrotesque_800ExtraBold,
     PlusJakartaSans_400Regular,
@@ -46,6 +50,16 @@ export default function RootLayout() {
     PlusJakartaSans_700Bold,
     PlusJakartaSans_800ExtraBold,
   });
+
+  // Les polices ne doivent jamais bloquer l'affichage : en cas d'erreur ou de lenteur (4 s),
+  // l'appli s'affiche avec la police du système plutôt que de rester sur un écran vide.
+  const [fontWaitOver, setFontWaitOver] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setFontWaitOver(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+  const ready = fontsLoaded || !!fontError || fontWaitOver;
+  if (ready) mark(fontsLoaded ? 'fonts-ready' : 'fonts-ready-(secours)');
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -82,12 +96,12 @@ export default function RootLayout() {
         }} />
       )}
       <View style={{ flex: 1, width: '100%', overflow: 'hidden' }}>
-        {fontsLoaded && (
+        {ready && (
           <ErrorBoundary scope="racine">
             <Stack screenOptions={{ headerShown: false }} />
           </ErrorBoundary>
         )}
-        {fontsLoaded && introChecked && !introFinished && <IntroScreen onFinish={handleIntroFinish} />}
+        {ready && introChecked && !introFinished && <IntroScreen onFinish={handleIntroFinish} />}
       </View>
     </ThemeProvider>
   );

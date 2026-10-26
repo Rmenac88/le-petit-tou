@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useDeferredValue } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,6 +6,7 @@ import {
   TextInput,
   Pressable,
   ScrollView,
+  FlatList,
   ActivityIndicator,
   Platform,
   Alert,
@@ -13,6 +14,7 @@ import {
   Modal,
   Animated,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ChevronLeft,
@@ -55,7 +57,15 @@ import { emitAppEvent } from '../lib/appEvents';
 import { ADMIN_IDLE_LOCK_MS } from '../constants/config';
 import dataset from '../constants/dataset.json';
 import { getStoredPartners, saveStoredPartners } from '../lib/partnersStore';
-import { dataStore } from '../lib/dataStore';
+import { appCache } from '../lib/dataCache';
+import { getOptimizedImageUrl } from '../lib/imageOptimizer';
+import {
+  SPOT_LIST_COLUMNS,
+  categoryLabelFor,
+  filterSpotsByQuery,
+  removeSpot,
+  upsertSpot,
+} from '../lib/adminSpotsLogic';
 import {
   isAddressInCategory,
   getCategorySpotCount,
@@ -65,6 +75,9 @@ import {
 import { Brand } from '../constants/brand';
 import AgendaAdminPanel from './admin/AgendaAdminPanel';
 import PushAdminPanel from './admin/PushAdminPanel';
+import FeaturedAdminPanel from './admin/FeaturedAdminPanel';
+import HomeBackgroundAdminPanel from './admin/HomeBackgroundAdminPanel';
+import OffersAdminPanel from './admin/OffersAdminPanel';
 const generateUUID = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -139,17 +152,89 @@ const uploadMediaToSupabase = async (
   }
 };
 
+// ── Ligne de la liste des adresses ──
+// Composant mémorisé : taper dans la recherche ou changer d'onglet ne refait pas le rendu des lignes déjà affichées.
+// La liste est virtualisée (FlatList) : seules les lignes visibles existent, au lieu de 790 cartes avec leurs images.
+interface SpotRowProps {
+  spot: any;
+  label: string;
+  onEdit: (spot: any) => void;
+  onDelete: (spot: any) => void;
+}
+
+/** Délai avant les téléchargements : laisse l'animation d'ouverture et le premier affichage se terminer. */
+const PORTAL_OPEN_SETTLE_MS = 350;
+
+const SPOT_ROW_PLACEHOLDER = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=200';
+
+const SpotRow = React.memo(function SpotRow({ spot, label, onEdit, onDelete }: SpotRowProps) {
+  return (
+    <View style={styles.spotCard}>
+      <ExpoImage
+        source={{ uri: getOptimizedImageUrl(spot.image_url || SPOT_ROW_PLACEHOLDER, 160) }}
+        style={styles.spotCardImage}
+        contentFit="cover"
+        transition={0}
+        cachePolicy="memory-disk"
+        recyclingKey={String(spot.id)}
+      />
+      <View style={styles.spotCardBody}>
+        <Text style={styles.spotCardTitle} numberOfLines={1}>{spot.title || spot.name}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <MapPin size={11} color={Brand.inkSoft} />
+          <Text style={styles.spotCardAddress} numberOfLines={1}>{spot.address || spot.location || 'Toulouse'}</Text>
+        </View>
+        <View style={styles.spotCardBadgeRow}>
+          <View style={styles.miniBadge}>
+            <Text style={styles.miniBadgeText}>{label}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+            <Star size={11} color={Brand.chouchou} fill={Brand.chouchou} />
+            <Text style={styles.spotCardRating}>{spot.rating || '4.8'}</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.spotCardActions}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Modifier" style={styles.actionBtnEdit} onPress={() => onEdit(spot)}>
+          <Edit3 size={16} color={Brand.ink} strokeWidth={2} />
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Supprimer" style={styles.actionBtnDelete} onPress={() => onDelete(spot)}>
+          <Trash2 size={16} color={Brand.primaryDeep} strokeWidth={2} />
+        </Pressable>
+      </View>
+    </View>
+  );
+});
+
+const spotKey = (spot: any) => String(spot.id);
+const SpotSeparator = () => <View style={{ height: 12 }} />;
+
 interface AdminPortalModalProps {
   visible: boolean;
   /** Code admin vérifié, gardé en mémoire par l'écran d'accueil (jamais stocké). */
   adminCode?: string;
   onClose: () => void;
   onLogout?: () => void;
+  /** Appelé dès qu'une écriture du catalogue réussit : l'accueil se rafraîchit alors UNE fois, à la fermeture. */
+  onCatalogChanged?: () => void;
 }
 
-export default function AdminPortalModal({ visible, adminCode, onClose, onLogout }: AdminPortalModalProps) {
+export default function AdminPortalModal({ visible, adminCode, onClose, onLogout, onCatalogChanged }: AdminPortalModalProps) {
   // Toutes les écritures du catalogue passent par la fonction serveur admin_write (code vérifié côté base)
-  const adminDb = useMemo(() => createAdminDb(adminCode ?? '', supabase), [adminCode]);
+  const onCatalogChangedRef = useRef(onCatalogChanged);
+  onCatalogChangedRef.current = onCatalogChanged;
+  const adminDb = useMemo(
+    () =>
+      createAdminDb(adminCode ?? '', {
+        rpc: (fn, args) =>
+          Promise.resolve(supabase.rpc(fn, args)).then((res: any) => {
+            if (fn === 'admin_write' && res?.data?.ok === true) onCatalogChangedRef.current?.();
+            return res;
+          }),
+      }),
+    [adminCode]
+  );
 
   // Verrouillage automatique : le code admin ne reste jamais en mémoire plus de 15 min sans activité
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -165,16 +250,21 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
     };
   }, [visible, resetIdleLock]);
   const [agendaCount, setAgendaCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<'spots' | 'editSpot' | 'categories' | 'events' | 'partners' | 'agenda' | 'notifs'>('spots');
+  const [featuredCount, setFeaturedCount] = useState(0);
+  const [offersCount, setOffersCount] = useState(0);
+  const [activeTab, setActiveTab] = useState<'spots' | 'editSpot' | 'categories' | 'events' | 'partners' | 'agenda' | 'notifs' | 'featured' | 'offers' | 'background'>('spots');
 
   // Spots Data & Filters State
-  const [spots, setSpots] = useState<any[]>(dataset.addresses || []);
+  // Affichage immédiat : dernière liste connue de l'appli, sinon adresses embarquées. La base actualise ensuite.
+  const [spots, setSpots] = useState<any[]>(() => appCache.get<any[]>('addresses') ?? (dataset.addresses as any[]) ?? []);
   const [loadingSpots, setLoadingSpots] = useState(false);
   const [spotSearchQuery, setSpotSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
 
   // Edit / Create Spot Form State
   const [editingSpotId, setEditingSpotId] = useState<string | null>(null);
+  const editingSpotIdRef = useRef<string | null>(null);
+  const [spotDetail, setSpotDetail] = useState<{ status: 'idle' | 'loading' | 'ready' | 'error'; id: string | null }>({ status: 'idle', id: null });
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formFullDescription, setFormFullDescription] = useState('');
@@ -251,13 +341,18 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
     name: string;
   }>({ visible: false, type: 'spot', id: '', name: '' });
 
+  // Les téléchargements démarrent une fois l'animation d'ouverture du portail terminée (≈ 300 ms) et ne sont plus
+  // diffusés à l'appli : elle se rafraîchit une seule fois à la fermeture si le catalogue a changé.
+  // (Pas d'InteractionManager : une animation en boucle ailleurs dans l'appli le bloquerait indéfiniment.)
   useEffect(() => {
-    if (visible) {
+    if (!visible) return;
+    const timer = setTimeout(() => {
       fetchSpots();
       fetchEvents();
       fetchCategories();
       fetchPartners();
-    }
+    }, PORTAL_OPEN_SETTLE_MS);
+    return () => clearTimeout(timer);
   }, [visible]);
 
   const fetchCategories = async () => {
@@ -266,7 +361,6 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
       const { data, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
       if (!error && data && data.length > 0) {
         setCategories(data);
-        dataStore.notifyCategoriesChanged(data);
       } else {
         setCategories(dataset.categories || []);
       }
@@ -278,20 +372,17 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
     }
   };
 
-  // Fetch Spots from Supabase DB (fallback to dataset.json)
+  // Liste des adresses : colonnes légères seulement (≈ 60 Ko transférés au lieu de 400 Ko, 310 Ko lus au lieu de 1,6 Mo).
+  // En cas d'échec la liste déjà affichée est conservée.
   const fetchSpots = async () => {
     try {
       setLoadingSpots(true);
-      const { data, error } = await supabase.from('addresses').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('addresses').select(SPOT_LIST_COLUMNS).order('created_at', { ascending: false });
       if (!error && data && data.length > 0) {
         setSpots(data);
-        dataStore.notifyAddressesChanged(data);
-      } else {
-        setSpots(dataset.addresses || []);
       }
     } catch (e) {
       console.warn('Fetch spots error:', e);
-      setSpots(dataset.addresses || []);
     } finally {
       setLoadingSpots(false);
     }
@@ -304,7 +395,6 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
       const { data, error } = await supabase.from('events').select('*').order('event_date', { ascending: true });
       if (!error && data) {
         setEvents(data);
-        dataStore.notifyEventsChanged(data);
       }
     } catch (e) {
       console.warn('Fetch events error:', e);
@@ -344,27 +434,52 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
   };
 
   // ── Open Spot Form (New or Edit) ──
+  const fillSpotForm = (spot: any) => {
+    const defaultCatId = categories[0]?.id || dataset.categories?.[0]?.id || 'e6134429-8d6e-5d84-bf4e-884e016df958';
+    setFormTitle(spot.title || '');
+    setFormDescription(spot.description || '');
+    setFormFullDescription(spot.full_description || spot.description || '');
+    setFormCategory(spot.category_id || classifyAddress(spot) || defaultCatId);
+    setFormAddress(spot.address || '');
+    setFormLocation(spot.location || '');
+    setFormPhone(spot.telephone || '');
+    setFormWebsite(spot.site_web || '');
+    setFormPriceLevel(spot.price_level || '€€');
+    setFormRating(spot.rating ? spot.rating.toString() : '4.8');
+    setFormLat(spot.lat ? spot.lat.toString() : '');
+    setFormLng(spot.lng ? spot.lng.toString() : '');
+    setFormCoverUrl(spot.image_url || '');
+    setFormGalleryUrls(spot.gallery_urls || []);
+    setFormIsRecommended(!!spot.is_recommended);
+    setFormIsNew(!!spot.is_new);
+  };
+
+  // La liste ne contient que des colonnes légères : la fiche COMPLÈTE est lue en base avant toute modification.
+  // Tant qu'elle n'est pas arrivée le formulaire est verrouillé, sinon un enregistrement effacerait les descriptions
+  // et la galerie absentes de la liste.
+  const loadSpotDetail = async (id: string) => {
+    setSpotDetail({ status: 'loading', id });
+    try {
+      const { data, error } = await supabase.from('addresses').select('*').eq('id', id).maybeSingle();
+      if (error || !data) throw error ?? new Error('introuvable');
+      if (editingSpotIdRef.current !== id) return; // l'admin est passé à une autre fiche entre-temps
+      fillSpotForm(data);
+      setSpotDetail({ status: 'ready', id });
+    } catch (e) {
+      if (editingSpotIdRef.current === id) setSpotDetail({ status: 'error', id });
+    }
+  };
+
   const handleOpenEditSpot = (spot?: any) => {
     const defaultCatId = categories[0]?.id || dataset.categories?.[0]?.id || 'e6134429-8d6e-5d84-bf4e-884e016df958';
     if (spot) {
+      editingSpotIdRef.current = spot.id;
       setEditingSpotId(spot.id);
-      setFormTitle(spot.title || '');
-      setFormDescription(spot.description || '');
-      setFormFullDescription(spot.full_description || spot.description || '');
-      setFormCategory(spot.category_id || classifyAddress(spot) || defaultCatId);
-      setFormAddress(spot.address || '');
-      setFormLocation(spot.location || '');
-      setFormPhone(spot.telephone || '');
-      setFormWebsite(spot.site_web || '');
-      setFormPriceLevel(spot.price_level || '€€');
-      setFormRating(spot.rating ? spot.rating.toString() : '4.8');
-      setFormLat(spot.lat ? spot.lat.toString() : '');
-      setFormLng(spot.lng ? spot.lng.toString() : '');
-      setFormCoverUrl(spot.image_url || '');
-      setFormGalleryUrls(spot.gallery_urls || []);
-      setFormIsRecommended(!!spot.is_recommended);
-      setFormIsNew(!!spot.is_new);
+      fillSpotForm(spot); // aperçu immédiat avec ce que la liste connaît déjà
+      loadSpotDetail(spot.id);
     } else {
+      editingSpotIdRef.current = null;
+      setSpotDetail({ status: 'idle', id: null });
       setEditingSpotId(null);
       setFormTitle('');
       setFormDescription('');
@@ -390,6 +505,10 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
   const handleSaveSpot = async () => {
     if (!formTitle.trim()) {
       showAlert('Champ requis', 'Veuillez saisir au moins le Nom de l\'établissement.');
+      return;
+    }
+    if (editingSpotId && spotDetail.status !== 'ready') {
+      showAlert('Fiche non chargée', 'La fiche complète n\'est pas encore chargée : patiente un instant ou touche « Réessayer ».');
       return;
     }
     try {
@@ -471,7 +590,8 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
         showAlert('Succès', `L'adresse "${formTitle}" a été créée et publiée.`);
       }
 
-      await fetchSpots();
+      // Liste mise à jour sur place avec la fiche enregistrée : pas de nouveau téléchargement de toute la table
+      setSpots((prev) => upsertSpot(prev, { ...record, id: editingSpotId ?? record.id }));
       setActiveTab('spots');
     } catch (e: any) {
       showAlert('Erreur d\'enregistrement', e.message);
@@ -490,7 +610,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
     try {
       setIsUploading(true);
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
       });
@@ -515,7 +635,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
     try {
       setIsUploading(true);
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
       });
@@ -592,11 +712,12 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
   // ── Delete Confirmation Handlers ──
   const handleConfirmDelete = async () => {
     const { type, id, name } = deleteConfirmModal;
+    const before = { spots, events, categories };
     setDeleteConfirmModal({ visible: false, type: 'spot', id: '', name: '' });
     try {
       if (type === 'spot') {
         // Optimistic UI update: remove from local state immediately
-        setSpots(prev => prev.filter(s => s.id !== id));
+        setSpots(prev => removeSpot(prev, id));
         const { data, error } = await adminDb.from('addresses').delete().eq('id', id).select();
         if (error) throw error;
         if (!data || data.length === 0) {
@@ -607,7 +728,6 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
         } else {
           showAlert('Suppression réussie', `L'adresse "${name}" a été définitivement supprimée.`);
         }
-        await fetchSpots();
       } else if (type === 'event') {
         setEvents(prev => prev.filter(e => e.id !== id));
         const { error } = await adminDb.from('events').delete().eq('id', id).select();
@@ -644,6 +764,10 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
       }
     } catch (e: any) {
       showAlert('Erreur lors de la suppression', e.message);
+      // Retrait optimiste annulé : l'élément est toujours en base, la liste doit le montrer à nouveau (même hors ligne)
+      if (type === 'spot') setSpots(before.spots);
+      else if (type === 'event') setEvents(before.events);
+      else if (type === 'category') setCategories(before.categories);
     }
   };
 
@@ -949,18 +1073,47 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
   };
 
   // ── Filtered Spots & Events Lists ──
-  const filteredSpots = spots.filter(s => {
-    if (spotSearchQuery) {
-      const q = spotSearchQuery.toLowerCase();
-      const nameMatch = (s.title || s.name || '').toLowerCase().includes(q);
-      const addrMatch = (s.address || '').toLowerCase().includes(q);
-      if (!nameMatch && !addrMatch) return false;
-    }
-    if (selectedCategoryFilter !== 'all' && !isAddressInCategory(s, selectedCategoryFilter)) {
-      return false;
-    }
-    return true;
-  });
+  // Le filtre de catégorie ne se recalcule que s'il change ; la recherche utilise une valeur différée pour que la
+  // saisie reste fluide pendant que la liste se met à jour.
+  const deferredSpotQuery = useDeferredValue(spotSearchQuery);
+  const spotsInCategory = useMemo(
+    () => (selectedCategoryFilter === 'all' ? spots : spots.filter((s) => isAddressInCategory(s, selectedCategoryFilter))),
+    [spots, selectedCategoryFilter]
+  );
+  const filteredSpots = useMemo(() => filterSpotsByQuery(spotsInCategory, deferredSpotQuery), [spotsInCategory, deferredSpotQuery]);
+  // Nombre d'adresses par catégorie : calculé seulement quand l'onglet Catégories est ouvert, et une seule fois
+  // par liste (et non à chaque lettre tapée dans le formulaire).
+  const onCategoriesTab = activeTab === 'categories';
+  const categorySpotCounts = useMemo(
+    () => (onCategoriesTab ? new Map<string, number>(categories.map((c: any) => [c.id, getCategorySpotCount(spots, c.id)])) : null),
+    [onCategoriesTab, categories, spots]
+  );
+  // Fiche en cours de chargement (ou illisible) : le formulaire reste verrouillé, voir loadSpotDetail
+  const spotFormLocked = !!editingSpotId && spotDetail.status !== 'ready';
+  const categoryNamesById = useMemo(
+    () => new Map<string, string>(categories.map((c: any) => [String(c.id), String(c.name)])),
+    [categories]
+  );
+
+  // Rappels stables pour les lignes mémorisées (ils lisent toujours la dernière version des fonctions)
+  const openEditRef = useRef(handleOpenEditSpot);
+  openEditRef.current = handleOpenEditSpot;
+  const onEditSpot = useCallback((spot: any) => openEditRef.current(spot), []);
+  const onDeleteSpot = useCallback(
+    (spot: any) => setDeleteConfirmModal({ visible: true, type: 'spot', id: spot.id, name: spot.title || spot.name }),
+    []
+  );
+  const renderSpotItem = useCallback(
+    ({ item }: { item: any }) => (
+      <SpotRow
+        spot={item}
+        label={categoryLabelFor(item, categoryNamesById, (s) => classifyAddress(s) as string | undefined)}
+        onEdit={onEditSpot}
+        onDelete={onDeleteSpot}
+      />
+    ),
+    [categoryNamesById, onEditSpot, onDeleteSpot]
+  );
 
   const todayStr = new Date().toISOString().split('T')[0];
   const upcomingCount = events.filter(e => e.event_date >= todayStr).length;
@@ -1000,7 +1153,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
 
         {/* Tab Selector Bar (Horizontally scrollable on mobile) */}
         <View style={styles.tabBar}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBarScroll}>
+          <ScrollView horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBarScroll}>
             <Pressable style={[styles.tabBtn, activeTab === 'spots' && styles.tabBtnActive]} onPress={() => setActiveTab('spots')}>
               <MapPin size={14} color={activeTab === 'spots' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
               <Text style={[styles.tabBtnText, activeTab === 'spots' && styles.tabBtnTextActive]}>Adresses ({spots.length})</Text>
@@ -1034,6 +1187,18 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
               <Calendar size={14} color={activeTab === 'agenda' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
               <Text style={[styles.tabBtnText, activeTab === 'agenda' && styles.tabBtnTextActive]}>Agenda ({agendaCount})</Text>
             </Pressable>
+            <Pressable style={[styles.tabBtn, activeTab === 'featured' && styles.tabBtnActive]} onPress={() => setActiveTab('featured')}>
+              <Star size={14} color={activeTab === 'featured' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
+              <Text style={[styles.tabBtnText, activeTab === 'featured' && styles.tabBtnTextActive]}>Chouchous du Petit Tou ({featuredCount})</Text>
+            </Pressable>
+            <Pressable style={[styles.tabBtn, activeTab === 'offers' && styles.tabBtnActive]} onPress={() => setActiveTab('offers')}>
+              <Tag size={14} color={activeTab === 'offers' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
+              <Text style={[styles.tabBtnText, activeTab === 'offers' && styles.tabBtnTextActive]}>Offres ({offersCount})</Text>
+            </Pressable>
+            <Pressable style={[styles.tabBtn, activeTab === 'background' && styles.tabBtnActive]} onPress={() => setActiveTab('background')}>
+              <Sparkles size={14} color={activeTab === 'background' ? Brand.primary : Brand.inkSoft} strokeWidth={2} style={{ marginRight: 6 }} />
+              <Text style={[styles.tabBtnText, activeTab === 'background' && styles.tabBtnTextActive]}>Apparence</Text>
+            </Pressable>
           </ScrollView>
         </View>
 
@@ -1062,7 +1227,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                 </View>
 
                 {/* Category Pills */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryPillsRow}>
+                <ScrollView horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryPillsRow}>
                   <Pressable
                     style={[styles.catPill, selectedCategoryFilter === 'all' && styles.catPillActive]}
                     onPress={() => setSelectedCategoryFilter('all')}
@@ -1085,68 +1250,63 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                 </ScrollView>
               </View>
 
-              {loadingSpots ? (
+              {loadingSpots && spots.length === 0 ? (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                   <ActivityIndicator size="large" color={Brand.primaryDeep} />
                 </View>
               ) : (
-                <ScrollView contentContainerStyle={{ paddingBottom: 60, gap: 12 }} showsVerticalScrollIndicator={false}>
-                  <View style={styles.listHeaderRow}>
-                    <Text style={styles.listHeaderCount}>{filteredSpots.length} adresses affichées</Text>
-                    <Pressable style={styles.addInlineBtn} onPress={() => handleOpenEditSpot()}>
-                      <Plus size={16} color={Brand.white} strokeWidth={2} />
-                      <Text style={styles.addInlineBtnText}>Ajouter</Text>
-                    </Pressable>
-                  </View>
-
-                  {filteredSpots.map(spot => (
-                    <View key={spot.id} style={styles.spotCard}>
-                      <Image
-                        source={{ uri: spot.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=200' }}
-                        style={styles.spotCardImage}
-                      />
-                      <View style={styles.spotCardBody}>
-                        <Text style={styles.spotCardTitle} numberOfLines={1}>{spot.title || spot.name}</Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <MapPin size={11} color={Brand.inkSoft} />
-                          <Text style={styles.spotCardAddress} numberOfLines={1}>{spot.address || spot.location || 'Toulouse'}</Text>
-                        </View>
-                        <View style={styles.spotCardBadgeRow}>
-                          <View style={styles.miniBadge}>
-                            <Text style={styles.miniBadgeText}>
-                              {categories.find(c => c.id === spot.category_id)?.name || categories.find(c => c.id === classifyAddress(spot))?.name || 'Adresse'}
-                            </Text>
-                          </View>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                            <Star size={11} color={Brand.chouchou} fill={Brand.chouchou} />
-                            <Text style={styles.spotCardRating}>{spot.rating || '4.8'}</Text>
-                          </View>
-                        </View>
-                      </View>
-
-                      {/* Card Action Buttons */}
-                      <View style={styles.spotCardActions}>
-                        <Pressable accessibilityRole="button" accessibilityLabel="Modifier" style={styles.actionBtnEdit} onPress={() => handleOpenEditSpot(spot)}>
-                          <Edit3 size={16} color={Brand.ink} strokeWidth={2} />
-                        </Pressable>
-                        <Pressable accessibilityRole="button" accessibilityLabel="Supprimer"
-                          style={styles.actionBtnDelete}
-                          onPress={() => setDeleteConfirmModal({ visible: true, type: 'spot', id: spot.id, name: spot.title || spot.name })}
-                        >
-                          <Trash2 size={16} color={Brand.primaryDeep} strokeWidth={2} />
-                        </Pressable>
-                      </View>
+                <FlatList
+                  data={filteredSpots as any[]}
+                  keyExtractor={spotKey}
+                  renderItem={renderSpotItem}
+                  ItemSeparatorComponent={SpotSeparator}
+                  ListHeaderComponentStyle={{ marginBottom: 12 }}
+                  ListHeaderComponent={
+                    <View style={styles.listHeaderRow}>
+                      <Text style={styles.listHeaderCount}>
+                        {filteredSpots.length} adresses affichées{loadingSpots ? ' · actualisation…' : ''}
+                      </Text>
+                      <Pressable style={styles.addInlineBtn} onPress={() => handleOpenEditSpot()}>
+                        <Plus size={16} color={Brand.white} strokeWidth={2} />
+                        <Text style={styles.addInlineBtnText}>Ajouter</Text>
+                      </Pressable>
                     </View>
-                  ))}
-                </ScrollView>
+                  }
+                  contentContainerStyle={{ paddingBottom: 60 }}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  initialNumToRender={8}
+                  maxToRenderPerBatch={8}
+                  updateCellsBatchingPeriod={40}
+                  windowSize={7}
+                  removeClippedSubviews={Platform.OS === 'android'}
+                />
               )}
             </View>
           )}
 
           {/* ── TAB 2: EDIT / CREATE SPOT FORM ── */}
           {activeTab === 'editSpot' && (
-            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
-              <View style={styles.formContainer}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
+              {spotFormLocked && (
+                <View style={styles.detailBanner}>
+                  {spotDetail.status === 'error' ? (
+                    <>
+                      <Text style={styles.detailBannerText}>Fiche complète indisponible : vérifie ta connexion.</Text>
+                      <Pressable style={styles.detailRetryBtn} onPress={() => editingSpotId && loadSpotDetail(editingSpotId)}>
+                        <RefreshCw size={14} color={Brand.white} strokeWidth={2} />
+                        <Text style={styles.detailRetryText}>Réessayer</Text>
+                      </Pressable>
+                    </>
+                  ) : (
+                    <>
+                      <ActivityIndicator size="small" color={Brand.primaryDeep} />
+                      <Text style={styles.detailBannerText}>Chargement de la fiche complète…</Text>
+                    </>
+                  )}
+                </View>
+              )}
+              <View style={[styles.formContainer, spotFormLocked && { opacity: 0.55, pointerEvents: 'none' }]}>
                 <Text style={styles.formSectionTitle}>
                   {editingSpotId ? 'Modifier l\'adresse' : 'Créer une nouvelle adresse'}
                 </Text>
@@ -1173,7 +1333,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                 <TextInput style={styles.input} value={formTitle} onChangeText={setFormTitle} placeholder="Ex: Mizuki Ramen" placeholderTextColor={Brand.inkSoft} />
 
                 <Text style={styles.inputLabel}>Catégorie *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 12 }}>
+                <ScrollView horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 12 }}>
                   {categories.map(c => (
                     <Pressable
                       key={c.id}
@@ -1188,7 +1348,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                 <Text style={styles.inputLabel}>Adresse postale exacte *</Text>
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                   <TextInput
-                    style={[styles.input, { flex: 1 }]}
+                    style={[styles.input, styles.inputHalf]}
                     value={formAddress}
                     onChangeText={setFormAddress}
                     placeholder="Ex: 54 Rue Peyrolières, 31000 Toulouse"
@@ -1247,7 +1407,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                     </Pressable>
                   </View>
 
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+                  <ScrollView horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
                     {formGalleryUrls.map((url, idx) => (
                       <View key={idx} style={styles.galleryThumbWrapper}>
                         <Image source={{ uri: url }} style={styles.galleryThumb} />
@@ -1263,7 +1423,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                 </View>
 
                 {/* Submit Action Button */}
-                <Pressable style={styles.saveSubmitBtn} onPress={handleSaveSpot} disabled={isUploading}>
+                <Pressable style={styles.saveSubmitBtn} onPress={handleSaveSpot} disabled={isUploading || spotFormLocked}>
                   {isUploading ? (
                     <ActivityIndicator color={Brand.white} size="small" />
                   ) : (
@@ -1276,7 +1436,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
 
           {/* ── TAB 3: CATEGORIES MANAGEMENT (List / Create / Edit / Delete) ── */}
           {activeTab === 'categories' && (
-            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
               {/* Category Form */}
               <View style={styles.formContainer}>
                 <Text style={styles.formSectionTitle}>{editingCatId ? 'Modifier la catégorie' : 'Ajouter une nouvelle catégorie'}</Text>
@@ -1327,19 +1487,19 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
               
               <View style={{ gap: 10 }}>
                 {categories.map((cat: any) => {
-                  const spotCount = getCategorySpotCount(spots, cat.id);
+                  const spotCount = categorySpotCounts?.get(cat.id) ?? 0;
                   return (
                     <View key={cat.id} style={styles.catAdminCard}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                         <View style={[styles.catIconCircle, { backgroundColor: `${cat.color || Brand.primary}20` }]}>
                           <Tag size={20} color={cat.color || Brand.primary} />
                         </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.catAdminTitle}>{cat.name}</Text>
-                          <Text style={styles.catAdminSub}>Slug: {cat.slug || cat.id} • {spotCount} adresses</Text>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.catAdminTitle} numberOfLines={2}>{cat.name}</Text>
+                          <Text style={styles.catAdminSub} numberOfLines={1}>Slug: {cat.slug || cat.id} • {spotCount} adresse{spotCount > 1 ? 's' : ''}</Text>
                         </View>
                       </View>
-                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
                         <Pressable accessibilityRole="button" accessibilityLabel="Modifier" style={styles.editActionBtn} onPress={() => handleOpenEditCategory(cat)}>
                           <Edit3 size={14} color={Brand.ink} />
                         </Pressable>
@@ -1367,7 +1527,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                   onPress={() => setEventTabFilter('all')}
                 >
                   <Calendar size={13} color={eventTabFilter === 'all' ? Brand.ink : Brand.inkSoft} style={{ marginRight: 6 }} />
-                  <Text style={[styles.eventTabPillText, eventTabFilter === 'all' && styles.eventTabPillTextActive]}>
+                  <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.eventTabPillText, eventTabFilter === 'all' && styles.eventTabPillTextActive]}>
                     Tous ({events.length})
                   </Text>
                 </Pressable>
@@ -1376,7 +1536,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                   onPress={() => setEventTabFilter('upcoming')}
                 >
                   <Clock size={13} color={eventTabFilter === 'upcoming' ? Brand.ink : Brand.inkSoft} style={{ marginRight: 6 }} />
-                  <Text style={[styles.eventTabPillText, eventTabFilter === 'upcoming' && styles.eventTabPillTextActive]}>
+                  <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.eventTabPillText, eventTabFilter === 'upcoming' && styles.eventTabPillTextActive]}>
                     À venir ({upcomingCount})
                   </Text>
                 </Pressable>
@@ -1385,13 +1545,13 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                   onPress={() => setEventTabFilter('archived')}
                 >
                   <Archive size={13} color={eventTabFilter === 'archived' ? Brand.ink : Brand.inkSoft} style={{ marginRight: 6 }} />
-                  <Text style={[styles.eventTabPillText, eventTabFilter === 'archived' && styles.eventTabPillTextActive]}>
+                  <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.eventTabPillText, eventTabFilter === 'archived' && styles.eventTabPillTextActive]}>
                     Archivés ({archivedCount})
                   </Text>
                 </Pressable>
               </View>
 
-              <ScrollView contentContainerStyle={{ paddingBottom: 60, gap: 12 }} showsVerticalScrollIndicator={false}>
+              <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 60, gap: 12 }} showsVerticalScrollIndicator={false}>
                 {/* Event Form Box */}
                 <View style={styles.formContainer}>
                   <Text style={styles.formSectionTitle}>{editingEventId ? 'Modifier l\'événement' : 'Créer un événement'}</Text>
@@ -1400,33 +1560,33 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                   <TextInput style={styles.input} value={eventFormDesc} onChangeText={setEventFormDesc} placeholder="Description *" placeholderTextColor={Brand.inkSoft} multiline />
                   
                   <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormDate} onChangeText={setEventFormDate} placeholder="Date (AAAA-MM-JJ ou JJ/MM/AAAA) *" placeholderTextColor={Brand.inkSoft} />
-                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormTime} onChangeText={setEventFormTime} placeholder="Heure (ex: 19:00)" placeholderTextColor={Brand.inkSoft} />
+                    <TextInput style={[styles.input, styles.inputHalf]} value={eventFormDate} onChangeText={setEventFormDate} placeholder="Date (JJ/MM/AAAA) *" placeholderTextColor={Brand.inkSoft} />
+                    <TextInput style={[styles.input, styles.inputHalf]} value={eventFormTime} onChangeText={setEventFormTime} placeholder="Heure (19:00)" placeholderTextColor={Brand.inkSoft} />
                   </View>
 
                   {/* Raccourcis date rapide */}
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8, alignItems: 'center' }}>
                     <Text style={{ fontSize: 12, color: Brand.inkSoft, marginRight: 2 }}>Raccourcis :</Text>
                     <Pressable
-                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: Brand.line }}
+                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 9, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, borderColor: Brand.line }}
                       onPress={() => setQuickDate(0)}
                     >
                       <Text style={{ fontSize: 12, fontWeight: '600', color: '#3A3A48' }}>Aujourd'hui</Text>
                     </Pressable>
                     <Pressable
-                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: Brand.line }}
+                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 9, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, borderColor: Brand.line }}
                       onPress={() => setQuickDate(1)}
                     >
                       <Text style={{ fontSize: 12, fontWeight: '600', color: '#3A3A48' }}>Demain</Text>
                     </Pressable>
                     <Pressable
-                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: Brand.line }}
+                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 9, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, borderColor: Brand.line }}
                       onPress={() => setQuickDate(7)}
                     >
                       <Text style={{ fontSize: 12, fontWeight: '600', color: '#3A3A48' }}>Dans 7 j</Text>
                     </Pressable>
                     <Pressable
-                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: Brand.line }}
+                      style={{ backgroundColor: '#F5F0F2', paddingVertical: 9, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, borderColor: Brand.line }}
                       onPress={() => setQuickDate(30)}
                     >
                       <Text style={{ fontSize: 12, fontWeight: '600', color: '#3A3A48' }}>Dans 1 mois</Text>
@@ -1436,9 +1596,9 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                   <TextInput style={styles.input} value={eventFormLocation} onChangeText={setEventFormLocation} placeholder="Lieu *" placeholderTextColor={Brand.inkSoft} />
 
                   <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <TextInput style={[styles.input, { flex: 1 }]} value={eventFormPrice} onChangeText={setEventFormPrice} keyboardType="numeric" placeholder="Tarif (€)" placeholderTextColor={Brand.inkSoft} />
+                    <TextInput style={[styles.input, styles.inputHalf]} value={eventFormPrice} onChangeText={setEventFormPrice} keyboardType="numeric" placeholder="Tarif (€)" placeholderTextColor={Brand.inkSoft} />
                     <TextInput
-                      style={[styles.input, { flex: 1 }]}
+                      style={[styles.input, styles.inputHalf]}
                       value={eventFormMaxPlaces}
                       onChangeText={setEventFormMaxPlaces}
                       keyboardType="numeric"
@@ -1474,7 +1634,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
 
                 {/* Events List */}
                 <Text style={{ fontSize: 14, fontWeight: '800', color: Brand.ink, marginTop: 12 }}>
-                  {filteredEvents.length} événements {eventTabFilter === 'all' ? 'au total' : eventTabFilter === 'upcoming' ? 'à venir' : 'passés (archivés)'}
+                  {filteredEvents.length} {filteredEvents.length > 1 ? 'événements' : 'événement'} {eventTabFilter === 'all' ? 'au total' : eventTabFilter === 'upcoming' ? 'à venir' : filteredEvents.length > 1 ? 'passés (archivés)' : 'passé (archivé)'}
                 </Text>
 
                 {filteredEvents.map(evt => (
@@ -1524,9 +1684,14 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
           {activeTab === 'agenda' && (
             <AgendaAdminPanel adminCode={adminCode} spots={spots} onCountChange={setAgendaCount} />
           )}
+          {activeTab === 'featured' && (
+            <FeaturedAdminPanel adminCode={adminCode} spots={spots} onCountChange={setFeaturedCount} />
+          )}
+          {activeTab === 'offers' && <OffersAdminPanel adminCode={adminCode} spots={spots} onCountChange={setOffersCount} />}
+          {activeTab === 'background' && <HomeBackgroundAdminPanel adminCode={adminCode} />}
 
           {activeTab === 'partners' && (
-            <ScrollView ref={partnersScrollRef} style={{ flex: 1, padding: 16 }} contentContainerStyle={{ paddingBottom: 60 }}>
+            <ScrollView ref={partnersScrollRef} keyboardShouldPersistTaps="handled" style={{ flex: 1, padding: 16 }} contentContainerStyle={{ paddingBottom: 60 }}>
               <View style={styles.formCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                   <Sparkles size={22} color={Brand.chouchou} />
@@ -1557,7 +1722,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                     style={{
                       flex: 1,
                       fontSize: 14,
-                      color: partnerFormSpotId ? Brand.ink : Brand.inkMute,
+                      color: partnerFormSpotId ? Brand.ink : Brand.inkSoft,
                       fontWeight: partnerFormSpotId ? '700' : '400',
                     }}
                     numberOfLines={1}
@@ -1809,7 +1974,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                   style={styles.input}
                 />
 
-                <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-end' }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.inputLabel}>Rang Top (1..10)</Text>
                     <TextInput
@@ -1822,7 +1987,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Montant payé (€) · interne, jamais affiché</Text>
+                    <Text style={styles.inputLabel}>Montant payé (€)</Text>
                     <TextInput
                       placeholder="150"
                       keyboardType="numeric"
@@ -1833,8 +1998,9 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                     />
                   </View>
                 </View>
+                <Text style={styles.fieldNote}>Le montant payé est interne : il n'est jamais affiché aux utilisateurs.</Text>
 
-                <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-end' }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.inputLabel}>Durée (jours)</Text>
                     <TextInput
@@ -1847,7 +2013,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Fréquence notifs (heures)</Text>
+                    <Text style={styles.inputLabel}>Notifs (toutes les… h)</Text>
                     <TextInput
                       placeholder="24"
                       keyboardType="numeric"
@@ -2066,7 +2232,7 @@ const styles = StyleSheet.create({
   },
   tabBtn: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 11,
     borderRadius: 12,
     backgroundColor: Brand.bg,
     flexDirection: 'row',
@@ -2123,7 +2289,7 @@ const styles = StyleSheet.create({
   },
   catPill: {
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 10,
     borderRadius: 24,
     backgroundColor: Brand.white,
     shadowColor: '#24242E',
@@ -2162,11 +2328,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#1FA67A',
+    backgroundColor: Brand.successDeep, // le blanc dessus atteint 4,9:1 (3,1:1 avec l'ancien vert)
     borderRadius: 14,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    shadowColor: '#1FA67A',
+    paddingVertical: 10,
+    shadowColor: Brand.successDeep,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -2190,6 +2356,27 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3,
   },
+  detailBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFF6E5',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+  },
+  detailBannerText: { flex: 1, fontSize: 13, fontWeight: '700', color: Brand.ink },
+  detailRetryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Brand.primaryDeep,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  detailRetryText: { color: Brand.white, fontSize: 12, fontWeight: '800' },
   spotCardImage: {
     width: 64,
     height: 64,
@@ -2230,23 +2417,23 @@ const styles = StyleSheet.create({
   spotCardRating: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#D97706',
+    color: Brand.ratingInk,
   },
   spotCardActions: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
   },
   actionBtnEdit: {
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     backgroundColor: '#F5F0F2',
     justifyContent: 'center',
     alignItems: 'center',
   },
   actionBtnDelete: {
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     backgroundColor: Brand.primarySoft,
     justifyContent: 'center',
@@ -2274,6 +2461,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#4A4A58',
     marginTop: 4,
+  },
+  fieldNote: {
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: Brand.inkSoft,
+    marginTop: -4,
+  },
+  // deux champs côte à côte : minWidth 0, sinon sur le web le second dépasse de la carte
+  inputHalf: {
+    flex: 1,
+    minWidth: 0,
   },
   input: {
     backgroundColor: Brand.bg,
@@ -2523,6 +2721,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
     backgroundColor: Brand.white,
     borderRadius: 18,
     padding: 14,
@@ -2578,16 +2777,16 @@ const styles = StyleSheet.create({
     color: Brand.white,
   },
   editActionBtn: {
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     backgroundColor: '#F5F0F2',
     justifyContent: 'center',
     alignItems: 'center',
   },
   deleteActionBtn: {
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     backgroundColor: Brand.primarySoft,
     justifyContent: 'center',

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -33,6 +33,15 @@ export default function IntroScreen({ onFinish }: IntroScreenProps) {
       })
     );
   }, [onFinish, opacity, scale, containerOpacity, reduceMotion]);
+
+  // Filet de sécurité : si l'animation native ne s'exécute pas (ou son rappel ne revient jamais),
+  // l'écran d'ouverture opaque ne doit pas rester indéfiniment par-dessus l'appli.
+  const finishRef = useRef(onFinish);
+  finishRef.current = onFinish;
+  useEffect(() => {
+    const t = setTimeout(() => finishRef.current(), reduceMotion ? 900 : 2200);
+    return () => clearTimeout(t);
+  }, [reduceMotion]);
 
   const logoStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

@@ -11,6 +11,12 @@ const here = new URL('.', import.meta.url);
 const baseline = readFileSync(new URL('baseline.sql', here), 'utf8');
 const m006 = readFileSync(new URL('../../src/scripts/006_security_lockdown.sql', here), 'utf8');
 const m007 = readFileSync(new URL('../../src/scripts/007_push_notifications.sql', here), 'utf8');
+const m010 = readFileSync(new URL('../../src/scripts/010_push_style.sql', here), 'utf8');
+const m011 = readFileSync(new URL('../../src/scripts/011_featured_spots.sql', here), 'utf8');
+const m012 = readFileSync(new URL('../../src/scripts/012_home_background.sql', here), 'utf8');
+const m013 = readFileSync(new URL('../../src/scripts/013_offers.sql', here), 'utf8');
+const m014 = readFileSync(new URL('../../src/scripts/014_home_theme.sql', here), 'utf8');
+const m015 = readFileSync(new URL('../../src/scripts/015_user_lists.sql', here), 'utf8');
 
 const GOOD_CODE = 'Code-De-Test-Synthetique-01';
 const BAD_CODE = 'mauvais-code-de-test';
@@ -45,6 +51,12 @@ async function newDb({ withPush = true } = {}) {
   if (withPush) {
     await db.exec(NET_STUB);
     await db.exec(m007);
+    await db.exec(m010);
+    await db.exec(m011);
+    await db.exec(m012);
+    await db.exec(m013);
+    await db.exec(m014);
+    await db.exec(m015);
   }
   return db;
 }
@@ -121,6 +133,15 @@ describe('surface d’attaque : fonctions appelables avec la clé publique', () 
     'admin_send_push', 'admin_write', 'delete_my_data', 'discover_place', 'get_my_card_usage', 'get_my_discoveries',
     'get_push_preferences', 'increment_spot_like', 'register_push_token', 'unregister_push_token',
     'update_push_preferences', 'use_discount_card', 'verify_admin_access',
+    // 011 : chouchous du Petit Tou (gérés par code admin) et date du jour utilisée par la politique de lecture
+    'admin_list_featured', 'admin_save_featured', 'admin_delete_featured', '_lpt_today',
+    // 012 : fond d'accueil (billet d'envoi vérifié par code admin ; la vérification de billet sert la politique de stockage)
+    'admin_request_upload', 'admin_set_home_background', '_upload_ticket_ok',
+    'admin_list_offers', 'admin_save_offer', 'admin_delete_offer',
+    // 014 : thème de l'année (code admin vérifié côté serveur)
+    'admin_set_home_theme',
+    // 015 : sauvegarde serveur des listes personnelles (identité d'appareil ou session)
+    'get_my_lists', 'save_my_lists',
   ];
   test('anon et authenticated ne peuvent exécuter que la liste blanche ; aucune fonction interne exposée', async () => {
     const db = await newDb();

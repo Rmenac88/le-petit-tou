@@ -79,3 +79,32 @@ test("identifiant d'appareil introuvable : échec propre", async () => {
   });
   assert.equal(res.ok, false);
 });
+
+test('beforeDelete est appelé en premier (arrêt des sauvegardes en attente) ; son échec ne bloque pas l’effacement', async () => {
+  const calls: string[] = [];
+  const res = await deleteMyData({
+    beforeDelete: async () => {
+      calls.push('before');
+    },
+    getUserId: async () => 'dev-1',
+    rpc: async (fn) => {
+      calls.push(fn);
+      return { data: { success: true }, error: null };
+    },
+    clearLocal: async () => {
+      calls.push('local');
+    },
+  });
+  assert.equal(res.ok, true);
+  assert.deepEqual(calls, ['before', 'delete_my_data', 'local']);
+
+  const failing = await deleteMyData({
+    beforeDelete: async () => {
+      throw new Error('boom');
+    },
+    getUserId: async () => 'dev-1',
+    rpc: okRpc,
+    clearLocal: async () => {},
+  });
+  assert.equal(failing.ok, true);
+});

@@ -30,13 +30,17 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Bookmark,
 } from 'lucide-react-native';
 import { getOptimizedImageUrl } from '../lib/imageOptimizer';
 import { discoveryStore } from '../lib/discoveryStore';
 
 import { formatRating } from '../lib/formatRating';
 import { Brand } from '../constants/brand';
-import { Features } from '../constants/features';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AddToListSheet from './lists/AddToListSheet';
+import { userListsStore } from '../lib/userListsStore';
+import { listsContaining } from '../lib/userListsLogic';
 const { width, height } = Dimensions.get('window');
 
 export interface SpotDetail {
@@ -92,7 +96,15 @@ export default function AddressDetailModal({
   likesCount = 0,
   onToggleFavorite,
 }: AddressDetailModalProps) {
+  const insets = useSafeAreaInsets();
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  // Listes personnelles : le signet se remplit dès que l'adresse est dans au moins une liste
+  const [showListSheet, setShowListSheet] = useState(false);
+  const [inLists, setInLists] = useState(false);
+  useEffect(() => {
+    if (!spot?.id) return;
+    return userListsStore.subscribe((state) => setInLists(listsContaining(state, String(spot.id)).length > 0));
+  }, [spot?.id]);
   const [internalFavorite, setInternalFavorite] = useState(false);
   const isFavorite = isFavoriteProp !== undefined ? isFavoriteProp : internalFavorite;
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -202,6 +214,20 @@ export default function AddressDetailModal({
               <Pressable style={styles.iconCircleBtn} onPress={onClose} accessibilityLabel="Retour">
                 <ArrowLeft size={22} color={Brand.ink} strokeWidth={2} />
               </Pressable>
+              <View style={styles.topActionsRight}>
+              <Pressable
+                style={styles.iconCircleBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Ajouter à une liste"
+                onPress={() => setShowListSheet(true)}
+              >
+                <Bookmark
+                  size={20}
+                  color={inLists ? Brand.primary : Brand.ink}
+                  fill={inLists ? Brand.primary : 'transparent'}
+                  strokeWidth={2}
+                />
+              </Pressable>
               <Pressable
                 style={[
                   styles.iconCircleBtn,
@@ -228,6 +254,7 @@ export default function AddressDetailModal({
                   </Text>
                 )}
               </Pressable>
+              </View>
             </View>
           </View>
 
@@ -249,15 +276,11 @@ export default function AddressDetailModal({
 
             {/* Location & Rating */}
             <View style={styles.metaRow}>
-              {Features.externalRatings && (
-                <>
-                  <View style={styles.ratingBox}>
-                    <Star size={16} color={Brand.chouchou} fill={Brand.chouchou} />
-                    <Text style={styles.ratingText}>{formatRating(spot.rating)}</Text>
-                  </View>
-                  <Text style={styles.dotSeparator}>•</Text>
-                </>
-              )}
+              <View style={styles.ratingBox}>
+                <Star size={16} color={Brand.chouchou} fill={Brand.chouchou} />
+                <Text style={styles.ratingText}>{formatRating(spot.rating)}</Text>
+              </View>
+              <Text style={styles.dotSeparator}>•</Text>
               <Text style={styles.locationSub}>{spot.location || 'Toulouse Centre'}</Text>
             </View>
 
@@ -419,8 +442,7 @@ export default function AddressDetailModal({
               )}
             </View>
 
-            {Features.externalRatings && (
-            <>
+            {/* Reviews / Avis */}
             <View style={styles.sectionBox}>
               <View style={styles.reviewsHeaderRow}>
                 <Text style={styles.sectionHeaderTitle}>Avis & Retours</Text>
@@ -450,14 +472,12 @@ export default function AddressDetailModal({
                 </View>
               )}
             </View>
-            </>
-            )}
 
           </View>
         </ScrollView>
 
         {/* Barre d'actions flottante (une main) */}
-        <View style={styles.floatingBar}>
+        <View style={[styles.floatingBar, { paddingBottom: Math.max(insets.bottom, 12) + 14 }]}>
             <View style={styles.ctaRow}>
               <Pressable
                 style={styles.primaryCtaBtn}
@@ -498,12 +518,24 @@ export default function AddressDetailModal({
             </View>
 
         </View>
+
+        <AddToListSheet
+          visible={showListSheet}
+          spotId={spot?.id ? String(spot.id) : null}
+          spotTitle={spot?.title}
+          onClose={() => setShowListSheet(false)}
+        />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  topActionsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   floatingBar: {
     position: 'absolute',
     left: 0,
@@ -512,7 +544,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 26,
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    backgroundColor: Brand.white, // opaque : le texte qui défile dessous ne doit pas transparaître
     borderTopWidth: 1,
     borderTopColor: Brand.line,
   },

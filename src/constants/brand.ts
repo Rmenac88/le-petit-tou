@@ -8,6 +8,12 @@ export const Brand = {
   primaryDeep: '#C93049',
   primarySoft: '#FDECEF',
   primarySofter: '#FCE4E8',
+  /** Texte rose foncé lisible (≥ 4,5:1) sur les fonds roses doux — primaryDeep n'atteint que 4,3:1 dessus. */
+  primaryInk: '#A52A40',
+  /** Vert d'action (bouton « Ajouter » du portail) : texte blanc dessus ≥ 4,5:1. */
+  successDeep: '#12805B',
+  /** Ambre foncé pour la note chiffrée (étoile) sur fond blanc : ≥ 4,5:1. */
+  ratingInk: '#B45309',
   chouchou: '#F2B835',
   chouchouDeep: '#B07A0A',
   ink: '#1A1A22',

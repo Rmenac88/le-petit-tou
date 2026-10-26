@@ -11,6 +11,8 @@ import {
 import { Image } from 'expo-image';
 import { X, Search, TrendingUp, MapPin, Star, Utensils, Wine, CakeSlice, ShoppingBag, Scissors, Landmark, Dumbbell, Sun, Leaf } from 'lucide-react-native';
 import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
+import SearchPill from '../SearchPill';
+import ProfileButton from '../ProfileButton';
 
 import { formatRating } from '../../lib/formatRating';
 import dataset from '../../constants/dataset.json';
@@ -44,9 +46,11 @@ const POPULAR_SEARCHES = [
 export default function SearchView({
   onSelectSpot,
   onToggleDock,
+  onOpenProfile,
 }: {
   onSelectSpot?: (spotId: string) => void;
   onToggleDock?: (visible: boolean) => void;
+  onOpenProfile?: () => void;
 }) {
   const [allSpots, setAllSpots] = useState<any[]>(dataset.addresses || []);
   const [query, setQuery] = useState('');
@@ -100,42 +104,33 @@ export default function SearchView({
   // Sub-millisecond pre-indexed search across all venues
   const filteredSpots = React.useMemo(() => {
     if (!debouncedQuery.trim() && !selectedTag) return [];
-    return searchIndex.search(debouncedQuery, selectedTag, searchLimit);
+    // +1 : permet de savoir qu'il reste des résultats (bouton « Afficher plus »), l'affichage est borné plus bas
+    return searchIndex.search(debouncedQuery, selectedTag, searchLimit + 1);
   }, [debouncedQuery, selectedTag, searchLimit, allSpots]);
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         
         {/* Title Header */}
         <View style={styles.header}>
-          <Text style={styles.title} numberOfLines={1}>Cherche, on te trouve la pépite.</Text>
-          {query.length === 0 && (
-            <Text style={styles.subtitle}>790 adresses testées par des étudiants toulousains.</Text>
-          )}
+          <View style={styles.headerText}>
+            <Text style={styles.title} numberOfLines={2}>Cherche, on te trouve la pépite.</Text>
+            {query.length === 0 && (
+              <Text style={styles.subtitle}>790 adresses testées par des étudiants toulousains.</Text>
+            )}
+          </View>
+          {onOpenProfile && <ProfileButton onPress={onOpenProfile} />}
         </View>
 
         {/* Clean Modern Search Bar */}
         <View style={styles.searchBarWrapper}>
-          <Pressable 
-            style={styles.searchBarContainer}
-            onPress={() => searchInputRef.current?.focus()}
-          >
-            <Search size={20} color={Brand.inkSoft} strokeWidth={2} style={{ marginRight: 10 }} />
-            <TextInput
-              ref={searchInputRef}
-              placeholder="Ex: Brunch, Tapas, Rooftop..."
-              placeholderTextColor={Brand.inkSoft}
-              value={query}
-              onChangeText={setQuery}
-              style={styles.searchInput}
-            />
-            {query.length > 0 && (
-              <Pressable onPress={() => setQuery('')} style={styles.clearBtn} accessibilityRole="button" accessibilityLabel="Effacer la recherche">
-                <X size={16} color={Brand.inkSoft} strokeWidth={2} />
-              </Pressable>
-            )}
-          </Pressable>
+          <SearchPill
+            inputRef={searchInputRef}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Ex: Brunch, Tapas, Rooftop..."
+          />
         </View>
 
         {/* Quick Filter Tags Carousel */}
@@ -163,7 +158,7 @@ export default function SearchView({
         {query.length > 0 || selectedTag ? (
           <View style={styles.sectionWrapper}>
             <Text style={styles.sectionTitle}>
-              Résultats ({filteredSpots.length})
+              Résultats ({Math.min(filteredSpots.length, searchLimit)}{filteredSpots.length > searchLimit ? '+' : ''})
             </Text>
 
             {filteredSpots.length === 0 ? (
@@ -237,7 +232,7 @@ export default function SearchView({
                     onPress={() => setSearchLimit(prev => prev + 20)}
                   >
                     <Text style={{ fontSize: 13, fontWeight: '800', color: Brand.white }}>
-                      Afficher plus de résultats ({Math.min(searchLimit, filteredSpots.length)} / {filteredSpots.length}) ↓
+                      Afficher plus de résultats ↓
                     </Text>
                   </Pressable>
                 )}
@@ -306,6 +301,13 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
   },
   title: {
     fontSize: 22,

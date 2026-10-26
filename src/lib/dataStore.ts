@@ -56,10 +56,7 @@ class GlobalDataStore {
   private eventListeners: Set<Listener<EventRecord[]>> = new Set();
 
   constructor() {
-    // Re-index search on initial startup with dataset
-    if (dataset && Array.isArray((dataset as any).addresses)) {
-      searchIndex.updateSpots((dataset as any).addresses);
-    }
+    // L'index de recherche se construit tout seul à la première recherche (pas de travail au démarrage)
   }
 
   // ── Dispatchers ──
