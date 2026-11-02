@@ -19,6 +19,8 @@ const contrast = (fg: string, bg: string) => {
 
 const PAIRS: [string, string, string, number][] = [
   ['texte blanc sur bouton rose foncé', Brand.white, Brand.primaryDeep, 4.5],
+  ['texte discret sur fond blanc', Brand.inkMute, Brand.white, 4.5],
+  ['texte discret sur fond de page', Brand.inkMute, Brand.bg, 4.5],
   ['texte rose foncé sur fond rose doux (erreurs, sélection)', Brand.primaryInk, Brand.primarySofter, 4.5],
   ['texte rose foncé sur fond rose très doux', Brand.primaryInk, Brand.primarySoft, 4.5],
   ['texte blanc sur bouton vert « Ajouter »', Brand.white, Brand.successDeep, 4.5],

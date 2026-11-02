@@ -11,6 +11,7 @@
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "fr.lepetittou.app",
       "supportsTablet": true,
+      "requireFullScreen": true,
       "infoPlist": {
         "CFBundleDisplayName": "Le Petit Tou",
         "NSLocationWhenInUseUsageDescription": "Le Petit Tou utilise votre position lorsque l'application est ouverte pour afficher les établissements toulousains recommandés les plus proches de vous.",

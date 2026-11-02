@@ -188,10 +188,6 @@ const SpotRow = React.memo(function SpotRow({ spot, label, onEdit, onDelete }: S
           <View style={styles.miniBadge}>
             <Text style={styles.miniBadgeText}>{label}</Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-            <Star size={11} color={Brand.chouchou} fill={Brand.chouchou} />
-            <Text style={styles.spotCardRating}>{spot.rating || '4.8'}</Text>
-          </View>
         </View>
       </View>
 
@@ -516,7 +512,6 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
 
       const latVal = formLat ? parseFloat(formLat) : 43.6047;
       const lngVal = formLng ? parseFloat(formLng) : 1.4442;
-      const ratingVal = formRating ? parseFloat(formRating) : 4.8;
 
       // Ensure category_id is a valid UUID
       let validCatId = formCategory;
@@ -544,7 +539,6 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
         telephone: formPhone.trim(),
         site_web: formWebsite.trim(),
         price_level: formPriceLevel,
-        rating: ratingVal,
         lat: isNaN(latVal) ? null : latVal,
         lng: isNaN(lngVal) ? null : lngVal,
         image_url: formCoverUrl || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600&auto=format&fit=crop',

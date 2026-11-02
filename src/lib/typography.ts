@@ -33,7 +33,16 @@ function patch(Component: any) {
   };
 }
 
+/** Les réglages de texte agrandi du téléphone restent respectés, mais plafonnés (hauteurs fixes : barre de recherche, dock). */
+export const MAX_FONT_SCALE = 1.35;
+
+function capFontScale(Component: any) {
+  Component.defaultProps = { ...(Component.defaultProps || {}), maxFontSizeMultiplier: MAX_FONT_SCALE };
+}
+
 export function applyBrandTypography() {
   patch(Text);
   patch(TextInput);
+  capFontScale(Text);
+  capFontScale(TextInput);
 }

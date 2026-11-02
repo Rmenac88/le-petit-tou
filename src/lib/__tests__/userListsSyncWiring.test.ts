@@ -41,9 +41,11 @@ test('« Effacer mes données » arrête les envois avant d’appeler le serveur
   assert.match(sql, /delete from public\.user_lists where device_id = v_key;/);
 });
 
-test('les textes montrés à l’utilisateur disent la vérité : sauvegarde serveur anonyme, nouveau profil après désinstallation', () => {
+test('les textes montrés à l’utilisateur disent la vérité : sauvegarde serveur anonyme, réinstallation différente sur iPhone et Android', () => {
   assert.doesNotMatch(privacy, /ne sont jamais envoyées à nos serveurs/);
   assert.doesNotMatch(section, /restent sur ton téléphone/);
   assert.match(privacy, /sauvegardées sur nos serveurs sous votre identifiant anonyme/);
-  assert.match(privacy, /si vous désinstallez l'application, un nouveau profil est créé/);
+  assert.doesNotMatch(privacy, /si vous désinstallez l'application, un nouveau profil est créé\./);
+  assert.match(privacy, /peut être conservé par l'iPhone/);
+  assert.match(privacy, /sur Android, un nouveau profil est créé/);
 });

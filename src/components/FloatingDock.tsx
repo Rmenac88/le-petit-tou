@@ -9,10 +9,20 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Home, Search, Map, Percent, CalendarDays, LucideIcon } from 'lucide-react-native';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Brand } from '../constants/brand';
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /** `profile` n'est pas dans la barre du bas : on y accède par le bouton en haut à droite. */
+const TAB_LABELS: Record<string, string> = {
+  home: 'Accueil',
+  search: 'Recherche',
+  map: 'Carte',
+  offers: 'Offres',
+  agenda: 'Agenda',
+  profile: 'Profil',
+};
+
 export type TabType = 'home' | 'search' | 'map' | 'offers' | 'agenda' | 'profile';
 
 interface FloatingDockProps {
@@ -88,6 +98,7 @@ function TabButton({ Icon, isActive, onPress, color, accessibilityLabel }: TabBu
 }
 
 export default function FloatingDock({ activeTab, onChangeTab, visible = true }: FloatingDockProps) {
+  const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const translateY = useSharedValue(0);
   const opacity = useSharedValue(1);
@@ -123,6 +134,7 @@ export default function FloatingDock({ activeTab, onChangeTab, visible = true }:
     <Animated.View
       style={[
         styles.outerContainer,
+        { bottom: Math.max(34, insets.bottom + 16) },
         animStyle,
         { pointerEvents: visible ? 'auto' : 'none' } as any,
       ]}
@@ -138,7 +150,7 @@ export default function FloatingDock({ activeTab, onChangeTab, visible = true }:
               isActive={isActive}
               onPress={() => onChangeTab(tab.type)}
               color={isActive ? Brand.primary : Brand.inkSoft}
-              accessibilityLabel={`tab-${tab.type}`}
+              accessibilityLabel={TAB_LABELS[tab.type] ?? tab.type}
             />
           );
         })}

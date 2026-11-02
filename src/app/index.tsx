@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { BackHandler, StyleSheet, View } from 'react-native';
 
 import FloatingDock, { TabType } from '@/components/FloatingDock';
 import HomeView from '@/components/views/HomeView';
@@ -34,6 +34,22 @@ export default function HomeScreen() {
     if (activeTab === 'profile') setHasVisitedProfile(true);
     if (activeTab === 'agenda') setHasVisitedAgenda(true);
   }, [activeTab]);
+
+  // Bouton retour Android : revient à l'écran précédent / à l'accueil avant de quitter l'appli
+  React.useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (activeTab === 'profile') {
+        setActiveTab(tabBeforeProfile);
+        return true;
+      }
+      if (activeTab !== 'home') {
+        setActiveTab('home');
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [activeTab, tabBeforeProfile]);
 
   // Notifications : canal/affichage au démarrage, rafraîchissement du jeton, ouverture du bon écran au toucher
   React.useEffect(() => {

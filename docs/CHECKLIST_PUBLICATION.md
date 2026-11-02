@@ -3,10 +3,13 @@
 Référence détaillée : `docs/audit/` (audit de sécurité, juridique et boutiques). Cette page n'en est que le résumé court.
 
 ## 1. Base de données (Supabase → SQL Editor)
-Ordre : `002` → `003` → `004` → `005` (avec ton code admin) → `006` → `007` → `008` → `009`. Ne jamais rejouer un script plus ancien après `006`.
-- [x] 006, 007, 008 : déjà lancés en production (21/10).
-- [ ] `016_hide_partner_price.sql` : ferme la lecture publique de `sponsored_partners` (le prix payé était lisible) et crée la vue publique. **À lancer en même temps que la mise à jour de l'appli** : une ancienne version de l'appli ne verrait plus les partenaires.
-- [ ] Vérifier après 016 : `scripts/audit-prod-check.sh`.
+Ordre : `002` → … → `008` (déjà lancés), puis `009` → `015` (Ryadh), puis `016`, `017`, `018` (Claude). Ne jamais rejouer un script plus ancien après `006`.
+- [ ] `009` à `015` : migrations de Ryadh pas encore appliquées en production (offres, thème, listes personnelles, etc.).
+- [ ] `016_hide_partner_price.sql` : ferme la lecture publique de `sponsored_partners` (le prix payé est lisible aujourd'hui). À lancer en même temps que la mise à jour de l'appli.
+- [ ] `017_remove_external_ratings.sql` : **destructif**, efface les notes Google/TripAdvisor de la table `addresses`. Sauvegarde ou exporte la table avant.
+- [ ] `018_purge_suggestions.sql` : purge des suggestions d'adresses après 24 mois (tenir la promesse de la politique).
+- [ ] Après les scripts : `scripts/audit-prod-check.sh`, puis `scripts/audit-prod-readonly.sql` dans l'éditeur SQL.
+- [ ] Historique GitHub : les notes (790) sont dans l'historique public du dépôt (commit `b6b20e5`). Les retirer demande de réécrire l'historique (force-push) : décision de l'association, à faire avant ou après avoir rendu le dépôt privé.
 
 ## 2. Décisions ouvertes (voir `docs/audit/04-SUIVI-2026-10-21.md`)
 - [ ] N-09 : verrouillage anti force brute global (10 mauvais codes bloquent tout le monde 15 min).

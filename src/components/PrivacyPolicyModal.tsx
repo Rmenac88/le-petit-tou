@@ -127,7 +127,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
                   • <Text style={styles.boldText}>Likes</Text> : un like par appareil et par adresse. Seul le total par adresse est public.
                 </Text>
                 <Text style={styles.bulletPoint}>
-                  • <Text style={styles.boldText}>Vos listes</Text> (« À tester plus tard », « Y retourner », listes que vous créez) : elles sont enregistrées sur votre téléphone et sauvegardées sur nos serveurs sous votre identifiant anonyme (aucun nom, e-mail ni compte). Elles sont effacées avec le bouton « Effacer mes données » ; si vous désinstallez l'application, un nouveau profil est créé.
+                  • <Text style={styles.boldText}>Vos listes</Text> (« À tester plus tard », « Y retourner », listes que vous créez) : elles sont enregistrées sur votre téléphone et sauvegardées sur nos serveurs sous votre identifiant anonyme (aucun nom, e-mail ni compte). Elles sont effacées avec le bouton « Effacer mes données » ; si vous désinstallez l'application, votre identifiant peut être conservé par l'iPhone (vous retrouvez alors votre profil à la réinstallation) ; sur Android, un nouveau profil est créé et les anciennes données restent sur nos serveurs jusqu'à leur suppression automatique (24 mois sans activité). Pour les effacer tout de suite, utilisez « Effacer mes données » avant de désinstaller.
                 </Text>
                 <Text style={styles.bulletPoint}>
                   • <Text style={styles.boldText}>Suggestions d'adresses</Text> : le texte que vous saisissez volontairement. N'y indiquez pas de données personnelles vous concernant.

@@ -18,7 +18,7 @@ export const Brand = {
   chouchouDeep: '#B07A0A',
   ink: '#1A1A22',
   inkSoft: '#6A6A78',
-  inkMute: '#9A9AA8',
+  inkMute: '#6F6F80',
   bg: '#F8F9FA',
   white: '#FFFFFF',
   line: '#ECE6EA',

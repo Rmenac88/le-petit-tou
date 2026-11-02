@@ -11,7 +11,7 @@ Source de vérité : `src/constants/brand.ts`. Aucune couleur, taille de texte o
 | `chouchou` | `#F2B835` | Label « Chouchou » (texte dessus : `ink`, 9,6:1) |
 | `ink` | `#1A1A22` | Titres, texte principal |
 | `inkSoft` | `#6A6A78` | **Tout texte secondaire** (5,3:1 sur blanc) |
-| `inkMute` | `#9A9AA8` | Icônes décoratives et états désactivés uniquement (2,8:1, jamais pour du texte) |
+| `inkMute` | `#6F6F80` | Texte discret, icônes et états désactivés (4,9:1 sur blanc) |
 | `bg` / `white` | `#F8F9FA` / `#FFFFFF` | Fond d'écran / surfaces |
 | `line` | `#ECE6EA` | Filets et bordures |
 | `night` / `nightMid` / `violet` | `#2B1D46` / `#3A235C` / `#6C4AB6` | Violet sidéral : bandeau d'accueil, carte privilège, intro |
