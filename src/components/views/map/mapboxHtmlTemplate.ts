@@ -189,11 +189,19 @@ function createSelectedElement(s) {
   var html = '<div class="custom-marker-pin cat-' + key + '">';
   html += '<div class="active-star-badge">&#11088;</div>';
   html += '<div class="custom-marker-inner"><div class="fallback-icon">' + iconSvg(key, 15) + '</div>';
-  if (s.image_url) {
-    html += '<img src="' + thumbUrl(s.image_url) + '" alt="" decoding="async" onload="this.style.opacity=1" onerror="this.remove()" />';
-  }
   html += '</div></div>';
   el.innerHTML = html;
+  if (s.image_url) {
+    // Élément créé par le DOM : l'adresse de l'image n'est jamais interprétée comme du HTML.
+    var im = document.createElement('img');
+    im.alt = '';
+    im.decoding = 'async';
+    im.onload = function () { im.style.opacity = 1; };
+    im.onerror = function () { im.remove(); };
+    im.src = thumbUrl(s.image_url);
+    var inner = el.querySelector('.custom-marker-inner');
+    if (inner) inner.appendChild(im);
+  }
   return el;
 }
 

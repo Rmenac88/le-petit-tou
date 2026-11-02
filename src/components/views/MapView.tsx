@@ -57,6 +57,7 @@ import { discoveryStore } from '../../lib/discoveryStore';
 import { formatRating } from '../../lib/formatRating';
 import { onAppEvent } from '../../lib/appEvents';
 import { Brand } from '../../constants/brand';
+import { Features } from '../../constants/features';
 // Carte Mapbox GL : une page HTML unique, affichée dans une iframe sur le web et dans une WebView sur téléphone.
 // (chargement conditionnel pour ne pas casser le bundle web)
 let NativeWebView: any = null;
@@ -1248,9 +1249,11 @@ export default function MapView({
                     {spot.address || spot.location || 'Toulouse'}
                   </Text>
                 </View>
-                <View style={styles.suggestionRating}>
-                  <Text style={styles.suggestionRatingText}>{formatRating(spot.rating)}</Text>
-                </View>
+                {Features.externalRatings && (
+                  <View style={styles.suggestionRating}>
+                    <Text style={styles.suggestionRatingText}>{formatRating(spot.rating)}</Text>
+                  </View>
+                )}
               </Pressable>
             ))}
 

@@ -153,6 +153,7 @@ import {
 } from '../../lib/categoryResolver';
 
 import { Brand } from '../../constants/brand';
+import { Features } from '../../constants/features';
 const ALL_EXPANDED_CATEGORIES = [
   { id: 'all', name: 'Toutes les adresses', icon_name: 'Compass', color: Brand.ink },
   { id: 'gourmand-gourmet', name: 'Gourmand & Restauration', icon_name: 'Utensils', color: Brand.primaryDeep },
@@ -682,6 +683,7 @@ export default function HomeView({
   const adminTapTimerRef = React.useRef<any>(null);
 
   const handleTitlePress = () => {
+    if (!Features.adminPortal) return;
     triggerHaptic();
     adminTapCountRef.current += 1;
     if (adminTapTimerRef.current) {
@@ -2223,22 +2225,22 @@ export default function HomeView({
                 <CheckCircle size={32} color={Brand.primaryDeep} strokeWidth={2} />
               </View>
 
-              <Text style={styles.successKicker}>CONFIRMATION</Text>
-              <Text style={styles.successTitle}>Réservation confirmée</Text>
+              <Text style={styles.successKicker}>BILLETTERIE</Text>
+              <Text style={styles.successTitle}>Direction la billetterie</Text>
               
               <Text style={styles.successEventTitle}>{successEvent.title}</Text>
               
               <Text style={styles.successDesc}>
-                Votre place a bien été enregistrée pour cet événement Le Petit Tou.
+                La réservation se termine sur le site de la billetterie : ta place n'est confirmée qu'une fois l'inscription faite là-bas.
               </Text>
 
               {/* Redirection banner */}
               <View style={styles.successNoticeBox}>
                 <Text style={styles.successNoticeTitle}>
-                  Redirection vers la billetterie en cours...
+                  Ouverture de la billetterie...
                 </Text>
                 <Text style={styles.successNoticeSubtitle}>
-                  Ouverture de l'accès partenaire officiel
+                  Tu vas quitter l'application
                 </Text>
               </View>
 
@@ -2560,10 +2562,9 @@ export default function HomeView({
                 <View style={styles.filterModalSortList}>
                   {[
                     { id: 'likes', label: 'Plus aimés', desc: 'Classés selon les likes réels de la communauté Le Petit Tou' },
-                    { id: 'rating', label: 'Mieux notés', desc: 'Les meilleures notes Google & Petit Tou en premier' },
                     { id: 'recommended', label: 'Coups de cœur', desc: 'La sélection officielle recommandée par nos rédacteurs' },
-                    { id: 'new', label: '🆕 Nouveautés', desc: 'Les adresses les plus récentes de notre guide' },
-                  ].map(s => {
+                    { id: 'new', label: 'Nouveautés', desc: 'Les adresses les plus récentes de notre guide' },
+                  ].concat(Features.externalRatings ? [{ id: 'rating', label: 'Mieux notés', desc: 'Les meilleures notes en premier' }] : []).map(s => {
                     const isSelected = selectedSort === s.id;
                     return (
                       <Pressable
