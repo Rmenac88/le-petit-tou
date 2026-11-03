@@ -2025,8 +2025,10 @@ export const styles = StyleSheet.create({
   },
   progressionTopRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 6,
     marginBottom: 6,
   },
   levelBadge: {

@@ -11,7 +11,8 @@ with allowed(fn) as (values
   ('admin_request_upload'), ('admin_set_home_background'), ('_upload_ticket_ok'),
   ('admin_list_offers'), ('admin_save_offer'), ('admin_delete_offer'),
   ('admin_set_home_theme'),
-  ('get_my_lists'), ('save_my_lists')
+  ('get_my_lists'), ('save_my_lists'),
+  ('admin_read')
 ),
 exposed as (
   select p.proname as fn, r.rolname as role

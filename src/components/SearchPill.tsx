@@ -54,6 +54,8 @@ export default function SearchPill({
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.1}
       />
 
       {value.trim().length > 0 && (
@@ -91,7 +93,7 @@ export default function SearchPill({
 
 const styles = StyleSheet.create({
   container: {
-    height: 52,
+    minHeight: 52,
     borderRadius: 20,
     backgroundColor: Brand.bg,
     borderWidth: 1,
@@ -117,7 +119,8 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     minWidth: 0,
-    height: '100%',
+    alignSelf: 'stretch',
+    minHeight: 40,
     fontSize: 13,
     fontWeight: '700',
     color: Brand.ink,

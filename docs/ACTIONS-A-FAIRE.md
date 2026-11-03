@@ -3,12 +3,17 @@
 Mis à jour le 3 novembre 2026. Chaque étape dit **où cliquer**, **quoi copier**, **ce que tu dois voir**, et **ce qui peut mal tourner**.
 Les rapports détaillés sont dans `docs/audit/` (10 à 13). Tout ce que Claude pouvait corriger dans le code est déjà commité sur la branche `integration/audit-plus-claude` (rien n'est poussé sur GitHub).
 
+## Statut au 3 novembre 2026
+
+**Fait** : sauvegarde de la base (`~/Documents/petittou/sauvegardes-base-2026-11-03`), scripts SQL `013` à `018` appliqués en production et vérifiés, contrôle de production conforme, branche poussée sur GitHub, APK Android construit et essayé sur émulateur, pages légales remplies avec les données du registre.
+**En attente** : `019` (fermeture des anciens éléments de la base, besoin de ton accord), restriction du jeton Mapbox (connexion à ton compte), nettoyage des données de démonstration (offres, Bonopandas, événement « test »), plan Supabase Pro et dépôt privé (Ryadh / plus tard), comptes boutiques (plus tard).
+
 ---
 
 ## Étape 1 — Prévenir Ryadh (5 minutes, aujourd'hui)
 
 Il a deux choses à faire de son côté :
-1. **Pousser sa branche** sur GitHub : la bannière « Office de tourisme » (fond personnalisable dans le portail) n'existe que sur son ordinateur.
+1. **Pousser sa branche** sur GitHub : la bannière « Office de tourisme » (fond personnalisable dans le portail) n'existe que sur son ordinateur. 
 2. **Relire** la branche `integration/audit-plus-claude` (fusion de son travail du 25/10 avec les corrections d'audit) avant qu'on la pousse.
 
 Message à lui envoyer :
@@ -18,7 +23,7 @@ Message à lui envoyer :
 
 ## Étape 2 — Rendre le dépôt GitHub privé (2 minutes, recommandé tout de suite)
 
-**Pourquoi** : le dépôt est public. Son historique contient 790 notes Google/TripAdvisor et l'empreinte d'un ancien code admin. Le rendre privé protège ça immédiatement, sans toucher au code.
+**Pourquoi** : le dépôt est public. Son historique contient d'anciennes données devenues inutiles et l'empreinte d'un ancien code admin. Le rendre privé protège ça immédiatement, sans toucher au code.
 
 1. Va sur `https://github.com/Rmenac88/le-petit-tou` → **Settings** (onglet en haut à droite).
 2. Tout en bas, section **Danger Zone** → **Change repository visibility** → **Make private**.
@@ -26,7 +31,7 @@ Message à lui envoyer :
 
 **Ce que tu dois voir** : un cadenas à côté du nom du dépôt.
 **Attention** : seules les personnes invitées pourront voir le code. Vérifie que Ryadh a bien accès (Settings → Collaborators).
-**Plus tard (facultatif)** : effacer ces données de l'historique demande de le réécrire. C'est possible mais délicat ; dis-le à Claude si tu veux le faire.
+**Plus tard** : quand l'appli est prête, retirer les anciennes données de l'historique (demande de le réécrire ; à faire avec Claude).
 
 ---
 
@@ -72,7 +77,7 @@ Si tu as passé l'étape 3, tu as aussi les sauvegardes automatiques (Database �
 | 6 | `014_home_theme.sql` | thème de l'année | de Ryadh |
 | 7 | `015_user_lists.sql` | sauvegarde serveur des listes personnelles | de Ryadh |
 | 8 | `016_hide_partner_price.sql` | **cache le prix payé par les partenaires** | voir ci-dessous |
-| 9 | `017_remove_external_ratings.sql` | **efface les notes Google/TripAdvisor** | destructif : étape 4 faite avant |
+| 9 | `017_remove_external_ratings.sql` | **efface les anciennes notes de la table des adresses** | destructif : étape 4 faite avant |
 | 10 | `018_purge_suggestions.sql` | supprime les suggestions après 24 mois | |
 
 > Si Ryadh t'a déjà fait lancer certains de ces scripts (009 à 012 notamment), relancer est sans danger : ils sont conçus pour être rejouables. Ne relance **jamais** un script numéroté plus petit que 006 après 006.
@@ -120,7 +125,6 @@ Les rapports `docs/audit/13` (section « décisions ») et `docs/audit/03` déta
 | Durées de conservation | 24 mois sans activité pour les listes, likes, points, suggestions ; 9 mois pour les jetons de notification. C'est ce que fait déjà le code. |
 | Mapbox comme seul fournisseur de carte | L'accepter et le déclarer dans la politique et dans les formulaires des boutiques (transfert hors UE). |
 | Viser l'iPad | Pas dans la première version : publier en iPhone seulement, plus simple et moins risqué. |
-| Notes Google/TripAdvisor | Ne pas les remettre sans accord écrit des services concernés. |
 | Libellé des partenaires payants | « Sponsorisé » (déjà en place), avec une mention claire dans la fiche de la boutique. |
 | Âge minimal et classe d'âge boutiques | À fixer avec le juriste (présence d'alcool dans les adresses). |
 | Droits sur les photos et textes des adresses | Vérifier d'où viennent les images (elles ont été reprises de lepetittou.com) et à qui appartient ce domaine. |
@@ -128,12 +132,9 @@ Les rapports `docs/audit/13` (section « décisions ») et `docs/audit/03` déta
 
 ---
 
-## Étape 9 — Faire valider le volet légal
+## Étape 9 — Pages légales (en grande partie faites)
 
-1. Envoie `docs/audit/03-JURIDIQUE-ET-BOUTIQUES-2026-10-21.md` et `docs/audit/13-DONNEES-ET-LEGAL.md` à un **juriste ou au DPO de TBS Education**.
-2. **Délai RGPD de 72 h** : le rapport du 19/10 évoque un incident « probable » (la base était modifiable et lisible avec la clé publique avant le 20/10). Le délai de 72 h pour notifier la CNIL, s'il s'applique, est **déjà dépassé** : fais trancher ça cette semaine par la personne compétente. Ce n'est pas une décision technique.
-3. Une fois validés, complète les champs **`[À COMPLÉTER]`** dans `public/confidentialite.html`, `public/mentions-legales.html` et `public/suppression-donnees.html`.
-4. **Héberge ces trois pages** à une adresse publique (les boutiques exigent une URL de politique de confidentialité). Exemple : GitHub Pages sur un dépôt dédié, ou le site de l'association. Note les trois adresses pour l'étape 10.
+Les trois pages (`public/confidentialite.html`, `public/mentions-legales.html`, `public/suppression-donnees.html`) sont remplies avec les informations du registre (SIREN, SIRET, forme juridique, région d'hébergement Irlande). Restent à compléter, ce que seule l'association connaît : numéro RNA, nom du directeur de la publication, hébergeur du site, adresse postale à publier (voir `docs/MESSAGE-ASSOCIATION.md`). Ensuite, les héberger à une adresse publique et noter les trois adresses pour l'étape 10.
 
 ---
 
@@ -176,6 +177,5 @@ Aucun test n'a été fait sur de vrais appareils. Avant de publier :
 
 1. Passage au plan Pro (étape 3).
 2. Scripts SQL lancés (étape 5), sinon le prix des partenaires reste lisible et les listes ne se sauvegardent pas.
-3. Notes Google/TripAdvisor effacées de la base (étape 5, script 017).
-4. Pages légales complétées et hébergées, avis du juriste (étapes 8 et 9).
-5. Comptes développeur et tests sur vrais téléphones (étapes 10 et 11).
+3. Pages légales complétées et hébergées, avis du juriste (étapes 8 et 9).
+4. Comptes développeur et tests sur vrais téléphones (étapes 10 et 11).
