@@ -127,6 +127,9 @@ import { resolveFeatured, type FeaturedRow } from '../../lib/featuredLogic';
 import { HOME_BACKGROUND_CHANGED_EVENT, fetchHomeBackground, loadStoredHomeBackground } from '../../lib/homeBackgroundStore';
 import { GALAXY, backgroundImageUrl, type HomeBackground } from '../../lib/homeBackgroundLogic';
 import { HOME_THEME_CHANGED_EVENT, fetchHomeTheme, loadStoredHomeTheme } from '../../lib/homeThemeStore';
+import { TOURISM_BANNER_CHANGED_EVENT, fetchTourismUrl, loadStoredTourismUrl } from '../../lib/tourismBannerStore';
+import { DEFAULT_TOURISM_URL } from '../../lib/tourismBannerLogic';
+import TourismBanner from './home/TourismBanner';
 import { DEFAULT_THEME, resolveTheme, type HomeTheme } from '../../lib/homeThemeLogic';
 import { SUPABASE_URL } from '../../lib/supabase';
 import { PUSH_PROMPTED_KEY, getPushState, isPushSupported } from '../../lib/pushNotifications';
@@ -620,6 +623,25 @@ export default function HomeView({
     };
   }, []);
   const resolvedHomeTheme = useMemo(() => resolveTheme(homeTheme), [homeTheme]);
+
+  // Lien de la bannière « Office de tourisme » : dernier lien connu tout de suite, puis lien frais ; agenda officiel par défaut
+  const [tourismUrl, setTourismUrl] = useState<string>(DEFAULT_TOURISM_URL);
+  useEffect(() => {
+    let alive = true;
+    const refresh = async () => {
+      const fresh = await fetchTourismUrl();
+      if (alive && fresh) setTourismUrl(fresh);
+    };
+    loadStoredTourismUrl().then((url) => {
+      if (alive) setTourismUrl(url);
+    });
+    refresh();
+    const off = onAppEvent(TOURISM_BANNER_CHANGED_EVENT, refresh);
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
 
   // « Les chouchous du Petit Tou » : dernière liste connue tout de suite, puis liste fraîche de la base
   const [featuredRows, setFeaturedRows] = useState<FeaturedRow[]>([]);
@@ -1763,6 +1785,9 @@ export default function HomeView({
                   })}
                 </ScrollView>
               )}
+
+              {/* ── Bannière Office de tourisme de Toulouse (lien réglé depuis le portail admin) ── */}
+              <TourismBanner url={tourismUrl} />
 
               {/* ── TOP PARTENAIRES LE PETIT TOU (STYLE NETFLIX 1..10) ── */}
               {sponsoredPartners.length > 0 && (

@@ -9,6 +9,7 @@ import { adminRequestUpload, adminSetHomeBackground } from '../../lib/homeBackgr
 import { FeaturedError } from '../../lib/featuredAdmin';
 import { confirmAction } from './confirmAction';
 import HomeThemeSection from './HomeThemeSection';
+import TourismBannerSection from './TourismBannerSection';
 import {
   BACKGROUND_BUCKET,
   BACKGROUND_MAX_BYTES,
@@ -165,6 +166,8 @@ export default function HomeBackgroundAdminPanel({ adminCode }: Props) {
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <HomeThemeSection adminCode={adminCode} />
+
+      <TourismBannerSection adminCode={adminCode} />
 
       <Text style={[styles.h, styles.hSpaced]}>Fond de l'accueil</Text>
       <Text style={styles.intro}>
