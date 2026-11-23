@@ -75,7 +75,9 @@ Pour iOS, EAS crée lui-même les certificats et la clé de notifications (APNs)
    - **Sécurité des données** (Data safety), d'après le code :
      - identifiants de l'appareil : collectés, non partagés, pour le fonctionnement de l'appli, chiffrés en transit,
        suppression possible (« Effacer mes données ») ;
-     - position : utilisée seulement sur le téléphone, jamais envoyée au serveur, donc **non collectée** ;
+     - position précise : **collectée, traitement éphémère, facultative** (envoyée à Mapbox seulement pour calculer
+       l'itinéraire à pied, jamais enregistrée ni envoyée à notre base) ; détail case par case dans
+       `docs/play-store/FICHE-PLAY-STORE.md` ;
      - activité dans l'appli (likes, listes, adresses visitées) : collectée, non partagée, pour le fonctionnement ;
      - aucun nom, aucune adresse e-mail, aucun paiement, aucun suivi publicitaire ;
    - page de suppression des données : l'adresse de `suppression-donnees.html`.
@@ -93,7 +95,8 @@ Pour iOS, EAS crée lui-même les certificats et la clé de notifications (APNs)
 3. **Confidentialité de l'app** (App Privacy) :
    - identifiants (identifiant d'appareil) : collectés, **non liés à l'identité**, fonctionnement de l'appli ;
    - activité (likes, listes, découvertes) : collectée, non liée à l'identité, fonctionnement de l'appli ;
-   - position : non collectée (elle ne quitte pas le téléphone) ;
+   - position précise : collectée, **non liée à l'identité**, fonctionnement de l'appli (itinéraires calculés par
+     Mapbox, rien n'est enregistré) ;
    - pistage : **non** (pas de publicité ciblée, donc pas de demande d'autorisation de suivi).
 4. **Fiche** : captures pour iPhone 6,9 et 6,5 pouces, description, mots-clés, adresse d'assistance, adresse de la
    politique de confidentialité, classification par âge (questionnaire), copyright.
