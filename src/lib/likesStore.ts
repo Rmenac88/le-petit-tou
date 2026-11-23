@@ -1,39 +1,13 @@
-import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
 import { supabase } from './supabase';
 import { emitAppEvent } from './appEvents';
 import { getOrCreateDeviceId } from './deviceIdentity';
 import { clearPending, mergeServerLikes, parsePending, recordPending, type PendingLikes } from './likesSyncLogic';
+import { appStorage } from './storage';
 
 const LIKES_STORAGE_KEY = 'LPT_DEVICE_LIKED_SPOTS';
 
-// Helper de persistance locale (SecureStore sur mobile, localStorage sur web)
-const storage = {
-  getItem: async (key: string): Promise<string | null> => {
-    try {
-      if (Platform.OS === 'web') {
-        if (typeof window !== 'undefined' && window.localStorage) {
-          return window.localStorage.getItem(key);
-        }
-        return null;
-      }
-      return await SecureStore.getItemAsync(key);
-    } catch (e) {
-      return null;
-    }
-  },
-  setItem: async (key: string, value: string): Promise<void> => {
-    try {
-      if (Platform.OS === 'web') {
-        if (typeof window !== 'undefined' && window.localStorage) {
-          window.localStorage.setItem(key, value);
-        }
-        return;
-      }
-      await SecureStore.setItemAsync(key, value);
-    } catch (e) {}
-  },
-};
+// Stockage commun de l'appli (fichiers sur téléphone, localStorage sur web ; reprise automatique de l'ancien coffre)
+const storage = appStorage;
 
 // Likes pas encore reçus par le serveur (hors connexion, erreur) : renvoyés au prochain lancement
 const PENDING_KEY = 'LPT_LIKES_PENDING_V1';

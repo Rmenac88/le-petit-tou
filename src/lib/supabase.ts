@@ -1,7 +1,5 @@
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
-import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
 import { withTimeout } from './fetchWithTimeout';
 
 /** Délai maximal d'une requête vers la base : au-delà, l'appli bascule sur ses données locales. */
@@ -27,44 +25,29 @@ const SUPABASE_ANON_KEY =
 /** Vrai dès que l'URL et la clé publique sont connues (variables d'environnement ou valeurs de repli ci-dessus). */
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
-// Custom Storage adapter to persist auth sessions safely across Web & Native
-const ExpoSecureStoreAdapter = {
-  getItem: (key: string) => {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem(key);
-      }
-      return null;
-    }
-    return SecureStore.getItemAsync(key);
-  },
+/**
+ * Aucune session de connexion n'est utilisée (pas de compte : l'identifiant d'appareil suffit). La bibliothèque
+ * relisait pourtant la « session » dans le coffre chiffré AVANT CHAQUE requête, une par une : sur Android, plusieurs
+ * secondes d'attente au démarrage et à l'ouverture de chaque écran. La session vit désormais en mémoire seulement.
+ */
+const memorySession = new Map<string, string>();
+const MemoryAuthStorage = {
+  getItem: (key: string) => memorySession.get(key) ?? null,
   setItem: (key: string, value: string) => {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(key, value);
-      }
-      return;
-    }
-    SecureStore.setItemAsync(key, value);
+    memorySession.set(key, value);
   },
   removeItem: (key: string) => {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.removeItem(key);
-      }
-      return;
-    }
-    SecureStore.deleteItemAsync(key);
+    memorySession.delete(key);
   },
 };
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   global: { fetch: supabaseFetch },
   auth: {
-    storage: ExpoSecureStoreAdapter as any,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: Platform.OS === 'web',
+    storage: MemoryAuthStorage,
+    autoRefreshToken: false,
+    persistSession: false,
+    detectSessionInUrl: false,
   },
 });
 

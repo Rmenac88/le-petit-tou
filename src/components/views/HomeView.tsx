@@ -824,16 +824,25 @@ export default function HomeView({
 
       setIsConfigured(true);
 
-      // Fetch Categories with safe select
-      const { data: catData, error: catError } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name', { ascending: true });
+      // Toutes les requêtes de l'accueil partent EN MÊME TEMPS (avant : l'une après l'autre, les attentes
+      // s'additionnaient sur réseau mobile). Chacune est ensuite utilisée dès qu'on en a besoin.
+      // (une requête Supabase ne part qu'au premier « then » : Promise.resolve la lance tout de suite)
+      const categoriesReq = Promise.resolve(supabase.from('categories').select('*').order('name', { ascending: true }));
+      const catalogReq = catalogStore.load({ refresh: forceRefresh });
+      const eventsReq = Promise.resolve(
+        supabase
+          .from('events')
+          .select('id, title, description, event_date, event_time, location, price, max_participants, image_url, booking_url, max_places')
+          .order('event_date', { ascending: true })
+      );
+      const partnersReq = syncPartnersWithSupabase().catch(() => null);
+
+      const { data: catData, error: catError } = await categoriesReq;
       mark('net-categories');
       if (catError) throw catError;
 
       // Catalogue : chargeur commun (un seul téléchargement par session, aucun si la copie du téléphone est à jour)
-      const { rows: addrData, source: addrSource } = await catalogStore.load({ refresh: forceRefresh });
+      const { rows: addrData, source: addrSource } = await catalogReq;
       mark(`net-addresses-${addrSource}`);
       if (!addrData) throw new Error('catalogue indisponible');
 
@@ -858,10 +867,7 @@ export default function HomeView({
       // Jamais d'événement fictif : sans données (ou en cas d'erreur) la liste est vide.
       let finalEvents: any[] = [];
       try {
-        const { data: eventsData, error: eventsError } = await supabase
-          .from('events')
-          .select('id, title, description, event_date, event_time, location, price, max_participants, image_url, booking_url, max_places')
-          .order('event_date', { ascending: true });
+        const { data: eventsData, error: eventsError } = await eventsReq;
 
         if (!eventsError && eventsData && eventsData.length > 0) {
           finalEvents = eventsData.map((ev: any) => ({
@@ -878,7 +884,7 @@ export default function HomeView({
 
       // Fetch & Sync Sponsored Partners (Top Netflix) in background
       try {
-        const synced = await syncPartnersWithSupabase();
+        const synced = await partnersReq;
         if (synced && synced.length > 0) {
           setSponsoredPartners(synced);
         }
