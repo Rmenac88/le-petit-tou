@@ -64,3 +64,16 @@ export const getOrCreateDeviceId = async (): Promise<string> => {
   if (!cachedDeviceId) cachedDeviceId = await loadOrCreateDeviceId();
   return cachedDeviceId;
 };
+
+/**
+ * Restauration d'un profil (code de récupération) : ce téléphone adopte l'identifiant donné. L'appelant a déjà vérifié
+ * le code (recoveryLogic.decideRestore) et vidé les copies locales ; l'appli doit être relancée ensuite.
+ */
+export const replaceDeviceId = async (deviceId: string): Promise<void> => {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && window.localStorage) window.localStorage.setItem(DEVICE_ID_KEY, deviceId);
+  } else {
+    await SecureStore.setItemAsync(DEVICE_ID_KEY, deviceId, { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK });
+  }
+  cachedDeviceId = deviceId;
+};

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, ChevronLeft, ChevronRight, RotateCcw, ShieldCheck } from 'lucide-react-native';
+import { Bell, ChevronLeft, ChevronRight, KeyRound, Lightbulb, RotateCcw, ShieldCheck } from 'lucide-react-native';
 
 import { Brand, Font } from '../../constants/brand';
 import dataset from '../../constants/dataset.json';
@@ -13,6 +13,8 @@ import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
 import MyListsSection from '../lists/MyListsSection';
 import NotificationSettingsModal from '../NotificationSettingsModal';
 import PrivacyPolicyModal from '../PrivacyPolicyModal';
+import RecoveryCodeModal from '../RecoveryCodeModal';
+import SuggestPlaceModal from '../SuggestPlaceModal';
 import ProgressionBanner from './home/ProgressionBanner';
 
 interface Props {
@@ -28,6 +30,8 @@ export default function ProfileView({ onBack, onSelectSpot, onToggleDock }: Prop
   const [detail, setDetail] = useState<SpotDetail | null>(null);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [showSuggest, setShowSuggest] = useState(false);
 
   useEffect(() => discoveryStore.subscribe((s) => setStats(s)), []);
   useEffect(() => {
@@ -92,6 +96,16 @@ export default function ProfileView({ onBack, onSelectSpot, onToggleDock }: Prop
             <Text style={styles.settingText}>Notifications</Text>
             <ChevronRight size={18} color={Brand.inkMute} />
           </Pressable>
+          <Pressable style={styles.settingRow} onPress={() => setShowSuggest(true)} accessibilityRole="button">
+            <Lightbulb size={18} color={Brand.ink} />
+            <Text style={styles.settingText}>Proposer une adresse</Text>
+            <ChevronRight size={18} color={Brand.inkMute} />
+          </Pressable>
+          <Pressable style={styles.settingRow} onPress={() => setShowRecovery(true)} accessibilityRole="button">
+            <KeyRound size={18} color={Brand.ink} />
+            <Text style={styles.settingText}>Code de récupération</Text>
+            <ChevronRight size={18} color={Brand.inkMute} />
+          </Pressable>
           <Pressable style={[styles.settingRow, styles.settingRowLast]} onPress={() => setShowPrivacy(true)} accessibilityRole="button">
             <ShieldCheck size={18} color={Brand.ink} />
             <Text style={styles.settingText}>Confidentialité et RGPD</Text>
@@ -116,6 +130,8 @@ export default function ProfileView({ onBack, onSelectSpot, onToggleDock }: Prop
       )}
       <NotificationSettingsModal visible={showNotifs} onClose={() => setShowNotifs(false)} />
       <PrivacyPolicyModal visible={showPrivacy} onClose={() => setShowPrivacy(false)} />
+      <RecoveryCodeModal visible={showRecovery} onClose={() => setShowRecovery(false)} />
+      <SuggestPlaceModal visible={showSuggest} onClose={() => setShowSuggest(false)} />
     </SafeAreaView>
   );
 }

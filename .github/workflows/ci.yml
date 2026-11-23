@@ -1,0 +1,49 @@
+# Intégration continue : chaque envoi sur GitHub relance tous les contrôles (audit S2-13).
+# Pour être poussé, ce fichier demande un jeton GitHub avec le droit « workflow ».
+name: CI
+on:
+  push:
+    branches: [main, 'audit/**', 'integration/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typage
+        run: npm run typecheck
+      - name: Tests unitaires
+        run: npm run test:agenda
+      - name: Tests SQL (PostgreSQL en mémoire)
+        run: npm run test:sql
+
+  securite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Détection de secrets dans tout l'historique
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Dépendances livrées dans l'appli (alertes élevées ou critiques)
+        # Informatif tant que les alertes connues d'expo-router 57 restent (passage à SDK 58 prévu)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high

@@ -108,6 +108,13 @@ class AuthService {
     this.notify();
   }
 
+  /** Restauration d'un profil (code de récupération) : les appels suivants utilisent cet identifiant. */
+  public async adoptDeviceIdentity(deviceId: string): Promise<void> {
+    this.cachedUserId = deviceId;
+    await appStorage.setItem(AUTH_USER_ID_KEY, deviceId);
+    this.notify();
+  }
+
   public async getUserId(): Promise<string> {
     if (this.cachedUserId) return this.cachedUserId;
     return await this.init();

@@ -1,0 +1,10 @@
+# La clé publique Supabase (rôle anon) est faite pour être dans l'appli : elle n'est pas un secret.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Clé publique Supabase (rôle anon) et code admin factice des tests"
+regexes = [
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrZXN2YXdha3hibHN1aG16YWVvIiwicm9sZSI6ImFub24i[A-Za-z0-9_.-]*''',
+  '''Code-De-Test-Synthetique-01''',
+]
