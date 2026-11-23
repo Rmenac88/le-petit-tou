@@ -1,16 +1,22 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import * as ExpoCrypto from 'expo-crypto';
+import { secureUuid } from './secureUuid';
 
 const DEVICE_ID_KEY = 'LPT_SECURE_DEVICE_ID';
 
+/** Identifiant tiré d'un générateur cryptographique (il sert de secret d'accès aux données de l'installation). */
 const generateUUID = (): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
+  const native: any = typeof crypto !== 'undefined' ? crypto : undefined;
+  return secureUuid({
+    randomUUID:
+      native && typeof native.randomUUID === 'function'
+        ? () => native.randomUUID()
+        : () => ExpoCrypto.randomUUID(),
+    getRandomValues:
+      native && typeof native.getRandomValues === 'function'
+        ? (b) => native.getRandomValues(b)
+        : (b) => ExpoCrypto.getRandomValues(b),
   });
 };
 

@@ -17,6 +17,9 @@ const m012 = readFileSync(new URL('../../src/scripts/012_home_background.sql', h
 const m013 = readFileSync(new URL('../../src/scripts/013_offers.sql', here), 'utf8');
 const m014 = readFileSync(new URL('../../src/scripts/014_home_theme.sql', here), 'utf8');
 const m015 = readFileSync(new URL('../../src/scripts/015_user_lists.sql', here), 'utf8');
+const LATER = ['016_hide_partner_price', '017_remove_external_ratings', '018_purge_suggestions', '019_close_legacy_surface',
+  '020_tourism_banner', '021_hardening', '022_catalog_version']
+  .map((n) => readFileSync(new URL(`../../src/scripts/${n}.sql`, here), 'utf8'));
 
 const GOOD_CODE = 'Code-De-Test-Synthetique-01';
 const BAD_CODE = 'mauvais-code-de-test';
@@ -57,6 +60,8 @@ async function newDb({ withPush = true } = {}) {
     await db.exec(m013);
     await db.exec(m014);
     await db.exec(m015);
+    // 016 à 022 : toute la chaîne du dépôt, dans l'ordre, sur la même base
+    for (const m of LATER) await db.exec(m);
   }
   return db;
 }
@@ -142,6 +147,8 @@ describe('surface d’attaque : fonctions appelables avec la clé publique', () 
     'admin_set_home_theme',
     // 015 : sauvegarde serveur des listes personnelles (identité d'appareil ou session)
     'get_my_lists', 'save_my_lists',
+    // 016 : lecture admin des partenaires (prix masqué au public) ; 020 : bannière tourisme ; 022 : empreinte du catalogue
+    'admin_read', 'admin_set_tourism_banner', 'catalog_version',
   ];
   test('anon et authenticated ne peuvent exécuter que la liste blanche ; aucune fonction interne exposée', async () => {
     const db = await newDb();

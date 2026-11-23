@@ -42,6 +42,7 @@ import {
 import { getCategoryIcon } from '../../lib/categoryIcons';
 import { supabase } from '../../lib/supabase';
 import { appCache } from '../../lib/dataCache';
+import { catalogStore } from '../../lib/catalogStore';
 import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
 import PlaceDetailSheet from '../PlaceDetailSheet';
 import { PLACEHOLDER_PHOTO } from '../../constants/placeholder';
@@ -131,6 +132,7 @@ const triggerHaptic = () => {
   } catch (e) {}
 };
 import { getWebMapHtml, MAP_BACKGROUND } from './map/mapboxHtmlTemplate';
+import { isTrustedMapMessage, mapNavigationDecision } from './map/mapGuards';
 import BrandSwitch from '../BrandSwitch';
 import SearchPill from '../SearchPill';
 
@@ -354,10 +356,15 @@ export default function MapView({
       mapMessageRef.current = handleWebMessage;
       // `window.addEventListener` n'existe que sur le web ; sur téléphone la WebView appelle `mapMessageRef`
       if (Platform.OS !== 'web') return;
-      window.addEventListener('message', handleWebMessage as any);
+      // Seuls les messages de l'iframe de la carte comptent (une autre fenêtre ne peut pas simuler un clic)
+      const onWindowMessage = (event: MessageEvent) => {
+        if (!isTrustedMapMessage(event.source, iframeRef.current?.contentWindow)) return;
+        handleWebMessage(event);
+      };
+      window.addEventListener('message', onWindowMessage);
 
       return () => {
-        window.removeEventListener('message', handleWebMessage as any);
+        window.removeEventListener('message', onWindowMessage);
       };
   }, [spots]);
 
@@ -413,14 +420,11 @@ export default function MapView({
 
       let rawSpots: any[] = [];
       try {
-        if (supabase) {
-          const { data, error } = await supabase
-            .from('addresses')
-            .select('id, title, category_id, location, address, image_url, rating, price_level, is_recommended, is_new, lat, lng, tags, telephone, site_web, horaires, description, gallery_urls, full_description');
-          if (!error && data && data.length > 0) {
-            rawSpots = data;
-            appCache.set('addresses', data);
-          }
+        // Même catalogue que l'accueil (chargeur commun) : aucun téléchargement en double
+        const { rows: data } = await catalogStore.load();
+        if (data && data.length > 0) {
+          rawSpots = data;
+          appCache.set('addresses', data);
         }
       } catch (err) {
         console.log('DEBUG: addresses table fetch fallback.');
@@ -1172,6 +1176,12 @@ export default function MapView({
             ref={webViewRef}
             style={styles.nativeMap}
             originWhitelist={['*']}
+            // La WebView n'affiche que la carte embarquée ; un lien externe (« © Mapbox ») s'ouvre dans le navigateur
+            onShouldStartLoadWithRequest={(req: any) => {
+              const decision = mapNavigationDecision(req?.url);
+              if (decision === 'external') Linking.openURL(req.url).catch(() => {});
+              return decision === 'allow';
+            }}
             source={{ html: getWebMapHtml(MAPBOX_ACCESS_TOKEN), baseUrl: 'https://localhost' }}
             injectedJavaScriptBeforeContentLoaded={BRIDGE_BEFORE_LOAD}
             onMessage={(e: any) => mapMessageRef.current?.({ data: e.nativeEvent.data })}

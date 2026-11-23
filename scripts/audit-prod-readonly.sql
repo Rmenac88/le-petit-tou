@@ -12,7 +12,9 @@ with allowed(fn) as (values
   ('admin_list_offers'), ('admin_save_offer'), ('admin_delete_offer'),
   ('admin_set_home_theme'),
   ('get_my_lists'), ('save_my_lists'),
-  ('admin_read')
+  ('admin_read'),
+  ('admin_set_tourism_banner'),
+  ('catalog_version')
 ),
 exposed as (
   select p.proname as fn, r.rolname as role

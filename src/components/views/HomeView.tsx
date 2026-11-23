@@ -128,6 +128,7 @@ import { HOME_BACKGROUND_CHANGED_EVENT, fetchHomeBackground, loadStoredHomeBackg
 import { GALAXY, backgroundImageUrl, type HomeBackground } from '../../lib/homeBackgroundLogic';
 import { HOME_THEME_CHANGED_EVENT, fetchHomeTheme, loadStoredHomeTheme } from '../../lib/homeThemeStore';
 import { TOURISM_BANNER_CHANGED_EVENT, fetchTourismUrl, loadStoredTourismUrl } from '../../lib/tourismBannerStore';
+import { catalogStore } from '../../lib/catalogStore';
 import { DEFAULT_TOURISM_URL } from '../../lib/tourismBannerLogic';
 import TourismBanner from './home/TourismBanner';
 import { DEFAULT_THEME, resolveTheme, type HomeTheme } from '../../lib/homeThemeLogic';
@@ -830,13 +831,10 @@ export default function HomeView({
       mark('net-categories');
       if (catError) throw catError;
 
-      // Fetch Addresses with explicit projection (Lean DTO)
-      const { data: addrData, error: addrError } = await supabase
-        .from('addresses')
-        .select('id, title, category_id, location, address, image_url, rating, price_level, is_recommended, is_new, lat, lng, tags, telephone, site_web, horaires, description')
-        .order('created_at', { ascending: false });
-      mark('net-addresses');
-      if (addrError) throw addrError;
+      // Catalogue : chargeur commun (un seul téléchargement par session, aucun si la copie du téléphone est à jour)
+      const { rows: addrData, source: addrSource } = await catalogStore.load({ refresh: forceRefresh });
+      mark(`net-addresses-${addrSource}`);
+      if (!addrData) throw new Error('catalogue indisponible');
 
       const finalCategories = catData && catData.length > 0 ? catData : (dataset.categories as any);
       setCategories(finalCategories);

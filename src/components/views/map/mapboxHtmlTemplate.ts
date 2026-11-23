@@ -469,6 +469,8 @@ if (window.ResizeObserver) {
 }
 
 window.addEventListener('message', function (event) {
+  // Web : seule la page de l'appli (fenêtre parente) pilote la carte. Téléphone : messages injectés par l'appli (source vide).
+  if (event.source !== null && event.source !== window.parent) return;
   try {
     var data = JSON.parse(event.data);
     if (!map) return;

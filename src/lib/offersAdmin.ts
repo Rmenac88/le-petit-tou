@@ -22,7 +22,11 @@ const NOT_DEPLOYED = 'La gestion des offres n\'est pas encore activée sur le se
 export function offersErrorFrom(raw: unknown, rpcError?: { code?: string; message?: string } | null): OffersError {
   // fonction absente de la base (migration 013 pas encore appliquée)
   if (rpcError && (rpcError.code === 'PGRST202' || /could not find the function|schema cache/i.test(rpcError.message ?? ''))) {
-    return new OffersError('network', NOT_DEPLOYED);
+    return new OffersError('network', `${NOT_DEPLOYED} [${rpcError.code || 'fonction introuvable'}]`);
+  }
+  // Erreur renvoyée par la base elle-même (code SQL ou PostgREST) : on l'affiche telle quelle, ce n'est pas une coupure réseau
+  if (rpcError && rpcError.code) {
+    return new OffersError('invalid', `Erreur du serveur [${rpcError.code}] : ${(rpcError.message ?? '').slice(0, 160)}`);
   }
   const textValue = typeof raw === 'string' ? raw : '';
   if (textValue === 'forbidden') return new OffersError('forbidden', FORBIDDEN);

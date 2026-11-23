@@ -16,7 +16,7 @@ import ProfileButton from '../ProfileButton';
 
 import { formatRating } from '../../lib/formatRating';
 import dataset from '../../constants/dataset.json';
-import { supabase } from '../../lib/supabase';
+import { catalogStore } from '../../lib/catalogStore';
 import { onAppEvent } from '../../lib/appEvents';
 import { searchIndex } from '../../lib/searchIndex';
 import { getOptimizedImageUrl } from '../../lib/imageOptimizer';
@@ -69,8 +69,9 @@ export default function SearchView({
   useEffect(() => {
     const fetchLatestSpots = async () => {
       try {
-        const { data, error } = await supabase.from('addresses').select('*').order('created_at', { ascending: false });
-        if (!error && data && data.length > 0) {
+        // Même catalogue que l'accueil (chargeur commun) : plus de second téléchargement complet
+        const { rows: data } = await catalogStore.load();
+        if (data && data.length > 0) {
           setAllSpots(data);
           searchIndex.updateSpots(data);
         }

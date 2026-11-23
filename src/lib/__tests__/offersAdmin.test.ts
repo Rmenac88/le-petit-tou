@@ -44,6 +44,16 @@ test('erreurs : refus de code, validation traduite, réseau coupé, migration pa
   assert.equal(offersErrorFrom(undefined).kind, 'network');
 });
 
+test('diagnostic : le message donne le code du serveur, et une erreur SQL n’est pas présentée comme une coupure réseau', async () => {
+  await assert.rejects(adminListOffers(client({ data: null, error: { code: 'PGRST202', message: 'Could not find the function public.admin_list_offers' } }), 'c'),
+    (e: OffersError) => /PGRST202/.test(e.message));
+  await assert.rejects(adminSaveOffer(client({ data: null, error: { code: '42703', message: 'column "sort_order" does not exist' } }), 'c', { title: 'T', discount_value: 'v' }),
+    (e: OffersError) => e.kind === 'invalid' && /42703/.test(e.message) && !/Connexion/.test(e.message));
+  // une vraie coupure réseau garde le message habituel
+  await assert.rejects(adminListOffers(client({ data: null, error: { message: 'TypeError: Network request failed' } }), 'c'),
+    (e: OffersError) => e.kind === 'network' && /Connexion/.test(e.message));
+});
+
 test('suppression : renvoie le nombre d\'offres retirées', async () => {
   const calls: any[] = [];
   assert.equal(await adminDeleteOffer(client({ data: { ok: true, deleted: 1 }, error: null }, calls), 'c', 'id-1'), 1);

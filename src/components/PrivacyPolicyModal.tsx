@@ -178,7 +178,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
                   <Text style={styles.sectionTitle}>4. Destinataires et sécurité</Text>
                 </View>
                 <Text style={styles.bulletPoint}>
-                  • <Text style={styles.boldText}>Supabase Inc. :</Text> hébergement de la base de données (sous-traitant). Échanges chiffrés (HTTPS) ; accès aux données de chaque utilisateur limité par des fonctions serveur.
+                  • <Text style={styles.boldText}>Supabase (Supabase Pte. Ltd.) :</Text> hébergement de la base de données (sous-traitant). Échanges chiffrés (HTTPS) ; accès aux données de chaque utilisateur limité par des fonctions serveur.
                 </Text>
                 <Text style={styles.bulletPoint}>
                   • <Text style={styles.boldText}>Mapbox, Apple, Google :</Text> cartographie et itinéraires (voir section 2) ; Apple et Google acheminent aussi les notifications.
