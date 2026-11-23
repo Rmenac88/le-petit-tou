@@ -13,6 +13,7 @@ const baseline = readFileSync(new URL('baseline.sql', here), 'utf8');
 const m006 = readFileSync(new URL('../../src/scripts/006_security_lockdown.sql', here), 'utf8');
 const m007 = readFileSync(new URL('../../src/scripts/007_push_notifications.sql', here), 'utf8');
 const m010 = readFileSync(new URL('../../src/scripts/010_push_style.sql', here), 'utf8');
+const m026 = readFileSync(new URL('../../src/scripts/026_remove_push_cap.sql', here), 'utf8');
 
 const GOOD_CODE = 'Code-De-Test-Synthetique-01';
 const DEV_A = '11111111-1111-4111-8111-111111111111';
@@ -196,6 +197,24 @@ describe('distribution : destinataires, délai, heures calmes, plafond', () => {
     await ageOutbox(db);
     await tick(db, DAY_PLUS_5);
     assert.equal((await rows(db, `select count(*)::int n from public.push_deliveries`))[0].n, 2);
+  });
+  test('026 : plus de plafond, toutes les notifications partent ; rejouable', async () => {
+    const db = await newDb();
+    await db.exec(m026);
+    await db.exec(m026);
+    await register(db, DEV_A, TOK_A);
+    for (const t of ['E1', 'E2', 'E3', 'E4', 'E5']) await addEvent(db, t);
+    await ageOutbox(db);
+    await tick(db, DAY_PLUS_5);
+    assert.equal((await rows(db, `select count(*)::int n from public.push_deliveries`))[0].n, 5);
+  });
+  test('026 : les heures calmes restent (rien entre 21 h et 8 h)', async () => {
+    const db = await newDb();
+    await db.exec(m026);
+    await register(db, DEV_A, TOK_A);
+    await addEvent(db, 'Soir');
+    await ageOutbox(db, '2026-07-01T22:00:00+02:00'); // une heure avant : seul le couvre-feu bloque
+    assert.equal((await tick(db, NIGHT)).fanout, 0);
   });
   test('plusieurs nouvelles adresses regroupées en un seul message (opt-in)', async () => {
     const db = await newDb();

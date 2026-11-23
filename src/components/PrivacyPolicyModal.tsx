@@ -164,7 +164,7 @@ export default function PrivacyPolicyModal({ visible, onClose }: PrivacyPolicyMo
                   <Text style={styles.sectionTitle}>3. Notifications, capteurs et traceurs</Text>
                 </View>
                 <Text style={styles.paragraph}>
-                  Les notifications sont désactivées par défaut. Si vous les activez (Accueil, « Notifications »), vous choisissez les types de messages ; nous en envoyons au plus 2 par jour, jamais entre 21 h et 8 h, sans donnée personnelle. Vous pouvez les arrêter à tout moment.
+                  Les notifications sont désactivées par défaut. Si vous les activez (Accueil, « Notifications »), vous choisissez les types de messages ; nous n'en envoyons jamais entre 21 h et 8 h, et jamais avec une donnée personnelle. Vous pouvez les arrêter à tout moment.
                 </Text>
                 <Text style={styles.paragraph}>
                   L'application n'utilise ni le microphone, ni le carnet d'adresses. L'accès aux photos n'est demandé que dans l'espace réservé à l'équipe du Petit Tou. Aucun cookie publicitaire, aucun outil de mesure d'audience et aucun SDK publicitaire n'est utilisé.
