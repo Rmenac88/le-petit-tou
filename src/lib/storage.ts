@@ -29,7 +29,8 @@ const nativeFiles: FileBackend = {
   async write(name, text) {
     const f = new File(dir(), name);
     if (!f.exists) f.create();
-    f.write(text);
+    // SDK 58 : File.write() est asynchrone ; on attend la fin de l'écriture avant de confirmer
+    await f.write(text);
   },
   async remove(name) {
     const f = new File(dir(), name);

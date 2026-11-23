@@ -13,6 +13,6 @@ Tous les skills sont installés dans `.agents/skills/` :
 - `writing-plans` : Spécification des architectures et plans de refactoring.
 
 ## Règles Projet Le Petit Tou
-- Expo SDK 57 / React Native 0.86 / React 19.
+- Expo SDK 58 / React Native 0.88 / React 19.3.
 - Respecter scrupuleusement la charte graphique décrite dans `DESIGN_SYSTEM.md` (tokens dans `src/constants/brand.ts`) : rose brique `#E84A5F`, rose poudré `#FDECEF`, jaune Chouchou `#F2B835`, anthracite `#1A1A22`, violet sidéral `#2B1D46`. Aucune couleur, taille de texte ou rayon en dur : importer les tokens.
 - Ne jamais casser la navigation, le dock flottant ni les gestes tactiles Apple Maps.

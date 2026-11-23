@@ -14,6 +14,7 @@ import {
   Modal,
   Animated,
 } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -327,7 +328,7 @@ export default function AdminPortalModal({ visible, adminCode, onClose, onLogout
   const [showPartnerAddressDropdown, setShowPartnerAddressDropdown] = useState(false);
   const [isSubmittingPartner, setIsSubmittingPartner] = useState(false);
   const [editingPartnerId, setEditingPartnerId] = useState<string | null>(null);
-  const partnersScrollRef = useRef<ScrollView>(null);
+  const partnersScrollRef = useRef<ScrollViewInstance>(null);
 
   // Deletion Confirmation Modal State
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<{

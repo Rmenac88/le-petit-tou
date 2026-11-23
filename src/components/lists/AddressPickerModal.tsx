@@ -85,7 +85,7 @@ export default function AddressPickerModal({ list, addresses, onClose }: Props) 
           contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           ListHeaderComponent={
-            results.length > 0 && !searching ? <Text style={styles.hint}>Suggestions · tape un nom pour chercher dans tout le guide</Text> : null
+            results.length > 0 && !searching ? <Text style={styles.hint}>Suggestions · tape un nom pour chercher dans tout le guide</Text> : undefined
           }
           ListEmptyComponent={
             <View style={styles.empty}>

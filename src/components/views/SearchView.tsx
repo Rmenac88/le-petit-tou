@@ -8,6 +8,7 @@ import {
   Pressable,
   Platform,
 } from 'react-native';
+import type { TextInputInstance } from 'react-native';
 import { Image } from 'expo-image';
 import { X, Search, TrendingUp, MapPin, Star, Utensils, Wine, CakeSlice, ShoppingBag, Scissors, Landmark, Dumbbell, Sun, Leaf } from 'lucide-react-native';
 import AddressDetailModal, { SpotDetail } from '../AddressDetailModal';
@@ -63,7 +64,7 @@ export default function SearchView({
   useEffect(() => {
     onToggleDock?.(!selectedSpotDetail);
   }, [selectedSpotDetail, onToggleDock]);
-  const searchInputRef = useRef<TextInput>(null);
+  const searchInputRef = useRef<TextInputInstance>(null);
 
   // Sync latest addresses dynamically from Supabase & Listen to changes
   useEffect(() => {

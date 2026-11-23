@@ -22,6 +22,7 @@ import {
   Linking,
   Modal,
 } from 'react-native';
+import type { TextInputInstance } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from './home/homeStyles';
@@ -432,7 +433,7 @@ export default function HomeView({
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [likesMap, setLikesMap] = useState<Record<string, number>>({});
-  const searchInputRef = useRef<TextInput>(null);
+  const searchInputRef = useRef<TextInputInstance>(null);
   
   // Smooth Brutalist Search focus and animation states
   const [isSearchFocused, setIsSearchFocused] = useState(false);

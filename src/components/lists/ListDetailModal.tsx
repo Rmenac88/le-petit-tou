@@ -92,7 +92,7 @@ export default function ListDetailModal({ list, addresses, onClose, onOpenSpot, 
                 <Plus size={18} color={Brand.white} strokeWidth={2.6} />
                 <Text style={styles.addBtnText}>Ajouter une adresse</Text>
               </Pressable>
-            ) : null
+            ) : undefined
           }
           ListEmptyComponent={
             <View style={styles.empty}>

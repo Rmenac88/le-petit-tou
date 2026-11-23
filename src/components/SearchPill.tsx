@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, Pressable, StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, View, type StyleProp, type TextInputInstance, type ViewStyle } from 'react-native';
 import { Search, SlidersHorizontal, X } from 'lucide-react-native';
 
 import { Brand } from '../constants/brand';
@@ -15,7 +15,7 @@ interface Props {
   /** Bouton « filtres » à droite ; absent : pas de bouton. */
   onOpenFilters?: () => void;
   filtersActive?: boolean;
-  inputRef?: React.Ref<TextInput>;
+  inputRef?: React.Ref<TextInputInstance>;
   /** Positionnement (la carte la pose en surimpression ; l'accueil la place dans le flux). */
   style?: StyleProp<ViewStyle>;
 }

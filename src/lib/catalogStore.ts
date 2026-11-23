@@ -44,7 +44,8 @@ async function writeCache(entry: CachedCatalog): Promise<void> {
   if (!f) return;
   try {
     if (!f.exists) f.create();
-    f.write(text);
+    // SDK 58 : File.write() est asynchrone
+    await f.write(text);
   } catch {}
 }
 

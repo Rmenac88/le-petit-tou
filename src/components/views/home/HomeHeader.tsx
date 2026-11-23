@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable, Image, StyleSheet } from 'react-native';
+import type { TextInputInstance } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import Stars from '../../Stars';
@@ -42,7 +43,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   onOpenFilters,
   onOpenProfile,
 }) => {
-  const searchInputRef = useRef<TextInput>(null);
+  const searchInputRef = useRef<TextInputInstance>(null);
   const searchPlaceholder = totalSpots && totalSpots > 0 ? `Rechercher (${totalSpots} adresses)...` : 'Rechercher une adresse...';
   // Le fond personnalisé ne remplace Galaxy qu'une fois chargé ; en cas d'échec, Galaxy reste affiché
   const [bgLoaded, setBgLoaded] = useState(false);
