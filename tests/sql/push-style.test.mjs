@@ -12,6 +12,7 @@ const baseline = read('baseline.sql');
 const m006 = read('../../src/scripts/006_security_lockdown.sql');
 const m007 = read('../../src/scripts/007_push_notifications.sql');
 const m010 = read('../../src/scripts/010_push_style.sql');
+const m027 = read('../../src/scripts/027_push_full_alerts.sql');
 
 const GOOD_CODE = 'Code-De-Test-Synthetique-01';
 const DEV = {
@@ -231,5 +232,20 @@ describe('cas limites', () => {
     assert.equal((await s('new_spot')).channel, 'lpt-new-spots');
     assert.equal((await s('announcement')).channel, 'lpt-announcements');
     assert.equal((await s('autre')).channel, 'lpt-announcements');
+  });
+  test('027 : tous les types en priorité haute, mode actif, canaux Android d’importance haute ; style non appelable', async () => {
+    const db = await newDb();
+    await db.exec(m027);
+    await db.exec(m027);
+    const s = async (k) => (await one(db, `select public._push_style($1) s`, [k])).s;
+    const expected = { event: 'lpt-evenements', agenda: 'lpt-rendez-vous', new_spot: 'lpt-adresses', announcement: 'lpt-announcements' };
+    for (const [kind, channel] of Object.entries(expected)) {
+      const st = await s(kind);
+      assert.equal(st.channel, channel, kind);
+      assert.equal(st.priority, 'high', kind);
+      assert.equal(st.level, 'active', kind);
+    }
+    assert.equal((await s('event')).subtitle, 'Événements de l’association'.replace('’', "'"));
+    await assert.rejects(as(db, 'anon', `select public._push_style('event')`), /permission denied/);
   });
 });

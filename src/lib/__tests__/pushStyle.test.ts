@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import {
   NOTIFICATION_ACCENT,
+  LEGACY_NOTIFICATION_CHANNELS,
   NOTIFICATION_CHANNELS,
   NOTIFICATION_CHANNEL_GROUP,
   isMissingFunctionError,
@@ -11,12 +12,22 @@ import {
 const root = new URL('../../../', import.meta.url);
 const read = (p: string) => readFileSync(new URL(p, root), 'utf8');
 
-test('les canaux Android de l’appli correspondent exactement à ceux envoyés par le serveur (migration 010)', () => {
-  const sql = read('src/scripts/010_push_style.sql');
+test('les canaux Android de l’appli correspondent exactement à ceux envoyés par le serveur (migration 027)', () => {
+  const sql = read('src/scripts/027_push_full_alerts.sql');
   const fromSql = [...sql.matchAll(/'channel', '([a-z-]+)'/g)].map((m) => m[1]).sort();
   const fromApp = NOTIFICATION_CHANNELS.map((c) => c.id).filter((id) => id !== 'default').sort();
   assert.deepEqual(fromApp, fromSql, 'un canal envoyé par le serveur doit exister dans l’appli, sinon la notification est perdue');
   assert.ok(NOTIFICATION_CHANNELS.some((c) => c.id === 'default'), 'le canal « default » sert aux anciens messages');
+});
+
+test('027 : tous les types en importance haute (son et bandeau), priorité haute et mode actif côté serveur', () => {
+  for (const c of NOTIFICATION_CHANNELS.filter((x) => x.id !== 'default')) assert.equal(c.importance, 'high', c.id);
+  const sql = read('src/scripts/027_push_full_alerts.sql');
+  assert.doesNotMatch(sql, /'priority', 'default'/);
+  assert.doesNotMatch(sql, /'level', 'passive'/);
+  // un canal existant ne change jamais d'importance : les anciens identifiants ne sont pas réutilisés, ils sont supprimés
+  for (const old of LEGACY_NOTIFICATION_CHANNELS) assert.ok(!NOTIFICATION_CHANNELS.some((c) => c.id === old), old);
+  assert.match(read('src/lib/pushNotifications.ts'), /deleteNotificationChannelAsync\(id\)/);
 });
 
 test('canaux : identifiants uniques, noms et descriptions renseignés, importance connue', () => {

@@ -11,6 +11,7 @@ import {
   DEFAULT_PUSH_PREFERENCES,
   ENABLE_FAILURE_MESSAGES,
   NOTIFICATION_ACCENT,
+  LEGACY_NOTIFICATION_CHANNELS,
   NOTIFICATION_CHANNELS,
   NOTIFICATION_CHANNEL_GROUP,
   isMissingFunctionError,
@@ -48,6 +49,10 @@ function ensureChannels(): Promise<boolean> {
         await Notifications.setNotificationChannelGroupAsync(NOTIFICATION_CHANNEL_GROUP.id, {
           name: NOTIFICATION_CHANNEL_GROUP.name,
         });
+        // Anciens canaux sans bandeau : retirés, pour ne pas apparaître en double dans les réglages du téléphone
+        for (const id of LEGACY_NOTIFICATION_CHANNELS) {
+          await Notifications.deleteNotificationChannelAsync(id).catch(() => {});
+        }
         for (const c of NOTIFICATION_CHANNELS) {
           await Notifications.setNotificationChannelAsync(c.id, {
             name: c.name,

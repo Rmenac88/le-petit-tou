@@ -10,7 +10,7 @@ export const NOTIFICATION_ACCENT = '#E84A5F';
 export const NOTIFICATION_CHANNEL_GROUP = { id: 'lpt', name: 'Le Petit Tou' } as const;
 
 export interface NotificationChannelSpec {
-  /** Identifiant Android : DOIT correspondre à public._push_style() dans la migration 010 (un test le vérifie). */
+  /** Identifiant Android : DOIT correspondre à public._push_style() (migration 027, un test le vérifie). */
   id: string;
   name: string;
   description: string;
@@ -20,14 +20,19 @@ export interface NotificationChannelSpec {
 /**
  * Canaux Android (visibles dans les réglages du téléphone, un par type de message). Une fois créé, un canal ne
  * peut plus changer d'importance : ces valeurs sont donc définitives. « default » reçoit les anciens messages.
+ * Tous les types sont en importance haute (son, vibration ET bandeau) depuis la migration 027 : d'où de nouveaux
+ * identifiants, les anciens canaux d'importance normale étant supprimés (LEGACY_NOTIFICATION_CHANNELS).
  */
 export const NOTIFICATION_CHANNELS: readonly NotificationChannelSpec[] = [
   { id: 'default', name: 'Le Petit Tou', description: 'Messages du Petit Tou.', importance: 'default' },
-  { id: 'lpt-events', name: 'Événements', description: 'Un nouvel événement de l’association est publié.', importance: 'default' },
-  { id: 'lpt-agenda', name: 'Agenda des partenaires', description: 'Une nouvelle date est ajoutée à l’agenda.', importance: 'default' },
-  { id: 'lpt-new-spots', name: 'Nouvelles adresses', description: 'Des adresses viennent d’arriver dans le guide.', importance: 'default' },
+  { id: 'lpt-evenements', name: 'Événements', description: 'Un nouvel événement de l’association est publié.', importance: 'high' },
+  { id: 'lpt-rendez-vous', name: 'Agenda des partenaires', description: 'Une nouvelle date est ajoutée à l’agenda.', importance: 'high' },
+  { id: 'lpt-adresses', name: 'Nouvelles adresses', description: 'Des adresses viennent d’arriver dans le guide.', importance: 'high' },
   { id: 'lpt-announcements', name: 'Annonces', description: 'Les messages importants du Petit Tou.', importance: 'high' },
 ];
+
+/** Anciens canaux d'importance normale (sans bandeau), retirés du téléphone au démarrage. */
+export const LEGACY_NOTIFICATION_CHANNELS: readonly string[] = ['lpt-events', 'lpt-agenda', 'lpt-new-spots'];
 
 export interface PushPreferences {
   notify_events: boolean;
