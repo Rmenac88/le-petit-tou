@@ -285,8 +285,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Pas de flex: 1 ici : la feuille n'a qu'une hauteur maximale, et sur Android la liste s'écrasait à 0 pixel
+  // (texte invisible, seul « J'ai compris » restait). flexShrink : la liste prend la hauteur du texte, dans la limite.
   bodyScroll: {
-    flex: 1,
+    flexShrink: 1,
   },
   bodyContent: {
     paddingHorizontal: 22,
