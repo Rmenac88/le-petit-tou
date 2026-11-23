@@ -10,7 +10,7 @@
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "fr.lepetittou.app",
-      "supportsTablet": true,
+      "supportsTablet": false,
       "requireFullScreen": true,
       "infoPlist": {
         "CFBundleDisplayName": "Le Petit Tou",

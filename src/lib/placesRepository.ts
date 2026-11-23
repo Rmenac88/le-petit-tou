@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { appCache } from './dataCache';
 import dataset from '../constants/dataset.json';
 import { classifySpot, getBudgetInfo } from './categoryResolver';
+import { pointsFor } from './pointsLogic';
 
 const TOULOUSE_LAT = 43.6047;
 const TOULOUSE_LNG = 1.4442;
@@ -133,7 +134,7 @@ class PlacesRepository {
       hours: addr.horaires || '',
       tags: addr.tags || [],
       breadcrumbs: addr.breadcrumbs || [],
-      points_reward: addr.is_recommended ? 25 : (addr.rating >= 4.8 ? 20 : 10),
+      points_reward: pointsFor(addr),
       is_recommended: !!addr.is_recommended,
       is_new: !!addr.is_new,
       likes_count: Number(addr.likes_count) || 0,
@@ -205,7 +206,7 @@ class PlacesRepository {
             rating: Number(addr.rating) || 4.8,
             price_level: '€€',
             budget_label: '€€',
-            points_reward: Number(addr.points_reward) || (addr.is_recommended ? 25 : 10),
+            points_reward: pointsFor(addr),
             is_recommended: !!addr.is_recommended,
             is_new: !!addr.is_new,
             image_url: addr.image_url,
@@ -261,7 +262,7 @@ class PlacesRepository {
         hours: local.horaires || '',
         tags: local.tags || [],
         breadcrumbs: local.breadcrumbs || [],
-        points_reward: local.is_recommended ? 25 : (local.rating >= 4.8 ? 20 : 10),
+        points_reward: pointsFor(local),
         is_recommended: !!local.is_recommended,
         is_new: !!local.is_new,
       };
@@ -303,7 +304,7 @@ class PlacesRepository {
           hours: data.horaires || detail?.hours || '',
           tags: data.tags || detail?.tags || [],
           breadcrumbs: data.breadcrumbs || detail?.breadcrumbs || [],
-          points_reward: Number(data.points_reward) || detail?.points_reward || 10,
+          points_reward: pointsFor(data),
           is_recommended: !!data.is_recommended,
           is_new: !!data.is_new,
           likes_count: Number(data.likes_count) || 0,

@@ -34,6 +34,7 @@ import {
 } from 'lucide-react-native';
 import { getOptimizedImageUrl } from '../lib/imageOptimizer';
 import { discoveryStore } from '../lib/discoveryStore';
+import { pointsFor } from '../lib/pointsLogic';
 
 import { formatRating } from '../lib/formatRating';
 import { Brand } from '../constants/brand';
@@ -47,6 +48,7 @@ const { width, height } = Dimensions.get('window');
 export interface SpotDetail {
   id: string;
   title: string;
+  points_reward?: number | null;
   is_recommended?: boolean;
   is_new?: boolean;
   category?: string;
@@ -125,7 +127,7 @@ export default function AddressDetailModal({
     if (isDiscovered || isDiscovering || !spot?.id) return;
     setIsDiscovering(true);
     try {
-      await discoveryStore.discoverSpot(spot.id, !!spot.is_recommended);
+      await discoveryStore.discoverSpot(spot.id, !!spot.is_recommended, spot.rating ?? null, spot.points_reward ?? null);
       setIsDiscovered(true);
     } finally {
       setIsDiscovering(false);
@@ -357,7 +359,7 @@ export default function AddressDetailModal({
               <View style={[styles.discoveryPtsBadge, isDiscovered && styles.discoveryPtsBadgeDiscovered]}>
                 {isDiscovered && <Check size={14} color="#065F46" strokeWidth={2} />}
                 <Text style={[styles.discoveryPtsText, isDiscovered && styles.discoveryPtsTextDiscovered]}>
-                  {isDiscovered ? 'Validé' : spot.is_recommended ? '+25 pts' : '+10 pts'}
+                  {isDiscovered ? 'Validé' : `+${pointsFor(spot)} pts`}
                 </Text>
               </View>
             </Pressable>

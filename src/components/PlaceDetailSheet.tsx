@@ -34,6 +34,7 @@ import {
 } from 'lucide-react-native';
 import { getOptimizedImageUrl } from '../lib/imageOptimizer';
 import { discoveryStore } from '../lib/discoveryStore';
+import { pointsFor } from '../lib/pointsLogic';
 
 import { Brand } from '../constants/brand';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -44,6 +45,7 @@ const EXPANDED_HEIGHT = Math.min(SCREEN_HEIGHT * 0.82, 700);
 export interface PlaceDetailSheetSpot {
   id: string;
   title: string;
+  points_reward?: number | null;
   name?: string;
   category?: string;
   cat?: string;
@@ -150,7 +152,7 @@ export default function PlaceDetailSheet({
     setIsDiscovering(true);
     triggerHaptic();
     try {
-      await discoveryStore.discoverSpot(spot.id, !!spot.is_recommended);
+      await discoveryStore.discoverSpot(spot.id, !!spot.is_recommended, spot.rating ?? null, spot.points_reward ?? null);
       setIsDiscovered(true);
     } finally {
       setIsDiscovering(false);
@@ -251,7 +253,7 @@ export default function PlaceDetailSheet({
             ) : (
               <View style={styles.pointsBadge}>
                 <Text style={styles.pointsBadgeText}>
-                  {spot.is_recommended ? '+25 pts' : '+10 pts'}
+                  {`+${pointsFor(spot)} pts`}
                 </Text>
               </View>
             )}
@@ -384,7 +386,7 @@ export default function PlaceDetailSheet({
               ]}
             >
               <Text style={styles.pointsTagText}>
-                {isDiscovered ? 'Validé' : spot.is_recommended ? '+25 pts' : '+10 pts'}
+                {isDiscovered ? 'Validé' : `+${pointsFor(spot)} pts`}
               </Text>
             </View>
           </Pressable>

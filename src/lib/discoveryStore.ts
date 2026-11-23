@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { appStorage } from './storage';
 import { authService } from './authService';
+import { pointsFor } from './pointsLogic';
 import dataset from '../constants/dataset.json';
 
 const TOTAL_PLACES_COUNT = dataset.addresses ? dataset.addresses.length : 790;
@@ -148,7 +149,8 @@ class DiscoveryStore {
   public async discoverSpot(
     spotId: string,
     isRecommended: boolean = false,
-    rating: number = 4.8
+    rating: number | null = null,
+    pointsReward: number | null = null
   ): Promise<{ success: boolean; pointsAwarded: number; isFirstTime: boolean }> {
     const pId = String(spotId);
 
@@ -161,11 +163,8 @@ class DiscoveryStore {
       };
     }
 
-    // Barème de points officiel :
-    // - Coup de cœur Le Petit Tou = 25 pts
-    // - Top note (>= 4.8) = 20 pts
-    // - Standard = 10 pts
-    const points = isRecommended ? 25 : (rating >= 4.8 ? 20 : 10);
+    // Barème officiel : le même que le serveur (pointsLogic.ts)
+    const points = pointsFor({ is_recommended: isRecommended, rating, points_reward: pointsReward });
 
     // MISE À JOUR OPTIMISTE IMMÉDIATE (0 ms)
     this.discoveredIds.add(pId);

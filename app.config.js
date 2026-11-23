@@ -22,11 +22,17 @@ module.exports = ({ config }) => {
   }
 
   // Notifications iOS : entitlement « production » pour les builds destinés aux stores
-  const plugins = (config.plugins || []).map((plugin) =>
-    Array.isArray(plugin) && plugin[0] === 'expo-notifications'
-      ? [plugin[0], { ...plugin[1], mode: isProduction ? 'production' : 'development' }]
-      : plugin
-  );
+  // Photos : seul le portail admin en ajoute. Sans portail (builds des boutiques), aucune permission photos n'est
+  // déclarée, pour ne pas montrer à Apple et Google une autorisation qu'aucun écran public n'utilise.
+  const withAdmin = process.env.EXPO_PUBLIC_ENABLE_ADMIN === '1';
+  const pluginName = (plugin) => (Array.isArray(plugin) ? plugin[0] : plugin);
+  const plugins = (config.plugins || [])
+    .filter((plugin) => withAdmin || pluginName(plugin) !== 'expo-image-picker')
+    .map((plugin) =>
+      Array.isArray(plugin) && plugin[0] === 'expo-notifications'
+        ? [plugin[0], { ...plugin[1], mode: isProduction ? 'production' : 'development' }]
+        : plugin
+    );
 
   return {
     ...config,

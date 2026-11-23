@@ -14,7 +14,8 @@ with allowed(fn) as (values
   ('get_my_lists'), ('save_my_lists'),
   ('admin_read'),
   ('admin_set_tourism_banner'),
-  ('catalog_version')
+  ('catalog_version'),
+  ('get_my_likes')
 ),
 exposed as (
   select p.proname as fn, r.rolname as role

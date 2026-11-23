@@ -116,6 +116,7 @@ import { getCategoryIcon } from '../../lib/categoryIcons';
 import {
   loadDeviceLikedSpotIds,
   fetchGlobalLikesMap,
+  syncDeviceLikes,
   toggleSpotLike,
 } from '../../lib/likesStore';
 import { discoveryStore, DiscoveryStats } from '../../lib/discoveryStore';
@@ -907,6 +908,10 @@ export default function HomeView({
   useEffect(() => {
     loadSupabaseData();
     loadDeviceLikedSpotIds().then(setFavorites);
+    // Puis : likes en attente renvoyés et relecture depuis le serveur (un like perdu sur le téléphone revient)
+    syncDeviceLikes().then((ids) => {
+      if (ids) setFavorites(ids);
+    });
     fetchGlobalLikesMap().then(setLikesMap);
     
     // Listen to real-time changes from Admin Portal

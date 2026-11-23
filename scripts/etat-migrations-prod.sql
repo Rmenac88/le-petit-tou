@@ -18,6 +18,8 @@ select
   to_regprocedure('public.admin_set_tourism_banner(text,text)') is not null               as m020_banniere_tourisme,
   exists (select 1 from pg_constraint where conname = 'push_devices_token_length')        as m021_durcissement,
   to_regprocedure('public.catalog_version()') is not null                                 as m022_empreinte_catalogue,
+  to_regprocedure('public.get_my_likes(text)') is not null                                as m023_likes_limites_journal,
+  coalesce((select 'security_invoker=true' = any(reloptions) from pg_class where oid = to_regclass('public.sponsored_partners_public')), false) as m024_vue_partenaires,
   (select count(*) from public.discount_cards
     where id::text like 'a1111111%' or id::text like 'a2222222%' or id::text like 'a3333333%'
        or id::text like 'a4444444%' or id::text like 'a5555555%')                          as offres_demo_restantes;
